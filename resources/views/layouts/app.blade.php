@@ -102,6 +102,16 @@
             box-shadow: 0 24px 70px rgba(0, 0, 0, .35), 0 0 26px rgba(220, 38, 38, .16);
         }
 
+        .with-breadcrumb>section:first-child {
+            padding-top: 11.5rem !important;
+        }
+
+        @media (min-width: 1024px) {
+            .with-breadcrumb>section:first-child {
+                padding-top: 9.5rem !important;
+            }
+        }
+
         .infinite-track {
             width: max-content;
             animation: ticker-scroll 32s linear infinite;
@@ -161,7 +171,9 @@
     x-data="bookMyMovieUi({{ $initialCartCount ?? 0 }}, {{ $initialWishlistCount ?? 0 }})" x-init="init()">
     <x-navbar :movies="$navMovies ?? ($movies ?? [])" />
 
-    <main>
+    <x-breadcrumbs />
+
+    <main class="{{ request()->routeIs('home') ? '' : 'with-breadcrumb' }}">
         @if(session('status'))
             <div class="fixed right-4 top-24 z-50 rounded-lg border border-green-500/30 bg-green-950 px-5 py-3 text-sm font-bold text-green-100 shadow-2xl shadow-black/40">
                 {{ session('status') }}

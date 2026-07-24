@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ContactMessage;
 use App\Models\Faq;
 use App\Models\Movie;
+use App\Support\FormSecurity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,10 +66,12 @@ class PublicController extends Controller
 
     public function submitContact(Request $request): RedirectResponse
     {
+        FormSecurity::validateRecaptcha($request, 'contact');
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:150'],
-            'message' => ['required', 'string', 'max:5000'],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', FormSecurity::disposableEmailRule()],
+            'message' => ['required', 'string', 'min:20', 'max:1200'],
         ]);
 
         ContactMessage::create([

@@ -128,6 +128,8 @@
 
 <body class="min-h-screen bg-ink font-sans text-gray-100 antialiased selection:bg-red-600 selection:text-white">
     <main class="auth-orbit min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+        <x-breadcrumbs auth="true" />
+
         <section
             class="auth-shell mx-auto grid min-h-[calc(100vh-3rem)] w-full max-w-6xl overflow-hidden rounded-lg border border-white/10 bg-gray-950/80 shadow-2xl shadow-black/50 lg:grid-cols-[.95fr_1.05fr]">
             <aside class="relative hidden min-h-full border-r border-white/10 bg-black/20 p-8 lg:flex lg:flex-col">
@@ -235,6 +237,7 @@
             };
         }
     </script>
+    @stack('scripts')
 </body>
 
 </html>

@@ -42,7 +42,8 @@
 
         <label class="block">
             <span class="text-sm font-bold text-gray-200">Full name</span>
-            <input name="name" value="{{ old('name') }}" autocomplete="name" placeholder="Your Name"
+            <input name="name" value="{{ old('name') }}" autocomplete="name" required minlength="3" maxlength="100"
+                placeholder="Syed Ahmer Shah"
                 class="auth-field mt-2 w-full rounded-md border-white/10 bg-gray-900/80 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-400 focus:ring-red-400">
         </label>
         @error('name')
@@ -51,8 +52,8 @@
 
         <label class="block">
             <span class="text-sm font-bold text-gray-200">Email address</span>
-            <input name="email" type="email" value="{{ old('email') }}" autocomplete="email"
-                placeholder="you@example.com"
+            <input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required minlength="6"
+                maxlength="150" placeholder="name@example.com"
                 class="auth-field mt-2 w-full rounded-md border-white/10 bg-gray-900/80 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-400 focus:ring-red-400">
         </label>
         @error('email')
@@ -61,8 +62,8 @@
 
         <label class="block">
             <span class="text-sm font-bold text-gray-200">Phone number</span>
-            <input name="phone" type="tel" value="{{ old('phone') }}" autocomplete="tel"
-                placeholder="+92 300 1234567"
+            <input name="phone" type="tel" value="{{ old('phone') }}" autocomplete="tel" minlength="10"
+                maxlength="20" pattern="[0-9+\-\s()]{10,20}" placeholder="+92 300 1234567"
                 class="auth-field mt-2 w-full rounded-md border-white/10 bg-gray-900/80 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-400 focus:ring-red-400">
         </label>
         @error('phone')
@@ -74,7 +75,8 @@
             <span
                 class="auth-field mt-2 flex rounded-md border border-white/10 bg-gray-900/80 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-400">
                 <input name="password" x-model="password" :type="showPassword ? 'text' : 'password'"
-                    autocomplete="new-password" placeholder="Create a strong password"
+                    autocomplete="new-password" required minlength="8" maxlength="72"
+                    placeholder="8+ characters with a number and symbol"
                     class="w-full border-0 bg-transparent px-4 py-3 text-white placeholder:text-gray-500 focus:ring-0">
                 <button type="button" @click="showPassword = !showPassword"
                     :aria-label="showPassword ? 'Hide password' : 'Show password'"
@@ -126,7 +128,7 @@
             <span
                 class="auth-field mt-2 flex rounded-md border border-white/10 bg-gray-900/80 focus-within:border-red-400 focus-within:ring-1 focus-within:ring-red-400">
                 <input name="password_confirmation" :type="showConfirmation ? 'text' : 'password'"
-                    autocomplete="new-password" placeholder="Repeat your password"
+                    autocomplete="new-password" required minlength="8" maxlength="72" placeholder="Repeat your password"
                     class="w-full border-0 bg-transparent px-4 py-3 text-white placeholder:text-gray-500 focus:ring-0">
                 <button type="button" @click="showConfirmation = !showConfirmation"
                     :aria-label="showConfirmation ? 'Hide password confirmation' : 'Show password confirmation'"
@@ -149,6 +151,8 @@
         @error('password_confirmation')
             <p class="-mt-3 text-sm font-semibold text-red-300">{{ $message }}</p>
         @enderror
+
+        <x-recaptcha action="user_register" />
 
         <button
             class="auth-glass w-full rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-950/30 transition hover:-translate-y-0.5 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400">

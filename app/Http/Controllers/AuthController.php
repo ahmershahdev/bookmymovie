@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\User;
+use App\Support\FormSecurity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,9 +22,11 @@ class AuthController extends Controller
 
     public function userLogin(Request $request): RedirectResponse
     {
+        FormSecurity::validateRecaptcha($request, 'user_login');
+
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', FormSecurity::disposableEmailRule()],
+            'password' => ['required', 'string', 'min:8', 'max:72'],
         ]);
 
         if (Auth::attempt([...$credentials, 'is_blocked' => false], $request->boolean('remember'))) {
@@ -42,11 +45,13 @@ class AuthController extends Controller
 
     public function userRegister(Request $request): RedirectResponse
     {
+        FormSecurity::validateRecaptcha($request, 'user_register');
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'unique:users,email', FormSecurity::disposableEmailRule()],
+            'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', 'unique:users,phone'],
+            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
         ]);
 
         unset($data['password_confirmation']);
@@ -157,7 +162,11 @@ class AuthController extends Controller
 
     public function sendResetLink(Request $request): RedirectResponse
     {
-        $data = $request->validate(['email' => ['required', 'email', 'exists:users,email']]);
+        FormSecurity::validateRecaptcha($request, 'forgot_password');
+
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
+        ]);
         $token = Str::random(64);
 
         DB::table('password_reset_tokens')->updateOrInsert(
@@ -177,9 +186,11 @@ class AuthController extends Controller
 
     public function resetPassword(Request $request, string $token): RedirectResponse
     {
+        FormSecurity::validateRecaptcha($request, 'reset_password');
+
         $data = $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
+            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
         ]);
 
         $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();

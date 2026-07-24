@@ -40,6 +40,14 @@ return [
         'redirect' => env('FACEBOOK_REDIRECT_URI'),
     ],
 
+    'recaptcha' => [
+        'v2_site_key' => env('RECAPTCHA_V2_SITE_KEY'),
+        'v2_secret_key' => env('RECAPTCHA_V2_SECRET_KEY'),
+        'v3_site_key' => env('RECAPTCHA_V3_SITE_KEY'),
+        'v3_secret_key' => env('RECAPTCHA_V3_SECRET_KEY'),
+        'v3_min_score' => env('RECAPTCHA_V3_MIN_SCORE', 0.5),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

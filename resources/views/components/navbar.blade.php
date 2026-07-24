@@ -4,7 +4,7 @@
     <nav class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8" aria-label="Primary">
         <a href="{{ route('home') }}"
             class="flex shrink-0 items-center gap-3 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400">
-            <img src="{{ asset('images/logo.png') }}" alt="BookMyMovie logo"
+            <img src="{{ asset('images/header-logo-3.png') }}" alt="BookMyMovie logo"
                 class="h-11 w-11 rounded-md object-cover ring-1 ring-red-500/30">
             <span class="hidden text-lg font-black tracking-normal sm:inline">
                 <span class="brand-gradient">BookMyMovie</span>

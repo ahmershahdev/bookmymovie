@@ -11,13 +11,15 @@
 
         <label class="block">
             <span class="text-sm font-bold text-gray-200">Email address</span>
-            <input name="email" type="email" value="{{ old('email') }}" autocomplete="email"
-                placeholder="you@example.com"
+            <input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required minlength="6"
+                maxlength="150" placeholder="name@example.com"
                 class="auth-field mt-2 w-full rounded-md border-white/10 bg-gray-900/80 px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-400 focus:ring-red-400">
         </label>
         @error('email')
             <p class="-mt-3 text-sm font-semibold text-red-300">{{ $message }}</p>
         @enderror
+
+        <x-recaptcha action="forgot_password" />
 
         <button
             class="auth-glass w-full rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-950/30 transition hover:-translate-y-0.5 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400">
