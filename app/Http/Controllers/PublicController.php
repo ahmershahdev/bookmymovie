@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ContactMessage;
+use App\Models\ContentPage;
 use App\Models\Faq;
 use App\Models\Movie;
 use App\Support\FormSecurity;
@@ -16,14 +17,15 @@ class PublicController extends Controller
     public function search(Request $request): View
     {
         $query = trim((string) $request->query('q', ''));
+        $likeQuery = addcslashes($query, '\\%_');
 
         $movies = Movie::query()
             ->with('genres')
-            ->when($query, function ($builder) use ($query) {
-                $builder->where(function ($builder) use ($query) {
-                    $builder->where('title', 'like', "%{$query}%")
-                        ->orWhere('language', 'like', "%{$query}%")
-                        ->orWhereHas('genres', fn ($genres) => $genres->where('name', 'like', "%{$query}%"));
+            ->when($query !== '', function ($builder) use ($likeQuery) {
+                $builder->where(function ($builder) use ($likeQuery) {
+                    $builder->where('title', 'like', "%{$likeQuery}%")
+                        ->orWhere('language', 'like', "%{$likeQuery}%")
+                        ->orWhereHas('genres', fn ($genres) => $genres->where('name', 'like', "%{$likeQuery}%"));
                 });
             })
             ->latest('release_date')
@@ -64,6 +66,31 @@ class PublicController extends Controller
         return view('public.contact');
     }
 
+    public function about(): View
+    {
+        return $this->contentPage('about');
+    }
+
+    public function terms(): View
+    {
+        return $this->contentPage('terms');
+    }
+
+    public function privacy(): View
+    {
+        return $this->contentPage('privacy');
+    }
+
+    public function refund(): View
+    {
+        return $this->contentPage('refund');
+    }
+
+    public function eticket(): View
+    {
+        return $this->contentPage('eticket-info');
+    }
+
     public function submitContact(Request $request): RedirectResponse
     {
         FormSecurity::validateRecaptcha($request, 'contact');
@@ -83,5 +110,15 @@ class PublicController extends Controller
         ]);
 
         return back()->with('status', 'Your message has been sent.');
+    }
+
+    private function contentPage(string $slug): View
+    {
+        $page = ContentPage::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        return view('public.page', compact('page'));
     }
 }

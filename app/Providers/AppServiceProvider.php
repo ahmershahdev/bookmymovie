@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Cart;
 use App\Models\Movie;
+use App\Models\SiteSetting;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -25,15 +27,22 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         View::composer('*', function ($view) {
-            $view->with('navMovies', Schema::hasTable('movies')
-                ? Movie::query()
-                    ->with('genres')
-                    ->whereIn('status', ['now_showing', 'coming_soon'])
-                    ->limit(8)
-                    ->get()
-                    ->map(fn (Movie $movie) => $movie->toCardArray())
-                    ->all()
-                : []);
+            try {
+                $view->with('siteSettings', Schema::hasTable('site_settings') ? SiteSetting::publicMap() : []);
+
+                $view->with('navMovies', Schema::hasTable('movies')
+                    ? Movie::query()
+                        ->with('genres')
+                        ->whereIn('status', ['now_showing', 'coming_soon'])
+                        ->limit(8)
+                        ->get()
+                        ->map(fn (Movie $movie) => $movie->toCardArray())
+                        ->all()
+                    : []);
+            } catch (QueryException) {
+                $view->with('siteSettings', []);
+                $view->with('navMovies', []);
+            }
 
             if (Auth::check()) {
                 $cart = Cart::query()

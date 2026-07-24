@@ -47,6 +47,15 @@
         if (request()->routeIs('movies.seats')) {
             $items[] = ['label' => 'Select Seats', 'url' => null];
         }
+    } elseif (request()->routeIs('movies.compare')) {
+        $items[] = ['label' => 'Movies', 'url' => route('movies.index')];
+        $items[] = ['label' => 'Compare Movies', 'url' => null];
+    } elseif (request()->routeIs('terms', 'privacy', 'refund')) {
+        $items[] = ['label' => 'Policies', 'url' => null];
+        $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
+    } elseif (request()->routeIs('faq', 'contact', 'eticket.info')) {
+        $items[] = ['label' => 'Help Center', 'url' => null];
+        $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
     } elseif (request()->routeIs(
         'user.dashboard',
         'user.bookings',
@@ -57,13 +66,17 @@
         'user.checkout',
         'user.profile'
     )) {
-        $items[] = ['label' => 'Account', 'url' => route('user.dashboard')];
-
-        if (! request()->routeIs('user.dashboard')) {
-            $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
-        }
+        $items[] = ['label' => 'Account', 'url' => null];
+        $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
+    } elseif (request()->routeIs('user.login', 'user.register', 'user.signup', 'password.request', 'password.reset')) {
+        $items[] = ['label' => 'Account Access', 'url' => null];
+        $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
+    } elseif (request()->routeIs('admin.login', 'admin.register')) {
+        $items[] = ['label' => 'Admin', 'url' => null];
+        $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last())->headline(), 'url' => null];
     } elseif (request()->routeIs('admin.dashboard')) {
-        $items[] = ['label' => 'Admin Dashboard', 'url' => null];
+        $items[] = ['label' => 'Admin', 'url' => null];
+        $items[] = ['label' => 'Dashboard', 'url' => null];
     } else {
         $items[] = ['label' => $titleMap[$routeName] ?? str($segments->last() ?: 'Page')->replace('-', ' ')->headline(), 'url' => null];
     }
@@ -72,15 +85,15 @@
 @unless(request()->routeIs('home'))
     <nav
         class="{{ $auth
-            ? 'mx-auto mb-4 w-full max-w-6xl'
-            : 'fixed inset-x-0 top-[8.25rem] z-40 border-y border-white/10 bg-gray-950/88 px-4 py-2 backdrop-blur-xl lg:top-[4.55rem]' }}"
+            ? 'mx-auto mb-4 flex w-full max-w-6xl'
+            : 'fixed inset-x-0 top-[8.25rem] z-40 px-4 py-2 lg:top-[4.55rem]' }}"
         aria-label="Breadcrumb">
         <ol
-            class="{{ $auth ? 'flex' : 'mx-auto flex max-w-7xl' }} items-center gap-2 overflow-x-auto whitespace-nowrap text-xs font-black uppercase tracking-[.12em] text-gray-400">
+            class="{{ $auth ? 'flex' : 'mx-auto flex w-max max-w-[calc(100vw-2rem)]' }} items-center gap-1.5 overflow-x-auto rounded-full border border-white/10 bg-gray-950/90 px-2 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-400 shadow-2xl shadow-black/40 backdrop-blur-xl">
             @foreach($items as $item)
-                <li class="flex items-center gap-2">
+                <li class="flex items-center gap-1.5">
                     @if(! $loop->first)
-                        <svg class="h-3.5 w-3.5 text-red-400/70" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg class="h-3.5 w-3.5 shrink-0 text-gold/80" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd"
                                 d="M7.21 14.77a.75.75 0 01.02-1.06L11.17 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
                                 clip-rule="evenodd" />
@@ -89,12 +102,16 @@
 
                     @if($item['url'] && ! $loop->last)
                         <a href="{{ $item['url'] }}"
-                            class="rounded-full border border-white/10 bg-white/[.04] px-3 py-1.5 text-gray-200 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-red-400/50 hover:bg-red-950/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400">
+                            class="inline-flex items-center rounded-full border border-white/10 bg-white/[.05] px-3.5 py-1.5 text-gray-200 shadow-sm shadow-black/20 transition hover:-translate-y-0.5 hover:border-red-400/50 hover:bg-red-950/35 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400">
                             {{ $item['label'] }}
                         </a>
-                    @else
-                        <span class="rounded-full border border-red-500/25 bg-red-950/30 px-3 py-1.5 text-red-100 shadow-lg shadow-red-950/20"
+                    @elseif($loop->last)
+                        <span class="inline-flex items-center rounded-full border border-gold/35 bg-gradient-to-r from-red-950/70 via-gray-900 to-gold/10 px-3.5 py-1.5 text-red-50 shadow-lg shadow-red-950/20"
                             aria-current="page">
+                            {{ $item['label'] }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center rounded-full border border-white/10 bg-black/25 px-3.5 py-1.5 text-gray-300">
                             {{ $item['label'] }}
                         </span>
                     @endif

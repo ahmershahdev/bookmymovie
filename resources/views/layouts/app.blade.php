@@ -5,26 +5,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'BookMyMovie')</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-                    },
-                    colors: {
-                        gold: '#d4af37',
-                        platinum: '#d7dce2',
-                        boxseat: '#7c3aed',
-                    },
-                },
-            },
-        };
-    </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
+    <title>@yield('title', $siteSettings['site_name'] ?? 'BookMyMovie')</title>
+    <meta name="csp-nonce" content="{{ $cspNonce ?? '' }}">
+    <link rel="icon" href="{{ asset('images/favicon/favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('images/site.webmanifest') }}">
+    <meta name="theme-color" content="#05070d">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script nonce="{{ $cspNonce ?? '' }}" defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style nonce="{{ $cspNonce ?? '' }}">
         html {
             scrollbar-width: thin;
             scrollbar-color: #dc2626 #05070d;
@@ -185,7 +176,7 @@
     <x-site-footer />
     <x-scroll-to-top />
 
-    <script>
+    <script nonce="{{ $cspNonce ?? '' }}">
         function bookMyMovieUi(initialCartCount = 0, initialWishlistCount = 0) {
             return {
                 cartCount: initialCartCount,

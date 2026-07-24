@@ -7,20 +7,38 @@ use App\Models\Movie;
 use App\Models\Show;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MovieController extends Controller
 {
     public function index(Request $request): View
     {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'genre' => ['nullable', 'string', 'max:120', 'exists:genres,slug'],
+            'language' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', Rule::in(['now_showing', 'coming_soon', 'ended'])],
+            'certificate' => ['nullable', Rule::in(['U', 'UA', 'A', 'S', 'G', 'PG', 'PG-13', 'R'])],
+        ]);
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        $searchLike = addcslashes($search, '\\%_');
+
         $movies = Movie::query()
             ->with('genres')
-            ->when($request->filled('genre'), function ($builder) use ($request) {
-                $builder->whereHas('genres', fn ($genres) => $genres->where('slug', $request->string('genre')));
+            ->when($search !== '', function ($builder) use ($searchLike) {
+                $builder->where(function ($builder) use ($searchLike) {
+                    $builder->where('title', 'like', "%{$searchLike}%")
+                        ->orWhere('description', 'like', "%{$searchLike}%");
+                });
             })
-            ->when($request->filled('language'), fn ($builder) => $builder->where('language', $request->string('language')))
-            ->when($request->filled('status'), fn ($builder) => $builder->where('status', $request->string('status')))
-            ->when($request->filled('certificate'), fn ($builder) => $builder->where('certificate_rating', $request->string('certificate')))
+            ->when(! empty($filters['genre']), function ($builder) use ($filters) {
+                $builder->whereHas('genres', fn ($genres) => $genres->where('slug', $filters['genre']));
+            })
+            ->when(! empty($filters['language']), fn ($builder) => $builder->where('language', $filters['language']))
+            ->when(! empty($filters['status']), fn ($builder) => $builder->where('status', $filters['status']))
+            ->when(! empty($filters['certificate']), fn ($builder) => $builder->where('certificate_rating', $filters['certificate']))
             ->latest('release_date')
             ->paginate(12)
             ->withQueryString();

@@ -16,20 +16,20 @@ Route::get('/movies/{slug}/book/{show}', [MovieController::class, 'seats'])->nam
 Route::get('/compare', [PublicController::class, 'compare'])->name('movies.compare');
 Route::match(['get', 'post'], '/search', [PublicController::class, 'search'])->name('search');
 
-Route::view('/about', 'public.about')->name('about');
+Route::get('/about', [PublicController::class, 'about'])->name('about');
 Route::get('/contact', [PublicController::class, 'contact'])->name('contact');
 Route::post('/contact', [PublicController::class, 'submitContact']);
 Route::get('/faq', [PublicController::class, 'faq'])->name('faq');
-Route::view('/terms', 'public.static.terms')->name('terms');
-Route::view('/privacy', 'public.static.privacy')->name('privacy');
-Route::view('/refund-policy', 'public.static.refund')->name('refund');
-Route::view('/e-ticket-info', 'public.static.eticket')->name('eticket.info');
+Route::get('/terms', [PublicController::class, 'terms'])->name('terms');
+Route::get('/privacy', [PublicController::class, 'privacy'])->name('privacy');
+Route::get('/refund-policy', [PublicController::class, 'refund'])->name('refund');
+Route::get('/e-ticket-info', [PublicController::class, 'eticket'])->name('eticket.info');
 
 Route::get('/login', [AuthController::class, 'showUserLogin'])->name('user.login');
-Route::post('/login', [AuthController::class, 'userLogin']);
+Route::post('/login', [AuthController::class, 'userLogin'])->middleware('throttle:5,1');
 Route::get('/register', [AuthController::class, 'showUserRegister'])->name('user.register');
 Route::get('/signup', [AuthController::class, 'showUserRegister'])->name('user.signup');
-Route::post('/register', [AuthController::class, 'userRegister']);
+Route::post('/register', [AuthController::class, 'userRegister'])->middleware('throttle:6,1');
 Route::post('/logout', [AuthController::class, 'logout'])->name('user.logout');
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider'])
     ->whereIn('provider', ['google', 'facebook'])
@@ -38,14 +38,14 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
     ->whereIn('provider', ['google', 'facebook'])
     ->name('oauth.callback');
 Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
-Route::post('/forgot-password', [AuthController::class, 'sendResetLink']);
+Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:6,1');
 Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
-Route::post('/reset-password/{token}', [AuthController::class, 'resetPassword']);
+Route::post('/reset-password/{token}', [AuthController::class, 'resetPassword'])->middleware('throttle:6,1');
 
 Route::get('/admin/login', [AuthController::class, 'showAdminLogin'])->name('admin.login');
-Route::post('/admin/login', [AuthController::class, 'adminLogin']);
+Route::post('/admin/login', [AuthController::class, 'adminLogin'])->middleware('throttle:5,1');
 Route::get('/admin/register', [AuthController::class, 'showAdminRegister'])->name('admin.register');
-Route::post('/admin/register', [AuthController::class, 'adminRegister']);
+Route::post('/admin/register', [AuthController::class, 'adminRegister'])->middleware('throttle:6,1');
 Route::post('/admin/logout', [AuthController::class, 'adminLogout'])->name('admin.logout');
 Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
 Route::post('/admin/dashboard', [AdminController::class, 'handleDashboard']);

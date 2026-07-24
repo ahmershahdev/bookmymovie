@@ -5,25 +5,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'BookMyMovie Auth')</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-                    },
-                    colors: {
-                        gold: '#d4af37',
-                        ink: '#080b12',
-                    },
-                },
-            },
-        };
-    </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
+    <title>@yield('title', ($siteSettings['site_name'] ?? 'BookMyMovie') . ' Auth')</title>
+    <meta name="csp-nonce" content="{{ $cspNonce ?? '' }}">
+    <link rel="icon" href="{{ asset('images/favicon/favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('images/site.webmanifest') }}">
+    <meta name="theme-color" content="#05070d">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script nonce="{{ $cspNonce ?? '' }}" defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style nonce="{{ $cspNonce ?? '' }}">
         html {
             scrollbar-width: thin;
             scrollbar-color: #dc2626 #05070d;
@@ -137,7 +129,7 @@
                     class="flex w-max items-center gap-3 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400">
                     <img src="{{ asset('images/logo.png') }}" alt="BookMyMovie logo"
                         class="h-12 w-12 rounded-md object-cover ring-1 ring-red-500/30">
-                    <span class="text-xl font-black"><span class="brand-gradient">BookMyMovie</span></span>
+                    <span class="text-xl font-black"><span class="brand-gradient">{{ $siteSettings['site_name'] ?? 'BookMyMovie' }}</span></span>
                 </a>
 
                 <div class="mt-auto space-y-8">
@@ -169,7 +161,7 @@
                     <a href="{{ route('home') }}" class="mb-8 flex w-max items-center gap-3 rounded-md lg:hidden">
                         <img src="{{ asset('images/logo.png') }}" alt="BookMyMovie logo"
                             class="h-11 w-11 rounded-md object-cover">
-                        <span class="text-lg font-black"><span class="brand-gradient">BookMyMovie</span></span>
+                        <span class="text-lg font-black"><span class="brand-gradient">{{ $siteSettings['site_name'] ?? 'BookMyMovie' }}</span></span>
                     </a>
 
                     <div class="auth-glass mb-8 rounded-lg border border-white/10 bg-white/[.03] p-5">
@@ -210,7 +202,7 @@
         </section>
     </main>
 
-    <script>
+    <script nonce="{{ $cspNonce ?? '' }}">
         function passwordStrengthForm(initialPassword = '') {
             return {
                 password: initialPassword,

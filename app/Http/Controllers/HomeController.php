@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Genre;
 use App\Models\Movie;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
@@ -15,7 +17,7 @@ class HomeController extends Controller
                 ->with('genres')
                 ->whereIn('status', ['now_showing', 'coming_soon'])
                 ->latest('release_date')
-                ->limit(10)
+                ->limit(20)
                 ->get()
                 ->map(fn (Movie $movie) => $movie->toCardArray())
                 ->all()
@@ -23,14 +25,33 @@ class HomeController extends Controller
 
         $slides = array_slice($movies, 0, 3);
 
-        $tickerMessages = [
-            'Sale is live: premium seats from PKR 650 today.',
-            'Your wait is finished: Thunder Protocol is now showing.',
-            'Weekend family bookings get kids discount on Little Heroes.',
-            'New Karachi and Lahore shows added every evening.',
-            'Wishlist your next movie and book seats faster.',
-        ];
+        $movieCategories = Schema::hasTable('genres')
+            ? Genre::query()
+                ->with(['movies' => fn ($query) => $query
+                    ->with('genres')
+                    ->whereIn('status', ['now_showing', 'coming_soon'])
+                    ->orderBy('release_date')
+                    ->limit(4)])
+                ->orderBy('id')
+                ->get()
+                ->map(fn (Genre $genre) => [
+                    'name' => $genre->name,
+                    'slug' => $genre->slug,
+                    'movies' => $genre->movies->map(fn (Movie $movie) => $movie->toCardArray())->all(),
+                ])
+                ->filter(fn (array $category) => count($category['movies']) > 0)
+                ->values()
+                ->all()
+            : [];
 
-        return view('public.index', compact('movies', 'slides', 'tickerMessages'));
+        $tickerMessages = Schema::hasTable('site_settings')
+            ? collect(explode('|', SiteSetting::query()->where('key', 'home_ticker_messages')->value('value') ?? ''))
+                ->map(fn (string $message) => trim($message))
+                ->filter()
+                ->values()
+                ->all()
+            : [];
+
+        return view('public.index', compact('movies', 'slides', 'tickerMessages', 'movieCategories'));
     }
 }

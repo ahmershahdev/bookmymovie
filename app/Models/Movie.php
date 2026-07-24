@@ -23,6 +23,8 @@ class Movie extends Model
         'poster_image',
         'banner_image',
         'trailer_url',
+        'base_price',
+        'sale_price',
         'kids_discount_eligible',
         'average_rating',
         'total_reviews',
@@ -35,6 +37,8 @@ class Movie extends Model
             'release_date' => 'date',
             'kids_discount_eligible' => 'boolean',
             'average_rating' => 'decimal:2',
+            'base_price' => 'decimal:2',
+            'sale_price' => 'decimal:2',
         ];
     }
 
@@ -55,23 +59,61 @@ class Movie extends Model
 
     public function cardPrice(): float
     {
-        return (float) ShowSeatPrice::query()
+        $showSalePrice = ShowSeatPrice::query()
             ->whereIn('show_id', $this->shows()->select('id'))
-            ->min('price') ?: 0;
+            ->whereNotNull('sale_price')
+            ->min('sale_price');
+
+        if ($showSalePrice) {
+            return (float) $showSalePrice;
+        }
+
+        $showPrice = ShowSeatPrice::query()
+            ->whereIn('show_id', $this->shows()->select('id'))
+            ->min('price');
+
+        return (float) ($showPrice ?: $this->sale_price ?: $this->base_price ?: 0);
+    }
+
+    public function originalCardPrice(): float
+    {
+        $showPrice = ShowSeatPrice::query()
+            ->whereIn('show_id', $this->shows()->select('id'))
+            ->min('price');
+
+        return (float) ($showPrice ?: $this->base_price ?: 0);
+    }
+
+    public function firstScheduledShowId(): ?int
+    {
+        return $this->shows()
+            ->where('status', 'scheduled')
+            ->whereDate('show_date', '>=', now()->toDateString())
+            ->orderBy('show_date')
+            ->orderBy('show_time')
+            ->value('id');
     }
 
     public function toCardArray(?float $price = null): array
     {
+        $salePrice = $price ?? $this->cardPrice();
+        $originalPrice = $this->originalCardPrice();
+
         return [
+            'id' => $this->id,
             'title' => $this->title,
             'slug' => $this->slug,
             'genre' => $this->genres->pluck('name')->join(' / ') ?: 'Cinema',
             'language' => $this->language,
             'duration' => intdiv((int) $this->duration_minutes, 60).'h '.((int) $this->duration_minutes % 60).'m',
             'rating' => (float) $this->average_rating ?: 4.0,
+            'reviews' => (int) $this->total_reviews,
             'certificate' => $this->certificate_rating ?: 'UA',
             'status' => str($this->status)->replace('_', ' ')->headline()->toString(),
-            'price' => $price ?? $this->cardPrice(),
+            'price' => $salePrice,
+            'original_price' => $originalPrice,
+            'sale_price' => $salePrice,
+            'first_show_id' => $this->firstScheduledShowId(),
             'gradient' => 'from-red-950 via-gray-950 to-black',
             'tagline' => str($this->description ?: 'Premium cinema experience.')->limit(90)->toString(),
         ];

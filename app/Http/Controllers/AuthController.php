@@ -28,6 +28,7 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'min:6', 'max:150', FormSecurity::disposableEmailRule()],
             'password' => ['required', 'string', 'min:8', 'max:72'],
         ]);
+        $credentials['email'] = strtolower($credentials['email']);
 
         if (Auth::attempt([...$credentials, 'is_blocked' => false], $request->boolean('remember'))) {
             $request->session()->regenerate();
@@ -53,6 +54,7 @@ class AuthController extends Controller
             'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
         ]);
+        $data['email'] = strtolower($data['email']);
 
         unset($data['password_confirmation']);
 
@@ -167,6 +169,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
         ]);
+        $data['email'] = strtolower($data['email']);
         $token = Str::random(64);
 
         DB::table('password_reset_tokens')->updateOrInsert(
@@ -192,10 +195,11 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
             'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
         ]);
+        $data['email'] = strtolower($data['email']);
 
         $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();
 
-        if (! $record || ! Hash::check($token, $record->token)) {
+        if (! $record || now()->subHour()->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
             return back()->withErrors(['email' => 'Invalid reset token.']);
         }
 
@@ -213,9 +217,10 @@ class AuthController extends Controller
     public function adminLogin(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150'],
+            'password' => ['required', 'string', 'min:8', 'max:72'],
         ]);
+        $credentials['email'] = strtolower($credentials['email']);
 
         $admin = Admin::query()->where('email', $credentials['email'])->where('is_active', true)->first();
 
@@ -239,10 +244,11 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'invite_code' => ['required', 'string'],
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:150', 'unique:admins,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'unique:admins,email'],
+            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
         ]);
+        $data['email'] = strtolower($data['email']);
 
         if ($data['invite_code'] !== env('BOOKMYMOVIE_ADMIN_INVITE', 'BOOKMYMOVIE-ADMIN')) {
             return back()->withErrors(['invite_code' => 'Invalid invite code.'])->onlyInput('name', 'email');

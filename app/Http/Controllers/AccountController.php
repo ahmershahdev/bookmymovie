@@ -119,14 +119,20 @@ class AccountController extends Controller
 
     public function addToCart(Request $request): RedirectResponse
     {
+        $this->clearExpiredCarts();
+
         $data = $request->validate([
             'show_id' => ['required', 'integer', 'exists:shows,id'],
             'seats' => ['required', 'array', 'min:1', 'max:8'],
-            'seats.*' => ['integer'],
+            'seats.*' => ['integer', 'distinct', 'exists:seats,id'],
             'ticket_type' => ['nullable', Rule::in(['adult', 'kid'])],
         ]);
 
         $show = Show::findOrFail($data['show_id']);
+        if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
+            return back()->withErrors(['show_id' => 'This show is no longer available for booking.']);
+        }
+
         $seatIds = array_values(array_unique($data['seats']));
         $ticketType = $data['ticket_type'] ?? 'adult';
 
@@ -156,7 +162,7 @@ class AccountController extends Controller
                     'seat_id' => $seat->seat_id,
                     'seat_category_id' => $seat->seat_category_id,
                     'ticket_type' => $ticketType,
-                    'price' => $ticketType === 'kid' && $seat->kids_price ? $seat->kids_price : $seat->price,
+                    'price' => $this->seatPrice($seat, $ticketType),
                     'added_at' => now(),
                 ]);
             }
@@ -183,6 +189,8 @@ class AccountController extends Controller
 
     public function placeBooking(Request $request): RedirectResponse
     {
+        $this->clearExpiredCarts();
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:20'],
@@ -206,53 +214,76 @@ class AccountController extends Controller
             return redirect()->route('user.cart')->withErrors(['cart' => 'Please checkout one show at a time.']);
         }
 
-        $booking = DB::transaction(function () use ($items, $cart, $user) {
-            $show = Show::query()->lockForUpdate()->findOrFail($items->first()->show_id);
-            $subtotal = (float) $items->sum('price');
-            $adultCount = $items->where('ticket_type', 'adult')->count();
-            $kidsCount = $items->where('ticket_type', 'kid')->count();
+        try {
+            $booking = DB::transaction(function () use ($items, $cart, $user) {
+                $show = Show::query()->lockForUpdate()->findOrFail($items->first()->show_id);
 
-            $booking = Booking::create([
-                'booking_number' => $this->bookingNumber(),
-                'user_id' => $user->id,
-                'show_id' => $show->id,
-                'seat_count' => $items->count(),
-                'adult_count' => $adultCount,
-                'kids_count' => $kidsCount,
-                'subtotal' => $subtotal,
-                'discount_amount' => 0,
-                'total_amount' => $subtotal,
-                'payment_method' => 'cod',
-                'payment_status' => 'pending',
-                'booking_status' => 'confirmed',
-            ]);
+                if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
+                    throw new \RuntimeException('show-unavailable');
+                }
 
-            foreach ($items as $item) {
-                BookingSeat::create([
-                    'booking_id' => $booking->id,
-                    'seat_id' => $item->seat_id,
-                    'show_id' => $item->show_id,
-                    'seat_category_id' => $item->seat_category_id,
-                    'ticket_type' => $item->ticket_type,
-                    'price_paid' => $item->price,
-                    'ticket_number' => $booking->booking_number.'-'.$item->seat->row_label.$item->seat->seat_number,
-                    'created_at' => now(),
+                $alreadyBooked = BookingSeat::query()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $items->pluck('seat_id'))
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($alreadyBooked) {
+                    throw new \RuntimeException('seat-conflict');
+                }
+
+                $subtotal = (float) $items->sum('price');
+                $adultCount = $items->where('ticket_type', 'adult')->count();
+                $kidsCount = $items->where('ticket_type', 'kid')->count();
+
+                $booking = Booking::create([
+                    'booking_number' => $this->bookingNumber(),
+                    'user_id' => $user->id,
+                    'show_id' => $show->id,
+                    'seat_count' => $items->count(),
+                    'adult_count' => $adultCount,
+                    'kids_count' => $kidsCount,
+                    'subtotal' => $subtotal,
+                    'discount_amount' => 0,
+                    'total_amount' => $subtotal,
+                    'payment_method' => 'cod',
+                    'payment_status' => 'pending',
+                    'booking_status' => 'confirmed',
                 ]);
-            }
 
-            Payment::create([
-                'booking_id' => $booking->id,
-                'payment_method' => 'cod',
-                'amount' => $subtotal,
-                'status' => 'pending',
-                'notes' => 'Cash on delivery at cinema counter.',
-            ]);
+                foreach ($items as $item) {
+                    BookingSeat::create([
+                        'booking_id' => $booking->id,
+                        'seat_id' => $item->seat_id,
+                        'show_id' => $item->show_id,
+                        'seat_category_id' => $item->seat_category_id,
+                        'ticket_type' => $item->ticket_type,
+                        'price_paid' => $item->price,
+                        'ticket_number' => $booking->booking_number.'-'.$item->seat->row_label.$item->seat->seat_number,
+                        'created_at' => now(),
+                    ]);
+                }
 
-            $show->increment('booked_seats', $items->count());
-            $cart->delete();
+                Payment::create([
+                    'booking_id' => $booking->id,
+                    'payment_method' => 'cod',
+                    'amount' => $subtotal,
+                    'status' => 'pending',
+                    'notes' => 'Cash on delivery at cinema counter.',
+                ]);
 
-            return $booking;
-        });
+                $show->increment('booked_seats', $items->count());
+                $cart->delete();
+
+                return $booking;
+            });
+        } catch (QueryException|\RuntimeException $exception) {
+            $message = $exception instanceof \RuntimeException && $exception->getMessage() === 'show-unavailable'
+                ? 'This show is no longer available for booking.'
+                : 'One or more selected seats are no longer available. Please choose different seats.';
+
+            return redirect()->route('user.cart')->withErrors(['cart' => $message]);
+        }
 
         return redirect()->route('user.booking.show', $booking->booking_number)->with('status', 'Booking confirmed.');
     }
@@ -278,10 +309,19 @@ class AccountController extends Controller
 
     private function activeCart(): ?Cart
     {
+        $this->clearExpiredCarts();
+
         return Cart::query()
             ->where('user_id', Auth::id())
             ->where('expires_at', '>', now())
             ->first();
+    }
+
+    private function clearExpiredCarts(): void
+    {
+        Cart::query()
+            ->where('expires_at', '<=', now())
+            ->delete();
     }
 
     private function userBooking(string $number): Booking
@@ -300,5 +340,14 @@ class AccountController extends Controller
         } while (Booking::where('booking_number', $number)->exists());
 
         return $number;
+    }
+
+    private function seatPrice(object $seat, string $ticketType): float
+    {
+        if ($ticketType === 'kid') {
+            return (float) ($seat->kids_sale_price ?: $seat->kids_price ?: $seat->sale_price ?: $seat->price);
+        }
+
+        return (float) ($seat->sale_price ?: $seat->price);
     }
 }

@@ -35,8 +35,8 @@
 @once
     @push('scripts')
         @if($v2SiteKey || $v3SiteKey)
-            <script src="https://www.google.com/recaptcha/api.js?{{ $v3SiteKey ? 'render=' . urlencode($v3SiteKey) : 'render=explicit' }}" async defer></script>
-            <script>
+            <script nonce="{{ $cspNonce ?? '' }}" src="https://www.google.com/recaptcha/api.js?{{ $v3SiteKey ? 'render=' . urlencode($v3SiteKey) : 'render=explicit' }}" async defer></script>
+            <script nonce="{{ $cspNonce ?? '' }}">
                 window.bookMyMovieRenderCaptcha = function () {
                     if (!window.grecaptcha || !window.grecaptcha.render) {
                         return false;
