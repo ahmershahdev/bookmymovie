@@ -5,7 +5,27 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', ($siteSettings['site_name'] ?? 'BookMyMovie') . ' Auth')</title>
+    @php
+        $canonicalBase = rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/');
+        $canonicalPath = '/' . ltrim(request()->getPathInfo(), '/');
+        $canonicalUrl = $canonicalBase . ($canonicalPath === '/' ? '/' : $canonicalPath);
+        $metaTitle = \Illuminate\Support\Str::limit(trim($__env->yieldContent('meta_title', $__env->yieldContent('title', ($siteSettings['site_name'] ?? 'BookMyMovie') . ' Account'))), 60, '');
+        $metaDescription = \Illuminate\Support\Str::limit(trim($__env->yieldContent('meta_description', 'Access your BookMyMovie account to manage movie bookings, saved seats, wishlists, and profile details.')), 160, '');
+        $defaultSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            'name' => $metaTitle,
+            'url' => $canonicalUrl,
+        ];
+    @endphp
+    <title>{{ $metaTitle }}</title>
+    <meta name="description" content="{{ $metaDescription }}">
+    <link rel="canonical" href="@yield('canonical', $canonicalUrl)">
+    <meta property="og:title" content="{{ $metaTitle }}">
+    <meta property="og:description" content="{{ $metaDescription }}">
+    <meta property="og:url" content="@yield('canonical', $canonicalUrl)">
+    <meta property="og:type" content="website">
+    <script type="application/ld+json" nonce="{{ $cspNonce ?? '' }}">@yield('json_ld', json_encode($defaultSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))</script>
     <meta name="csp-nonce" content="{{ $cspNonce ?? '' }}">
     <link rel="icon" href="{{ asset('images/favicon/favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon/favicon-32x32.png') }}">

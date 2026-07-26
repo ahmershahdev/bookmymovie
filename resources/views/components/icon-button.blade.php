@@ -13,6 +13,7 @@
         <span x-cloak x-show="{{ $counter }} > 0" x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0 scale-50" x-transition:enter-end="opacity-100 scale-100"
             x-text="{{ $counter }}"
+            :class="{ 'counter-pop': {{ $counter }} > 0 }"
             class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-red-500 px-1.5 text-center text-[10px] font-black text-white shadow-md shadow-red-950/80 ring-2 ring-gray-950">
         </span>
     @endif

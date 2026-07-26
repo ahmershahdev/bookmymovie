@@ -23,7 +23,22 @@ class HomeController extends Controller
                 ->all()
             : [];
 
-        $slides = array_slice($movies, 0, 3);
+        $slides = Schema::hasTable('movies') && Schema::hasColumn('movies', 'hero_carousel_enabled')
+            ? Movie::query()
+                ->with('genres')
+                ->where('hero_carousel_enabled', true)
+                ->whereIn('status', ['now_showing', 'coming_soon'])
+                ->orderBy('hero_sort_order')
+                ->latest('release_date')
+                ->limit(5)
+                ->get()
+                ->map(fn (Movie $movie) => $movie->toCardArray())
+                ->all()
+            : [];
+
+        if ($slides === []) {
+            $slides = array_slice($movies, 0, 3);
+        }
 
         $movieCategories = Schema::hasTable('genres')
             ? Genre::query()

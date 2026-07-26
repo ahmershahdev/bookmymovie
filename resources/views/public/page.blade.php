@@ -1,6 +1,15 @@
 @extends('layouts.app')
 
 @section('title', ($page->meta_title ?: $page->title) . ' | ' . ($siteSettings['site_name'] ?? 'BookMyMovie'))
+@section('meta_description', $page->meta_description ?: $page->excerpt ?: ($siteSettings['default_meta_description'] ?? 'Book movie tickets, compare shows, reserve seats, and manage cinema bookings online with BookMyMovie.'))
+@section('canonical', rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/') . ($page->canonical_path ?: request()->getPathInfo()))
+@section('json_ld', json_encode([
+    '@context' => 'https://schema.org',
+    '@type' => 'WebPage',
+    'name' => $page->meta_title ?: $page->title,
+    'description' => $page->meta_description ?: $page->excerpt,
+    'url' => rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/') . ($page->canonical_path ?: request()->getPathInfo()),
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
 
 @section('content')
     <section class="bg-gray-950 px-4 pb-20 pt-32 text-gray-100 sm:px-6 lg:px-8">

@@ -21,4 +21,19 @@ class Coupon extends Model
         'is_active',
         'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'discount_value' => 'decimal:2',
+            'max_discount_amount' => 'decimal:2',
+            'min_order_amount' => 'decimal:2',
+            'used_count' => 'integer',
+            'max_uses' => 'integer',
+            'max_uses_per_user' => 'integer',
+            'valid_from' => 'datetime',
+            'valid_until' => 'datetime',
+            'is_active' => 'boolean',
+        ];
+    }
 }

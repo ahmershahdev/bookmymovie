@@ -94,10 +94,11 @@
             </a>
 
             <!-- Wishlist Fly Button -->
-            <form method="POST" action="{{ route('user.wishlist') }}">
+            <form method="POST" action="{{ route('user.wishlist') }}"
+                @submit.prevent="flyAndSubmit($event, 'wishlist-icon', 'wishlistCount')">
                 @csrf
                 <input type="hidden" name="slug" value="{{ $movie['slug'] }}">
-                <button type="submit" @click="fly($event, 'wishlist-icon', 'wishlistCount')"
+                <button type="submit"
                 class="group/btn inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-300 transition-all duration-300 hover:border-red-500/60 hover:bg-red-950/50 hover:text-red-400 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400"
                 aria-label="Add {{ $movie['title'] }} to wishlist">
                     <svg class="h-5 w-5 transition-transform duration-300 group-hover/btn:scale-110" viewBox="0 0 24 24"

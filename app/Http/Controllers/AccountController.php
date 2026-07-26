@@ -6,11 +6,14 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Coupon;
 use App\Models\Movie;
 use App\Models\Payment;
+use App\Models\Seat;
 use App\Models\Show;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Support\TransactionalMailer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +25,8 @@ use Illuminate\View\View;
 
 class AccountController extends Controller
 {
+    private const MAX_CART_ITEMS = 4;
+
     public function dashboard(): View
     {
         $user = Auth::user();
@@ -123,7 +128,7 @@ class AccountController extends Controller
 
         $data = $request->validate([
             'show_id' => ['required', 'integer', 'exists:shows,id'],
-            'seats' => ['required', 'array', 'min:1', 'max:8'],
+            'seats' => ['required', 'array', 'min:1', 'max:'.self::MAX_CART_ITEMS],
             'seats.*' => ['integer', 'distinct', 'exists:seats,id'],
             'ticket_type' => ['nullable', Rule::in(['adult', 'kid'])],
         ]);
@@ -136,38 +141,108 @@ class AccountController extends Controller
         $seatIds = array_values(array_unique($data['seats']));
         $ticketType = $data['ticket_type'] ?? 'adult';
 
-        $availableSeats = DB::table('v_seat_availability')
-            ->where('show_id', $show->id)
-            ->whereIn('seat_id', $seatIds)
-            ->where('seat_status', 'available')
-            ->get()
-            ->keyBy('seat_id');
-
-        if ($availableSeats->count() !== count($seatIds)) {
-            return back()->withErrors(['seats' => 'One or more selected seats are no longer available.']);
-        }
-
-        $cart = Cart::updateOrCreate(
-            ['user_id' => Auth::id()],
-            ['expires_at' => now()->addMinutes(10)]
-        );
-
         try {
-            foreach ($seatIds as $seatId) {
-                $seat = $availableSeats[$seatId];
+            DB::transaction(function () use ($seatIds, $show, $ticketType) {
+                User::query()->whereKey(Auth::id())->lockForUpdate()->firstOrFail();
 
-                CartItem::create([
-                    'cart_id' => $cart->id,
-                    'show_id' => $show->id,
-                    'seat_id' => $seat->seat_id,
-                    'seat_category_id' => $seat->seat_category_id,
-                    'ticket_type' => $ticketType,
-                    'price' => $this->seatPrice($seat, $ticketType),
-                    'added_at' => now(),
-                ]);
-            }
+                $show = Show::query()->lockForUpdate()->findOrFail($show->id);
+
+                if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
+                    throw new \RuntimeException('show-unavailable');
+                }
+
+                $lockedSeats = Seat::query()
+                    ->where('screen_id', $show->screen_id)
+                    ->where('is_active', true)
+                    ->whereIn('id', $seatIds)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                if ($lockedSeats->count() !== count($seatIds)) {
+                    throw new \RuntimeException('seat-conflict');
+                }
+
+                $alreadyBooked = BookingSeat::query()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->whereIn('booking_id', Booking::query()->select('id')->where('booking_status', '<>', 'cancelled'))
+                    ->lockForUpdate()
+                    ->exists();
+
+                $activelyReserved = CartItem::query()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->whereHas('cart', fn ($query) => $query->where('expires_at', '>', now()))
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($alreadyBooked || $activelyReserved) {
+                    throw new \RuntimeException('seat-conflict');
+                }
+
+                $cart = Cart::query()
+                    ->where('user_id', Auth::id())
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $cart) {
+                    $cart = Cart::create([
+                        'user_id' => Auth::id(),
+                        'expires_at' => now()->addMinutes(10),
+                    ]);
+                } else {
+                    $cart->forceFill(['expires_at' => now()->addMinutes(10)])->save();
+                }
+
+                $existingCount = $cart->items()->lockForUpdate()->count();
+                $newSeatCount = count($seatIds);
+
+                if ($existingCount + $newSeatCount > self::MAX_CART_ITEMS) {
+                    throw new \RuntimeException('cart-limit');
+                }
+
+                $availableSeats = DB::table('v_seat_availability')
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->where('seat_status', 'available')
+                    ->get()
+                    ->keyBy('seat_id');
+
+                if ($availableSeats->count() !== count($seatIds)) {
+                    throw new \RuntimeException('seat-conflict');
+                }
+
+                foreach ($seatIds as $seatId) {
+                    $seat = $availableSeats[$seatId];
+
+                    CartItem::create([
+                        'cart_id' => $cart->id,
+                        'show_id' => $show->id,
+                        'seat_id' => $seat->seat_id,
+                        'seat_category_id' => $seat->seat_category_id,
+                        'ticket_type' => $ticketType,
+                        'price' => $this->seatPrice($seat, $ticketType),
+                        'added_at' => now(),
+                    ]);
+                }
+            }, 3);
         } catch (QueryException) {
             return back()->withErrors(['seats' => 'Those seats were just reserved. Please choose different seats.']);
+        } catch (\RuntimeException $exception) {
+            if ($exception->getMessage() === 'cart-limit') {
+                return back()->withErrors(['cart' => 'Cart limit full. You can hold a maximum of 4 seats at once.']);
+            }
+
+            if ($exception->getMessage() === 'show-unavailable') {
+                return back()->withErrors(['show_id' => 'This show is no longer available for booking.']);
+            }
+
+            if ($exception->getMessage() === 'seat-conflict') {
+                return back()->withErrors(['seats' => 'One or more selected seats are no longer available.']);
+            }
+
+            throw $exception;
         }
 
         return redirect()->route('user.cart')->with('status', 'Seats added to cart.');
@@ -194,6 +269,7 @@ class AccountController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:20'],
+            'coupon_code' => ['nullable', 'string', 'max:30'],
         ]);
 
         /** @var User $user */
@@ -209,13 +285,42 @@ class AccountController extends Controller
             return redirect()->route('user.cart')->withErrors(['cart' => 'Your cart is empty or expired.']);
         }
 
+        if ($items->count() > self::MAX_CART_ITEMS) {
+            return redirect()->route('user.cart')->withErrors(['cart' => 'Cart limit full. You can order a maximum of 4 seats per booking.']);
+        }
+
         $showIds = $items->pluck('show_id')->unique();
         if ($showIds->count() !== 1) {
             return redirect()->route('user.cart')->withErrors(['cart' => 'Please checkout one show at a time.']);
         }
 
         try {
-            $booking = DB::transaction(function () use ($items, $cart, $user) {
+            $booking = DB::transaction(function () use ($cart, $user, $data) {
+                $cart = Cart::query()
+                    ->whereKey($cart->id)
+                    ->where('user_id', $user->id)
+                    ->where('expires_at', '>', now())
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $cart) {
+                    throw new \RuntimeException('cart-empty');
+                }
+
+                $items = $cart->items()->with(['show', 'seat'])->lockForUpdate()->get();
+
+                if ($items->isEmpty()) {
+                    throw new \RuntimeException('cart-empty');
+                }
+
+                if ($items->count() > self::MAX_CART_ITEMS) {
+                    throw new \RuntimeException('cart-limit');
+                }
+
+                if ($items->pluck('show_id')->unique()->count() !== 1) {
+                    throw new \RuntimeException('mixed-show');
+                }
+
                 $show = Show::query()->lockForUpdate()->findOrFail($items->first()->show_id);
 
                 if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
@@ -225,6 +330,7 @@ class AccountController extends Controller
                 $alreadyBooked = BookingSeat::query()
                     ->where('show_id', $show->id)
                     ->whereIn('seat_id', $items->pluck('seat_id'))
+                    ->whereIn('booking_id', Booking::query()->select('id')->where('booking_status', '<>', 'cancelled'))
                     ->lockForUpdate()
                     ->exists();
 
@@ -235,17 +341,21 @@ class AccountController extends Controller
                 $subtotal = (float) $items->sum('price');
                 $adultCount = $items->where('ticket_type', 'adult')->count();
                 $kidsCount = $items->where('ticket_type', 'kid')->count();
+                $coupon = $this->lockedCoupon($data['coupon_code'] ?? null, $subtotal, $user->id);
+                $discountAmount = $coupon ? $this->discountAmount($coupon, $subtotal) : 0.0;
+                $totalAmount = max(0, $subtotal - $discountAmount);
 
                 $booking = Booking::create([
                     'booking_number' => $this->bookingNumber(),
                     'user_id' => $user->id,
                     'show_id' => $show->id,
+                    'coupon_id' => $coupon?->id,
                     'seat_count' => $items->count(),
                     'adult_count' => $adultCount,
                     'kids_count' => $kidsCount,
                     'subtotal' => $subtotal,
-                    'discount_amount' => 0,
-                    'total_amount' => $subtotal,
+                    'discount_amount' => $discountAmount,
+                    'total_amount' => $totalAmount,
                     'payment_method' => 'cod',
                     'payment_status' => 'pending',
                     'booking_status' => 'confirmed',
@@ -267,23 +377,44 @@ class AccountController extends Controller
                 Payment::create([
                     'booking_id' => $booking->id,
                     'payment_method' => 'cod',
-                    'amount' => $subtotal,
+                    'amount' => $totalAmount,
                     'status' => 'pending',
                     'notes' => 'Cash on delivery at cinema counter.',
                 ]);
 
-                $show->increment('booked_seats', $items->count());
+                if ($coupon) {
+                    DB::table('coupon_usages')->insert([
+                        'coupon_id' => $coupon->id,
+                        'user_id' => $user->id,
+                        'booking_id' => $booking->id,
+                        'discount_applied' => $discountAmount,
+                        'used_at' => now(),
+                    ]);
+
+                    $coupon->forceFill(['used_count' => $coupon->used_count + 1])->save();
+                }
+
+                $show->forceFill(['booked_seats' => $show->booked_seats + $items->count()])->save();
                 $cart->delete();
 
                 return $booking;
-            });
+            }, 3);
         } catch (QueryException|\RuntimeException $exception) {
-            $message = $exception instanceof \RuntimeException && $exception->getMessage() === 'show-unavailable'
-                ? 'This show is no longer available for booking.'
-                : 'One or more selected seats are no longer available. Please choose different seats.';
+            $message = match ($exception instanceof \RuntimeException ? $exception->getMessage() : null) {
+                'cart-empty' => 'Your cart is empty or expired.',
+                'show-unavailable' => 'This show is no longer available for booking.',
+                'cart-limit' => 'Cart limit full. You can order a maximum of 4 seats per booking.',
+                'mixed-show' => 'Please checkout one show at a time.',
+                'coupon-invalid' => 'That coupon is invalid, expired, exhausted, or does not apply to this order.',
+                'coupon-user-limit' => 'That coupon has already been used the maximum number of times for this account.',
+                default => 'One or more selected seats are no longer available. Please choose different seats.',
+            };
 
             return redirect()->route('user.cart')->withErrors(['cart' => $message]);
         }
+
+        $booking->load('user');
+        TransactionalMailer::bookingConfirmed($booking->user, $booking);
 
         return redirect()->route('user.booking.show', $booking->booking_number)->with('status', 'Booking confirmed.');
     }
@@ -349,5 +480,55 @@ class AccountController extends Controller
         }
 
         return (float) ($seat->sale_price ?: $seat->price);
+    }
+
+    private function lockedCoupon(?string $code, float $subtotal, int $userId): ?Coupon
+    {
+        $code = strtoupper(trim((string) $code));
+
+        if ($code === '') {
+            return null;
+        }
+
+        $coupon = Coupon::query()
+            ->where('code', $code)
+            ->lockForUpdate()
+            ->first();
+
+        if (
+            ! $coupon
+            || ! $coupon->is_active
+            || now()->lt($coupon->valid_from)
+            || now()->gt($coupon->valid_until)
+            || $subtotal < (float) $coupon->min_order_amount
+            || ($coupon->max_uses !== null && $coupon->used_count >= $coupon->max_uses)
+        ) {
+            throw new \RuntimeException('coupon-invalid');
+        }
+
+        $userUses = DB::table('coupon_usages')
+            ->where('coupon_id', $coupon->id)
+            ->where('user_id', $userId)
+            ->lockForUpdate()
+            ->count();
+
+        if ($userUses >= $coupon->max_uses_per_user) {
+            throw new \RuntimeException('coupon-user-limit');
+        }
+
+        return $coupon;
+    }
+
+    private function discountAmount(Coupon $coupon, float $subtotal): float
+    {
+        $discount = $coupon->discount_type === 'percentage'
+            ? $subtotal * ((float) $coupon->discount_value / 100)
+            : (float) $coupon->discount_value;
+
+        if ($coupon->max_discount_amount !== null) {
+            $discount = min($discount, (float) $coupon->max_discount_amount);
+        }
+
+        return round(min($discount, $subtotal), 2);
     }
 }

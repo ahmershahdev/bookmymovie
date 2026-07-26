@@ -46,6 +46,7 @@ return [
         'v3_site_key' => env('RECAPTCHA_V3_SITE_KEY'),
         'v3_secret_key' => env('RECAPTCHA_V3_SECRET_KEY'),
         'v3_min_score' => env('RECAPTCHA_V3_MIN_SCORE', 0.5),
+        'skip_google_on_localhost' => env('RECAPTCHA_SKIP_GOOGLE_ON_LOCALHOST', true),
     ],
 
     'slack' => [

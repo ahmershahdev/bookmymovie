@@ -1,0 +1,24 @@
+# BookMyMovie
+
+> BookMyMovie is a Laravel cinema booking application for browsing movies, reserving seats, managing bookings, and administering site content.
+
+- Production URL: https://bookmymovie.ahmershah.dev/
+- Sitemap: https://bookmymovie.ahmershah.dev/sitemap.xml
+- Main pages: /, /movies, /compare, /faq, /contact, /about, /terms, /privacy, /refund-policy, /e-ticket-info
+- User account: /login, /register, /forgot-password
+- Admin entry: /admin/login
+
+## Features
+
+- Movie catalog with posters, banners, hero carousel placement, showtimes, sale pricing, ratings, and reviews.
+- Each seeded active movie has four available future showtimes.
+- Seat pricing is row-tiered: front row A is highest, then B, C, D, E, and F decrease progressively with row-specific benefits.
+- Seat selection, carts, checkout, booking tracking, wishlist, and profile management.
+- Seat purchases are capped at 4 seats per booking.
+- Admin dashboard for website settings, page SEO, complete movie CRUD, image uploads/deletes, coupons, users, reviews, notifications, and profile.
+- Security includes CSRF protection, throttled sensitive routes, hashed passwords, custom captcha, optional Google reCAPTCHA, and session timeout for admin access.
+- Booking writes use transactions, row locks, and unique seat constraints to prevent duplicate booking. Coupon redemption locks the coupon row before use counts are checked and updated.
+
+## Contact
+
+- Support email is configurable in the admin dashboard.

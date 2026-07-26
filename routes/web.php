@@ -18,7 +18,7 @@ Route::match(['get', 'post'], '/search', [PublicController::class, 'search'])->n
 
 Route::get('/about', [PublicController::class, 'about'])->name('about');
 Route::get('/contact', [PublicController::class, 'contact'])->name('contact');
-Route::post('/contact', [PublicController::class, 'submitContact']);
+Route::post('/contact', [PublicController::class, 'submitContact'])->middleware('throttle:contact-form');
 Route::get('/faq', [PublicController::class, 'faq'])->name('faq');
 Route::get('/terms', [PublicController::class, 'terms'])->name('terms');
 Route::get('/privacy', [PublicController::class, 'privacy'])->name('privacy');
@@ -44,6 +44,10 @@ Route::post('/reset-password/{token}', [AuthController::class, 'resetPassword'])
 
 Route::get('/admin/login', [AuthController::class, 'showAdminLogin'])->name('admin.login');
 Route::post('/admin/login', [AuthController::class, 'adminLogin'])->middleware('throttle:5,1');
+Route::get('/admin/forgot-credentials', [AuthController::class, 'showAdminForgotCredentials'])->name('admin.credentials.request');
+Route::post('/admin/forgot-credentials', [AuthController::class, 'sendAdminCredentialReset'])->middleware('throttle:3,1');
+Route::get('/admin/reset-credentials/{token}', [AuthController::class, 'showAdminResetCredentials'])->name('admin.credentials.reset');
+Route::post('/admin/reset-credentials/{token}', [AuthController::class, 'resetAdminCredentials'])->middleware('throttle:3,1');
 Route::get('/admin/register', [AuthController::class, 'showAdminRegister'])->name('admin.register');
 Route::post('/admin/register', [AuthController::class, 'adminRegister'])->middleware('throttle:6,1');
 Route::post('/admin/logout', [AuthController::class, 'adminLogout'])->name('admin.logout');
@@ -56,11 +60,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/account/bookings/{number}', [AccountController::class, 'bookingShow'])->name('user.booking.show');
     Route::get('/account/bookings/{number}/track', [AccountController::class, 'tracking'])->name('user.tracking');
     Route::get('/account/wishlist', [AccountController::class, 'wishlist'])->name('user.wishlist');
-    Route::post('/account/wishlist', [AccountController::class, 'toggleWishlist']);
+    Route::post('/account/wishlist', [AccountController::class, 'toggleWishlist'])->middleware('throttle:wishlist-actions');
     Route::get('/cart', [AccountController::class, 'cart'])->name('user.cart');
-    Route::post('/cart', [AccountController::class, 'addToCart']);
+    Route::post('/cart', [AccountController::class, 'addToCart'])->middleware('throttle:cart-actions');
     Route::get('/checkout', [AccountController::class, 'checkout'])->name('user.checkout');
-    Route::post('/checkout', [AccountController::class, 'placeBooking']);
+    Route::post('/checkout', [AccountController::class, 'placeBooking'])->middleware('throttle:checkout-actions');
     Route::get('/account/profile', [AccountController::class, 'profile'])->name('user.profile');
     Route::post('/account/profile', [AccountController::class, 'updateProfile']);
 });

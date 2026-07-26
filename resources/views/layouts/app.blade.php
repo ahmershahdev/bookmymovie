@@ -5,7 +5,34 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', $siteSettings['site_name'] ?? 'BookMyMovie')</title>
+    @php
+        $canonicalBase = rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/');
+        $canonicalPath = '/' . ltrim(request()->getPathInfo(), '/');
+        $canonicalUrl = $canonicalBase . ($canonicalPath === '/' ? '/' : $canonicalPath);
+        $metaTitle = trim($__env->yieldContent('meta_title', $__env->yieldContent('title', $siteSettings['default_meta_title'] ?? 'BookMyMovie - Book Cinema Tickets Online')));
+        $metaTitle = \Illuminate\Support\Str::limit($metaTitle, 60, '');
+        $metaDescription = trim($__env->yieldContent('meta_description', $siteSettings['default_meta_description'] ?? 'Book movie tickets, compare shows, reserve seats, and manage cinema bookings online with BookMyMovie.'));
+        $metaDescription = \Illuminate\Support\Str::limit($metaDescription, 160, '');
+        $defaultSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => $siteSettings['site_name'] ?? 'BookMyMovie',
+            'url' => $canonicalBase . '/',
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => $canonicalBase . '/search?q={search_term_string}',
+                'query-input' => 'required name=search_term_string',
+            ],
+        ];
+    @endphp
+    <title>{{ $metaTitle }}</title>
+    <meta name="description" content="{{ $metaDescription }}">
+    <link rel="canonical" href="@yield('canonical', $canonicalUrl)">
+    <meta property="og:title" content="{{ $metaTitle }}">
+    <meta property="og:description" content="{{ $metaDescription }}">
+    <meta property="og:url" content="@yield('canonical', $canonicalUrl)">
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <script type="application/ld+json" nonce="{{ $cspNonce ?? '' }}">@yield('json_ld', json_encode($defaultSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))</script>
     <meta name="csp-nonce" content="{{ $cspNonce ?? '' }}">
     <link rel="icon" href="{{ asset('images/favicon/favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon/favicon-32x32.png') }}">
@@ -79,7 +106,17 @@
             position: fixed;
             z-index: 80;
             pointer-events: none;
-            animation: fly-to-target 720ms cubic-bezier(.2, .8, .2, 1) forwards;
+            transform-origin: center;
+            animation: fly-to-target 980ms cubic-bezier(.18, .72, .18, 1) forwards;
+            will-change: transform, opacity;
+        }
+
+        .nav-action-shake {
+            animation: nav-action-shake 620ms ease both;
+        }
+
+        .counter-pop {
+            animation: counter-pop 520ms ease both;
         }
 
         .premium-tilt {
@@ -149,9 +186,47 @@
         }
 
         @keyframes fly-to-target {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+
+            55% {
+                opacity: .92;
+                transform: translate(calc(var(--fly-x) * .72), calc(var(--fly-y) * .58 - 42px)) scale(.42) rotate(5deg);
+            }
+
             to {
-                transform: translate(var(--fly-x), var(--fly-y)) scale(.18) rotate(8deg);
+                transform: translate(var(--fly-x), var(--fly-y)) scale(.12) rotate(10deg);
                 opacity: 0;
+            }
+        }
+
+        @keyframes nav-action-shake {
+            0%, 100% {
+                transform: translateX(0) scale(1);
+            }
+
+            18%, 54% {
+                transform: translateX(-3px) scale(1.08);
+            }
+
+            36%, 72% {
+                transform: translateX(3px) scale(1.08);
+            }
+        }
+
+        @keyframes counter-pop {
+            0% {
+                transform: scale(.55);
+            }
+
+            60% {
+                transform: scale(1.25);
+            }
+
+            100% {
+                transform: scale(1);
             }
         }
     </style>
@@ -188,12 +263,20 @@
                         this.scrolled = window.scrollY > 300;
                     });
                 },
-                fly(event, targetId, counterKey) {
-                    const source = event.currentTarget.closest('[data-fly-source]') || event.currentTarget;
+                animateTarget(target) {
+                    if (!target) return;
+
+                    target.classList.remove('nav-action-shake');
+                    void target.offsetWidth;
+                    target.classList.add('nav-action-shake');
+                    window.setTimeout(() => target.classList.remove('nav-action-shake'), 700);
+                },
+                fly(event, targetId, counterKey = null, increment = 1) {
+                    const source = event.submitter?.closest('[data-fly-source]') || event.currentTarget.closest('[data-fly-source]') || event.currentTarget;
                     const target = document.getElementById(targetId);
 
                     if (!source || !target) {
-                        this[counterKey]++;
+                        if (counterKey) this[counterKey] += increment;
                         return;
                     }
 
@@ -210,8 +293,22 @@
                     clone.style.setProperty('--fly-y', `${targetRect.top + targetRect.height / 2 - sourceRect.top - sourceRect.height / 2}px`);
 
                     document.body.appendChild(clone);
-                    this[counterKey]++;
-                    window.setTimeout(() => clone.remove(), 760);
+                    if (counterKey) this[counterKey] += increment;
+                    this.animateTarget(target);
+                    window.setTimeout(() => clone.remove(), 1040);
+                },
+                flyAndSubmit(event, targetId, counterKey = null) {
+                    const form = event.target;
+
+                    if (form.dataset.submitting === '1') {
+                        return;
+                    }
+
+                    form.dataset.submitting = '1';
+                    const selectedSeats = new FormData(form).getAll('seats[]').length;
+                    const increment = Math.max(1, selectedSeats);
+                    this.fly(event, targetId, counterKey, increment);
+                    window.setTimeout(() => form.submit(), 820);
                 },
                 scrollTop() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });

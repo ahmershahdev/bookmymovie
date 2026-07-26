@@ -14,6 +14,7 @@ use App\Models\Seat;
 use App\Models\SeatCategory;
 use App\Models\Show;
 use App\Models\ShowSeatPrice;
+use App\Models\ShowSeatRowPrice;
 use App\Models\SiteSetting;
 use App\Models\Theater;
 use App\Models\User;
@@ -63,6 +64,7 @@ class DatabaseSeeder extends Seeder
             'cart_items',
             'carts',
             'coupons',
+            'show_seat_row_prices',
             'show_seat_prices',
             'shows',
             'seats',
@@ -192,6 +194,11 @@ class DatabaseSeeder extends Seeder
                 'status' => 'now_showing',
                 'poster_image' => null,
                 'banner_image' => null,
+                'hero_carousel_enabled' => $index < 5,
+                'hero_sort_order' => $index,
+                'hero_eyebrow' => $index < 5 ? 'Featured release' : null,
+                'hero_tagline' => $index < 5 ? $movieData['description'] : null,
+                'hero_image' => null,
                 'trailer_url' => 'https://www.youtube.com/embed/dQw4w9WgXcQ',
                 'base_price' => 2500,
                 'sale_price' => 1999,
@@ -214,18 +221,21 @@ class DatabaseSeeder extends Seeder
             ]);
 
             $screen = $screens[$index % $screens->count()];
-            $show = Show::create([
-                'movie_id' => $movie->id,
-                'screen_id' => $screen->id,
-                'show_date' => now()->addDays(intdiv($index, $screens->count()))->toDateString(),
-                'show_time' => ['10:00:00', '13:30:00', '17:00:00', '20:30:00'][$index % 4],
-                'status' => 'scheduled',
-                'total_seats' => 60,
-                'booked_seats' => 0,
-                'created_by' => $admin->id,
-            ]);
 
-            $this->seedShowPrices($show);
+            foreach (['10:00:00', '13:30:00', '17:00:00', '20:30:00'] as $timeIndex => $showTime) {
+                $show = Show::create([
+                    'movie_id' => $movie->id,
+                    'screen_id' => $screen->id,
+                    'show_date' => now()->addDays(intdiv($index, $screens->count()) + $timeIndex)->toDateString(),
+                    'show_time' => $showTime,
+                    'status' => 'scheduled',
+                    'total_seats' => 60,
+                    'booked_seats' => 0,
+                    'created_by' => $admin->id,
+                ]);
+
+                $this->seedShowPrices($show);
+            }
         });
     }
 
@@ -256,9 +266,18 @@ class DatabaseSeeder extends Seeder
     private function seedShowPrices(Show $show): void
     {
         ShowSeatPrice::insert([
-            ['show_id' => $show->id, 'seat_category_id' => 1, 'price' => 2500, 'sale_price' => 1999, 'kids_price' => 1800, 'kids_sale_price' => 1499],
+            ['show_id' => $show->id, 'seat_category_id' => 1, 'price' => 3400, 'sale_price' => 2799, 'kids_price' => 2600, 'kids_sale_price' => 2199],
             ['show_id' => $show->id, 'seat_category_id' => 2, 'price' => 2800, 'sale_price' => 2249, 'kids_price' => 2100, 'kids_sale_price' => 1699],
             ['show_id' => $show->id, 'seat_category_id' => 3, 'price' => 3200, 'sale_price' => 2499, 'kids_price' => null, 'kids_sale_price' => null],
+        ]);
+
+        ShowSeatRowPrice::insert([
+            ['show_id' => $show->id, 'row_label' => 'A', 'tier_name' => 'A Front Premium', 'benefits' => 'Closest screen view, recliner pitch, priority entry lane, complimentary drink upgrade', 'price' => 3800, 'sale_price' => 3299, 'kids_price' => 3000, 'kids_sale_price' => 2599, 'created_at' => now(), 'updated_at' => now()],
+            ['show_id' => $show->id, 'row_label' => 'B', 'tier_name' => 'B Premium', 'benefits' => 'Front-center view, extra legroom, faster counter support', 'price' => 3400, 'sale_price' => 2899, 'kids_price' => 2700, 'kids_sale_price' => 2299, 'created_at' => now(), 'updated_at' => now()],
+            ['show_id' => $show->id, 'row_label' => 'C', 'tier_name' => 'C Prime', 'benefits' => 'Balanced screen distance, central sound coverage, standard comfort seating', 'price' => 3000, 'sale_price' => 2499, 'kids_price' => 2350, 'kids_sale_price' => 1999, 'created_at' => now(), 'updated_at' => now()],
+            ['show_id' => $show->id, 'row_label' => 'D', 'tier_name' => 'D Comfort', 'benefits' => 'Mid-hall view, easy aisle access, family-friendly pricing', 'price' => 2700, 'sale_price' => 2199, 'kids_price' => 2100, 'kids_sale_price' => 1749, 'created_at' => now(), 'updated_at' => now()],
+            ['show_id' => $show->id, 'row_label' => 'E', 'tier_name' => 'E Saver', 'benefits' => 'Value seating, clear sightline, quick exit access', 'price' => 2400, 'sale_price' => 1999, 'kids_price' => 1900, 'kids_sale_price' => 1599, 'created_at' => now(), 'updated_at' => now()],
+            ['show_id' => $show->id, 'row_label' => 'F', 'tier_name' => 'F Back Value', 'benefits' => 'Lowest row price, relaxed rear view, good for groups', 'price' => 2100, 'sale_price' => 1749, 'kids_price' => null, 'kids_sale_price' => null, 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 
@@ -295,10 +314,13 @@ class DatabaseSeeder extends Seeder
     {
         collect([
             'site_name' => 'BookMyMovie',
+            'default_meta_title' => 'BookMyMovie - Book Cinema Tickets Online',
+            'default_meta_description' => 'Book movie tickets, compare shows, reserve seats, and manage cinema bookings online with BookMyMovie.',
+            'canonical_base_url' => 'https://bookmymovie.ahmershah.dev',
             'site_tagline' => 'Database-powered cinema booking with live shows, sale pricing, reviews, and seat selection.',
             'footer_description' => 'BookMyMovie is your all-in-one digital cinema companion for showtimes, sale prices, reviews, wishlists, and secure seat booking.',
             'copyright_note' => 'Created by Syed Ahmer Shah',
-            'support_email' => 'support@bookmymovie.test',
+            'support_email' => 'support@bookmymovie.ahmershah.dev',
             'support_phone' => '021-111-266-566',
             'service_area' => 'Pakistan',
             'response_sla' => 'Under 24 hours',

@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
 @section('title', $siteSettings['site_name'] ?? 'BookMyMovie')
+@section('meta_title', $siteSettings['default_meta_title'] ?? 'BookMyMovie - Book Cinema Tickets Online')
+@section('meta_description', $siteSettings['default_meta_description'] ?? 'Book movie tickets, compare shows, reserve seats, and manage cinema bookings online with BookMyMovie.')
 
 @section('content')
     <section class="bg-gray-950 px-4 pb-16 pt-32 sm:px-6 lg:px-8">

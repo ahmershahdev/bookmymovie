@@ -10,6 +10,8 @@ class ContentPage extends Model
         'slug',
         'title',
         'meta_title',
+        'meta_description',
+        'canonical_path',
         'hero_label',
         'excerpt',
         'body',

@@ -1,6 +1,31 @@
 @extends('layouts.app')
 
-@section('title', $movie->title . ' | BookMyMovie')
+@section('title', ($movie->meta_title ?: $movie->title . ' Tickets') . ' | BookMyMovie')
+@section('meta_description', $movie->meta_description ?: \Illuminate\Support\Str::limit($movie->description ?: 'Book showtimes and seats for ' . $movie->title . ' with BookMyMovie.', 160, ''))
+@section('canonical', rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/') . route('movies.show', $movie->slug, false))
+@section('og_type', 'video.movie')
+@section('json_ld', json_encode([
+    '@context' => 'https://schema.org',
+    '@type' => 'Movie',
+    'name' => $movie->title,
+    'description' => $movie->meta_description ?: $movie->description,
+    'image' => $movie->poster_image ? asset(ltrim($movie->poster_image, '/')) : asset('images/logo.png'),
+    'datePublished' => optional($movie->release_date)->toDateString(),
+    'aggregateRating' => [
+        '@type' => 'AggregateRating',
+        'ratingValue' => $movie->displayRating(),
+        'reviewCount' => max(1, $movie->displayReviewCount()),
+        'bestRating' => 5,
+        'worstRating' => 1,
+    ],
+    'offers' => [
+        '@type' => 'Offer',
+        'price' => $movie->cardPrice(),
+        'priceCurrency' => 'PKR',
+        'availability' => $shows->isNotEmpty() ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+        'url' => rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/') . route('movies.show', $movie->slug, false),
+    ],
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
 
 @section('content')
     <div class="bg-gray-950 text-gray-100 min-h-screen" x-data="{ activeTab: 'showtimes', trailerOpen: false }">
@@ -77,7 +102,7 @@
                             </span>
 
                             <div class="flex items-center px-3 py-1 rounded-md bg-amber-500/10 text-amber-400">
-                                <x-star-rating :rating="$movie->average_rating ?: 4" />
+                                <x-star-rating :rating="$movie->displayRating()" />
                             </div>
                         </div>
 
@@ -95,7 +120,8 @@
                             @endif
 
                             <!-- Wishlist Form Button -->
-                            <form method="POST" action="{{ route('user.wishlist') }}" class="inline-block">
+                            <form method="POST" action="{{ route('user.wishlist') }}" class="inline-block"
+                                @submit.prevent="flyAndSubmit($event, 'wishlist-icon', 'wishlistCount')">
                                 @csrf
                                 <input type="hidden" name="movie_id" value="{{ $movie->id }}">
                                 <button type="submit"
@@ -281,7 +307,7 @@
                 <div class="lg:col-span-3 rounded-2xl border border-white/10 bg-gray-900/40 p-6 md:p-8 backdrop-blur-sm">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                         <h3 class="text-xl font-bold text-white">Database Reviews</h3>
-                        <span class="text-sm font-bold text-amber-300">{{ number_format((float) $movie->average_rating, 1) }} / 5</span>
+                        <span class="text-sm font-bold text-amber-300">{{ number_format($movie->displayRating(), 1) }} / 5</span>
                     </div>
                     <div class="mt-5 grid gap-4 md:grid-cols-2">
                         @forelse($movie->reviews as $review)

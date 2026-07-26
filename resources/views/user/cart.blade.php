@@ -6,7 +6,7 @@
     <section class="bg-gray-950 px-4 pb-16 pt-36 sm:px-6 lg:px-8">
         <div class="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_340px]">
             <div>
-                <x-section-heading eyebrow="Cart" title="Seat cart" description="Held seats expire after 10 minutes." />
+                <x-section-heading eyebrow="Cart" title="Seat cart" description="Held seats expire after 10 minutes. Each booking is capped at 4 seats." />
                 @error('cart')<p class="mt-4 text-sm text-red-300">{{ $message }}</p>@enderror
                 <div class="mt-8 space-y-4">
                     @forelse($cartItems as $item)

@@ -1,0 +1,115 @@
+# BookMyMovie
+
+BookMyMovie is a Laravel-based movie ticket booking website. The site lets users discover cinema releases, compare movies, choose seats, complete bookings, and manage their account history. The admin dashboard manages business and content operations.
+
+## Canonical Site
+
+The canonical production domain is:
+
+https://bookmymovie.ahmershah.dev/
+
+## Public Routes
+
+- `/` - Home page with hero slider, movie categories, and sale ticker.
+- `/movies` - Movie listing with filters.
+- `/movies/{slug}` - Movie detail page with showtimes, pricing, reviews, poster, banner, trailer, and schema metadata.
+- `/movies/{slug}/book/{show}` - Seat selection flow with live reserved/booked states, line-by-line A-F row tier pricing, row benefits, and a 4-seat booking cap.
+- `/compare` - Movie comparison page.
+- `/search` - Search results.
+- `/about` - About page.
+- `/contact` - Contact form.
+- `/faq` - Frequently asked questions.
+- `/terms` - Terms page.
+- `/privacy` - Privacy page.
+- `/refund-policy` - Refund policy.
+- `/e-ticket-info` - E-ticket information.
+
+## Account Routes
+
+- `/login` - User login.
+- `/register` and `/signup` - User registration.
+- `/forgot-password` - User reset code request.
+- `/reset-password/{token}` - User password reset.
+- `/account` - User dashboard.
+- `/account/bookings` - Booking history.
+- `/account/profile` - Profile settings.
+- `/cart` and `/checkout` - Cart and checkout.
+
+## Admin Routes
+
+- `/admin/login` - Admin login.
+- `/admin/forgot-credentials` - Admin credential recovery using the configured recovery secret and admin email.
+- `/admin/reset-credentials/{token}` - Admin password or email reset with a 15-minute code.
+- `/admin/dashboard` - Unified admin dashboard for site settings, SEO, complete movie CRUD, poster/banner/hero uploads and deletes, hero carousel management, coupons, users, reviews, notifications, and admin profile.
+
+## SEO
+
+The app renders:
+
+- Title tags capped in templates to 60 characters.
+- Meta descriptions capped in templates to 160 characters.
+- Canonical URLs using `https://bookmymovie.ahmershah.dev`.
+- Open Graph metadata.
+- JSON-LD WebSite, WebPage, and Movie schema where applicable.
+- `robots.txt` points crawlers to `https://bookmymovie.ahmershah.dev/sitemap.xml`.
+- `sitemap.xml` maps public production URLs on `https://bookmymovie.ahmershah.dev`.
+- `llms.txt` and `llms-full.txt` summarize public routes, features, SEO behavior, and operational constraints for AI crawlers.
+
+Admins can edit:
+
+- Website name.
+- Default meta title.
+- Default meta description.
+- Canonical base URL.
+- Page titles, meta titles, meta descriptions, canonical paths, and excerpts.
+- Movie meta titles and descriptions.
+- Movie poster, banner, hero carousel image, hero eyebrow, hero tagline, and hero sort order.
+
+## Shows and Seat Pricing
+
+- Active seeded movies receive four future scheduled showtimes.
+- Row A is the highest front premium tier.
+- Row B is slightly less expensive than A.
+- Row C is less expensive than B, followed by D, E, and F.
+- Each row tier stores benefits such as priority entry, extra legroom, central sound coverage, family pricing, value seating, or group-friendly rear seating.
+- The `v_seat_availability` view exposes row tier names, benefits, sale prices, and live `available`, `reserved`, `booked`, or `inactive` seat states.
+
+## Security
+
+The project uses Laravel's standard protections and app-specific controls:
+
+- CSRF tokens on form submissions.
+- Request validation before database writes.
+- Eloquent/query builder prepared statements instead of raw user-input SQL.
+- Throttling on login, registration, reset, contact, wishlist, cart, and checkout routes.
+- Hashed user and admin passwords.
+- Custom captcha on protected public forms.
+- Optional Google reCAPTCHA outside localhost.
+- Admin session timeout after 60 minutes by default.
+- Booking cart and checkout transactions lock user/cart/show/seat records and rely on unique `cart_items(seat_id, show_id)` and `booking_seats(seat_id, show_id)` constraints to prevent duplicate reservations and duplicate bookings.
+- Coupon checkout locks the coupon row before checking `max_uses`, `used_count`, and per-user usage, then inserts usage and increments the counter in the same transaction.
+- Seat purchases are capped at 4 seats per user booking in validation, UI, cart, and checkout.
+
+## Email Automation
+
+Transactional email is centralized through Laravel Mail and can use SMTP providers such as SendGrid or Sender.net. Current automated emails include:
+
+- User signup.
+- User login alert.
+- User forgot-password reset code.
+- Admin credential reset code.
+- Booking confirmation.
+
+Reset codes are random 12-character values and expire after 15 minutes.
+
+## Movie Media
+
+Movie image fields store public asset paths or uploaded public-disk paths, for example:
+
+- `images/movies/example-poster.jpg`
+- `images/movies/example-banner.jpg`
+- `movie-media/posters/example.jpg`
+- `movie-media/banners/example.jpg`
+- `movie-media/heros/example.jpg`
+
+Admins can upload, replace, and delete poster, banner, and hero images from the movie editor. Existing `public/images/movies/` paths remain supported for manually managed assets.

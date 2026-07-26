@@ -9,7 +9,7 @@
                 class="rounded-lg border border-white/10 bg-gray-900 p-6">
                 @csrf
                 <h1 class="text-3xl font-black text-white">Checkout</h1>
-                <p class="mt-2 text-sm text-gray-300">COD only. Pay at cinema counter.</p>
+                <p class="mt-2 text-sm text-gray-300">COD only. Pay at cinema counter. Each booking is capped at 4 seats.</p>
                 <div class="mt-6 grid gap-4">
                     <label><span class="text-sm font-bold text-gray-300">Full name</span><input name="name"
                             value="{{ old('name', auth()->user()->name) }}"
@@ -19,6 +19,10 @@
                             value="{{ old('phone', auth()->user()->phone) }}"
                             class="mt-2 w-full rounded-md border-white/10 bg-gray-950 text-white focus:border-red-400 focus:ring-red-400"></label>
                     @error('phone')<p class="text-sm text-red-300">{{ $message }}</p>@enderror
+                    <label><span class="text-sm font-bold text-gray-300">Coupon code</span><input name="coupon_code"
+                            value="{{ old('coupon_code') }}" placeholder="Optional"
+                            class="mt-2 w-full rounded-md border-white/10 bg-gray-950 uppercase text-white focus:border-red-400 focus:ring-red-400"></label>
+                    @error('coupon_code')<p class="text-sm text-red-300">{{ $message }}</p>@enderror
                     <button @disabled($cartItems->isEmpty())
                         class="rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-gray-700">Place
                         COD booking</button>
@@ -27,6 +31,7 @@
             <aside class="rounded-lg border border-white/10 bg-gray-900 p-6">
                 <h2 class="font-black text-white">Order total</h2>
                 <p class="mt-4 text-3xl font-black text-gold">PKR {{ number_format($total) }}</p>
+                <p class="mt-2 text-xs font-bold text-gray-400">Coupon discounts are applied after validation during final booking.</p>
                 <div class="mt-5 space-y-2 text-sm text-gray-300">
                     @foreach($cartItems as $item)
                         <p>{{ $item->seat->row_label }}{{ $item->seat->seat_number }} - PKR {{ number_format((float) $item->price) }}</p>

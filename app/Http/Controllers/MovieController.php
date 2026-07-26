@@ -88,11 +88,31 @@ class MovieController extends Controller
             ->orderBy('seat_number')
             ->get();
 
+        $pricingTiers = $seats
+            ->groupBy('row_label')
+            ->map(function ($tierSeats, string $rowLabel) {
+                $rows = $tierSeats->pluck('row_label')->unique()->values();
+
+                return [
+                    'category' => $tierSeats->first()->row_tier_name ?: $tierSeats->first()->category_name,
+                    'rows' => $rows->join(', '),
+                    'benefits' => $tierSeats->first()->row_benefits,
+                    'is_front' => in_array($rowLabel, ['A', 'B'], true),
+                    'price' => (float) $tierSeats->first()->price,
+                    'sale_price' => $tierSeats->first()->sale_price !== null ? (float) $tierSeats->first()->sale_price : null,
+                    'kids_price' => $tierSeats->first()->kids_price !== null ? (float) $tierSeats->first()->kids_price : null,
+                    'kids_sale_price' => $tierSeats->first()->kids_sale_price !== null ? (float) $tierSeats->first()->kids_sale_price : null,
+                ];
+            })
+            ->sortBy('rows')
+            ->values();
+
         return view('movies.seats', [
             'movie' => $movie,
             'showModel' => Show::findOrFail($show),
             'showDetails' => $showDetails,
             'seats' => $seats,
+            'pricingTiers' => $pricingTiers,
             'slug' => $slug,
             'show' => $show,
         ]);

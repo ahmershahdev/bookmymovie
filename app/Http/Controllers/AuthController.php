@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Admin;
 use App\Models\User;
 use App\Support\FormSecurity;
+use App\Support\TransactionalMailer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +33,7 @@ class AuthController extends Controller
 
         if (Auth::attempt([...$credentials, 'is_blocked' => false], $request->boolean('remember'))) {
             $request->session()->regenerate();
+            TransactionalMailer::userLogin($request->user());
 
             return redirect()->intended(route('user.dashboard'));
         }
@@ -61,6 +63,7 @@ class AuthController extends Controller
         $user = User::create($data);
         Auth::login($user);
         $request->session()->regenerate();
+        TransactionalMailer::userSignup($user);
 
         return redirect()->route('user.dashboard')->with('status', 'Account created.');
     }
@@ -170,12 +173,13 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
         ]);
         $data['email'] = strtolower($data['email']);
-        $token = Str::random(64);
+        $token = strtoupper(Str::random(12));
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email' => $data['email']],
             ['token' => Hash::make($token), 'created_at' => now()]
         );
+        TransactionalMailer::passwordResetCode($data['email'], $token, route('password.reset', $token));
 
         return back()
             ->with('status', 'Password reset link generated.')
@@ -199,7 +203,7 @@ class AuthController extends Controller
 
         $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();
 
-        if (! $record || now()->subHour()->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
+        if (! $record || now()->subMinutes(15)->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
             return back()->withErrors(['email' => 'Invalid reset token.']);
         }
 
@@ -212,6 +216,72 @@ class AuthController extends Controller
     public function showAdminLogin(): View
     {
         return view('auth.admin-login');
+    }
+
+    public function showAdminForgotCredentials(): View
+    {
+        return view('auth.admin-forgot-credentials');
+    }
+
+    public function sendAdminCredentialReset(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'secret_key' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:150', 'exists:admins,email'],
+        ]);
+
+        if (! hash_equals((string) env('BOOKMYMOVIE_ADMIN_RECOVERY_SECRET', env('BOOKMYMOVIE_ADMIN_INVITE', 'BOOKMYMOVIE-ADMIN')), (string) $data['secret_key'])) {
+            return back()->withErrors(['secret_key' => 'Invalid recovery secret.'])->onlyInput('email');
+        }
+
+        $token = strtoupper(Str::random(12));
+        $email = strtolower($data['email']);
+
+        DB::table('admin_password_resets')->updateOrInsert(
+            ['email' => $email],
+            ['token' => Hash::make($token), 'created_at' => now()]
+        );
+
+        TransactionalMailer::passwordResetCode($email, $token, route('admin.credentials.reset', $token), true);
+
+        return back()
+            ->with('status', 'Admin recovery link generated and emailed.')
+            ->with('reset_link', route('admin.credentials.reset', $token));
+    }
+
+    public function showAdminResetCredentials(string $token): View
+    {
+        return view('auth.admin-reset-credentials', compact('token'));
+    }
+
+    public function resetAdminCredentials(Request $request, string $token): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:150', 'exists:admins,email'],
+            'change_target' => ['required', 'in:password,email'],
+            'new_email' => ['nullable', 'required_if:change_target,email', 'email', 'max:150', 'unique:admins,email'],
+            'password' => ['nullable', 'required_if:change_target,password', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $email = strtolower($data['email']);
+        $record = DB::table('admin_password_resets')->where('email', $email)->first();
+
+        if (! $record || now()->subMinutes(15)->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
+            return back()->withErrors(['email' => 'Invalid or expired admin recovery code.']);
+        }
+
+        $admin = Admin::query()->where('email', $email)->firstOrFail();
+
+        if ($data['change_target'] === 'email') {
+            $admin->email = strtolower($data['new_email']);
+        } else {
+            $admin->password = Hash::make($data['password']);
+        }
+
+        $admin->save();
+        DB::table('admin_password_resets')->where('email', $email)->delete();
+
+        return redirect()->route('admin.login')->with('status', 'Admin credentials updated. Please login.');
     }
 
     public function adminLogin(Request $request): RedirectResponse
@@ -231,6 +301,7 @@ class AuthController extends Controller
         $admin->forceFill(['last_login_at' => now()])->save();
         $request->session()->regenerate();
         $request->session()->put('admin_id', $admin->id);
+        $request->session()->put('admin_authenticated_at', now()->timestamp);
 
         return redirect()->route('admin.dashboard');
     }
@@ -271,6 +342,7 @@ class AuthController extends Controller
     public function adminLogout(Request $request): RedirectResponse
     {
         $request->session()->forget('admin_id');
+        $request->session()->forget('admin_authenticated_at');
         $request->session()->regenerateToken();
 
         return redirect()->route('admin.login');

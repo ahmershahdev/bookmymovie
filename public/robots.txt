@@ -1,2 +1,4 @@
 User-agent: *
 Disallow:
+
+Sitemap: https://bookmymovie.ahmershah.dev/sitemap.xml

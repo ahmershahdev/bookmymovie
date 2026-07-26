@@ -26,13 +26,13 @@ The interface uses a dark cinema theme, glass panels, 3D tilt effects, rich tabl
 | Area | Features |
 | --- | --- |
 | Public site | Home, movies, movie details, compare, search, about, contact, FAQ, legal pages |
-| Booking flow | Show selection, visual seats, cart, checkout, booking tracking |
+| Booking flow | 4 showtimes per seeded movie, row-tier seat pricing, visual seats, cart, checkout, booking tracking |
 | User account | Login, register, forgot password, reset password, profile, wishlist, bookings |
 | Security UX | CSRF protection, min/max validation, password strength UI, disposable email blocking |
 | Captcha | Google reCAPTCHA v2 checkbox and v3 score verification when keys are configured |
 | Support | Detailed contact page, Pakistan map, message limits, placeholders, clean feedback |
 | Legal content | Privacy policy, refund policy, terms of service with detailed tables and cards |
-| Admin | Dashboard and management-ready models for cinema operations |
+| Admin | Unified dashboard, theme selector, movie CRUD, media uploads, hero carousel, SEO, coupons, notifications |
 
 ## UI Highlights
 
@@ -40,6 +40,7 @@ The interface uses a dark cinema theme, glass panels, 3D tilt effects, rich tabl
 | --- | --- |
 | 3D feel | Reusable `premium-tilt` and `auth-shell` hover transforms |
 | Navigation clarity | Global breadcrumbs on every non-home page |
+| Admin theming | Persistent admin theme selector and custom scrollbar styling |
 | Auth polish | Social buttons, password visibility toggles, strength meter, captcha block |
 | Contact UX | Pakistan service map, live message counter, validation limits |
 | Legal readability | Tables, cards, sectioned policy groups, responsive layout |
@@ -176,6 +177,10 @@ FACEBOOK_REDIRECT_URI="${APP_URL}/auth/facebook/callback"
 ```bash
 php artisan test
 ```
+
+## Seat Pricing
+
+Seat prices are assigned per show and row. Row A is the highest front premium tier, then B, C, D, E, and F decrease progressively. Each row tier stores benefits such as priority entry, extra legroom, central sound coverage, family pricing, value seating, or group-friendly rear seating.
 
 ## Notes
 

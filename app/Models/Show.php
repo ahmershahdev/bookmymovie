@@ -41,4 +41,9 @@ class Show extends Model
     {
         return $this->hasMany(ShowSeatPrice::class);
     }
+
+    public function rowPrices(): HasMany
+    {
+        return $this->hasMany(ShowSeatRowPrice::class);
+    }
 }
