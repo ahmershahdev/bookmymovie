@@ -155,11 +155,39 @@
                 </svg>
             </x-icon-button>
 
-            <!-- Login CTA Button -->
-            <a href="{{ route('user.login') }}"
-                class="hidden rounded-full bg-gradient-to-r from-red-600 to-red-500 px-5 py-2 text-sm font-black text-white shadow-lg shadow-red-950/50 transition hover:from-red-500 hover:to-red-400 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400 sm:inline-flex">
-                Login
-            </a>
+            @auth
+                <div class="relative" x-data="{ accountOpen: false }">
+                    <button type="button" @click="accountOpen = !accountOpen" @keydown.escape.window="accountOpen = false"
+                        class="hidden items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-black text-white transition hover:border-red-500/60 hover:bg-red-950/30 focus:outline-none focus:ring-2 focus:ring-red-400 sm:inline-flex">
+                        @if(auth()->user()->profile_picture)
+                            <img src="{{ asset('storage/' . auth()->user()->profile_picture) }}" alt=""
+                                class="h-7 w-7 rounded-full object-cover ring-1 ring-red-400/40">
+                        @else
+                            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-xs">
+                                {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                            </span>
+                        @endif
+                        Account
+                    </button>
+
+                    <div x-cloak x-show="accountOpen" @click.outside="accountOpen = false"
+                        x-transition
+                        class="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-gray-900/95 p-2 shadow-2xl shadow-black/80 backdrop-blur-xl">
+                        <a href="{{ route('user.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-bold text-gray-200 hover:bg-white/5 hover:text-white">Account page</a>
+                        <a href="{{ route('user.profile') }}" class="block rounded-lg px-3 py-2 text-sm font-bold text-gray-200 hover:bg-white/5 hover:text-white">Profile</a>
+                        <a href="{{ route('user.bookings') }}" class="block rounded-lg px-3 py-2 text-sm font-bold text-gray-200 hover:bg-white/5 hover:text-white">Order history</a>
+                        <form method="POST" action="{{ route('user.logout') }}" class="mt-1 border-t border-white/10 pt-1">
+                            @csrf
+                            <button class="w-full rounded-lg px-3 py-2 text-left text-sm font-bold text-red-300 hover:bg-red-950/40 hover:text-red-100">Logout</button>
+                        </form>
+                    </div>
+                </div>
+            @else
+                <a href="{{ route('user.login') }}"
+                    class="hidden rounded-full bg-gradient-to-r from-red-600 to-red-500 px-5 py-2 text-sm font-black text-white shadow-lg shadow-red-950/50 transition hover:from-red-500 hover:to-red-400 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400 sm:inline-flex">
+                    Login
+                </a>
+            @endauth
         </div>
     </nav>
 

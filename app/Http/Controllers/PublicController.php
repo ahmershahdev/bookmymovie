@@ -40,14 +40,7 @@ class PublicController extends Controller
 
     public function compare(): View
     {
-        $movies = Movie::query()
-            ->with('genres')
-            ->whereIn('status', ['now_showing', 'coming_soon'])
-            ->orderByDesc('average_rating')
-            ->limit(6)
-            ->get();
-
-        return view('public.compare', compact('movies'));
+        return view('public.compare');
     }
 
     public function faq(): View

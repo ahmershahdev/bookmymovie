@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'My Bookings | BookMyMovie')
+@section('meta_description', 'Review BookMyMovie order history, payment status, selected movie tickets, and booking details.')
 
 @section('content')
     <section class="bg-gray-950 px-4 pb-16 pt-36 sm:px-6 lg:px-8">

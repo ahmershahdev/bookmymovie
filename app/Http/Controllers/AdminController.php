@@ -6,20 +6,26 @@ use App\Models\Admin;
 use App\Models\Booking;
 use App\Models\ContentPage;
 use App\Models\Coupon;
+use App\Models\Genre;
 use App\Models\Movie;
 use App\Models\Notification;
 use App\Models\Review;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\MovieImageProcessor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use RuntimeException;
 
 class AdminController extends Controller
 {
@@ -49,7 +55,7 @@ class AdminController extends Controller
             'contentPages' => ContentPage::query()->orderBy('slug')->get(),
             'selectedMovie' => $selectedMovie,
             'movieEditorList' => Movie::query()->latest()->limit(100)->get(['id', 'title', 'slug', 'base_price', 'sale_price', 'rating_mode', 'hero_carousel_enabled']),
-            'genres' => \App\Models\Genre::query()->orderBy('name')->get(['id', 'name']),
+            'genres' => Genre::query()->orderBy('name')->get(['id', 'name']),
             'moviesList' => Movie::query()->latest()->limit(8)->get()->map(fn (Movie $movie) => "{$movie->title} - PKR ".number_format((float) ($movie->sale_price ?: $movie->base_price)))->all(),
             'trashedMovies' => Movie::onlyTrashed()->latest('deleted_at')->limit(12)->get(['id', 'title', 'deleted_at']),
             'showsList' => DB::table('v_show_details')->orderBy('show_date')->orderBy('show_time')->limit(8)->get()
@@ -65,7 +71,7 @@ class AdminController extends Controller
                     ->limit(12)
                     ->get()
                 : collect(),
-            'rowPriceBenefits' => $selectedMovie && \Illuminate\Support\Facades\Schema::hasTable('show_seat_row_prices')
+            'rowPriceBenefits' => $selectedMovie && Schema::hasTable('show_seat_row_prices')
                 ? DB::table('show_seat_row_prices')
                     ->join('shows', 'show_seat_row_prices.show_id', '=', 'shows.id')
                     ->where('shows.movie_id', $selectedMovie->id)
@@ -117,10 +123,14 @@ class AdminController extends Controller
         $data['description'] = $data['description'] ?: 'Added from admin dashboard.';
         $data['created_by'] = $admin->id;
 
-        foreach (['poster_image' => 'poster_upload', 'banner_image' => 'banner_upload', 'hero_image' => 'hero_upload'] as $column => $field) {
+        foreach (['poster_image' => 'poster_upload', 'hero_image' => 'hero_upload'] as $column => $field) {
             if ($uploaded = $this->storeMovieUpload($request, $field, $column)) {
                 $data[$column] = $uploaded;
             }
+        }
+
+        if (! empty($data['hero_image'])) {
+            $data['banner_image'] = $data['hero_image'];
         }
 
         $movie = Movie::create($data);
@@ -136,18 +146,26 @@ class AdminController extends Controller
         $data = $this->validatedMovieData($request, $movie);
         $data['slug'] = $data['slug'] ?: Str::slug($data['title']);
 
-        foreach (['poster_image', 'banner_image', 'hero_image'] as $column) {
+        foreach (['poster_image', 'hero_image'] as $column) {
             if ($request->boolean("delete_{$column}")) {
                 $this->deleteStoredMovieImage($movie->{$column});
                 $data[$column] = null;
             }
         }
 
-        foreach (['poster_image' => 'poster_upload', 'banner_image' => 'banner_upload', 'hero_image' => 'hero_upload'] as $column => $field) {
+        foreach (['poster_image' => 'poster_upload', 'hero_image' => 'hero_upload'] as $column => $field) {
             if ($uploaded = $this->storeMovieUpload($request, $field, $column)) {
                 $this->deleteStoredMovieImage($movie->{$column});
                 $data[$column] = $uploaded;
             }
+        }
+
+        if (array_key_exists('hero_image', $data)) {
+            if ($movie->banner_image && $movie->banner_image !== $movie->hero_image) {
+                $this->deleteStoredMovieImage($movie->banner_image);
+            }
+
+            $data['banner_image'] = $data['hero_image'];
         }
 
         $movie->update($data);
@@ -186,7 +204,7 @@ class AdminController extends Controller
      */
     private function validatedMovieData(Request $request, ?Movie $movie = null): array
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'title' => ['required', 'string', 'max:200'],
             'slug' => ['nullable', 'string', 'max:230', Rule::unique('movies', 'slug')->ignore($movie?->id)],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -195,16 +213,22 @@ class AdminController extends Controller
             'certificate_rating' => ['nullable', Rule::in(['U', 'UA', 'A', 'S', 'G', 'PG', 'PG-13', 'R'])],
             'release_date' => ['required', 'date'],
             'status' => ['required', Rule::in(['coming_soon', 'now_showing', 'ended'])],
-            'poster_image' => ['nullable', 'string', 'max:255'],
-            'poster_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'banner_image' => ['nullable', 'string', 'max:255'],
-            'banner_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:6144'],
+            'poster_upload' => [
+                Rule::requiredIf($movie === null || ! $movie->poster_image || $request->boolean('delete_poster_image')),
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:3072',
+            ],
             'hero_carousel_enabled' => ['nullable', 'boolean'],
             'hero_sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
             'hero_eyebrow' => ['nullable', 'string', 'max:80'],
             'hero_tagline' => ['nullable', 'string', 'max:220'],
-            'hero_image' => ['nullable', 'string', 'max:255'],
-            'hero_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:6144'],
+            'hero_upload' => [
+                Rule::requiredIf($movie === null || ! ($movie->hero_image ?: $movie->banner_image) || $request->boolean('delete_hero_image')),
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:3072',
+            ],
             'trailer_url' => ['nullable', 'url', 'max:500'],
             'meta_title' => ['nullable', 'string', 'max:60'],
             'meta_description' => ['nullable', 'string', 'max:160'],
@@ -217,9 +241,25 @@ class AdminController extends Controller
             'genre_ids' => ['nullable', 'array'],
             'genre_ids.*' => ['integer', 'exists:genres,id'],
             'delete_poster_image' => ['nullable', 'boolean'],
-            'delete_banner_image' => ['nullable', 'boolean'],
             'delete_hero_image' => ['nullable', 'boolean'],
+        ], [
+            'poster_upload.required' => 'Upload a 9:16 poster image for this movie.',
+            'poster_upload.max' => 'Poster image must be 3 MB or smaller.',
+            'hero_upload.required' => 'Upload a 16:9 carousel image for this movie.',
+            'hero_upload.max' => 'Carousel image must be 3 MB or smaller.',
         ]);
+
+        $validator->after(function ($validator) use ($request) {
+            if (! $this->imageHasAspect($request, 'poster_upload', 9 / 16)) {
+                $validator->errors()->add('poster_upload', 'Poster image must use a 9:16 vertical aspect ratio.');
+            }
+
+            if (! $this->imageHasAspect($request, 'hero_upload', 16 / 9)) {
+                $validator->errors()->add('hero_upload', 'Carousel image must use a 16:9 widescreen aspect ratio.');
+            }
+        });
+
+        $validated = $validator->validate();
 
         $validated['hero_carousel_enabled'] = $request->boolean('hero_carousel_enabled');
         $validated['kids_discount_eligible'] = $request->boolean('kids_discount_eligible');
@@ -227,13 +267,28 @@ class AdminController extends Controller
 
         return Arr::except($validated, [
             'poster_upload',
-            'banner_upload',
             'hero_upload',
             'genre_ids',
             'delete_poster_image',
-            'delete_banner_image',
             'delete_hero_image',
         ]);
+    }
+
+    private function imageHasAspect(Request $request, string $field, float $expectedRatio): bool
+    {
+        if (! $request->hasFile($field) || ! $request->file($field)->isValid()) {
+            return true;
+        }
+
+        $size = getimagesize($request->file($field)->getRealPath());
+
+        if (! $size || empty($size[1])) {
+            return true;
+        }
+
+        $actualRatio = $size[0] / $size[1];
+
+        return abs($actualRatio - $expectedRatio) <= 0.02;
     }
 
     private function storeMovieUpload(Request $request, string $field, string $column): ?string
@@ -242,7 +297,14 @@ class AdminController extends Controller
             return null;
         }
 
-        return $request->file($field)->store('movie-media/'.Str::of($column)->before('_image')->plural(), 'public');
+        try {
+            return app(MovieImageProcessor::class)->storeAsWebp(
+                $request->file($field),
+                'movie-media/'.Str::of($column)->before('_image')->plural()
+            );
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([$field => $exception->getMessage()]);
+        }
     }
 
     private function deleteStoredMovieImage(?string $path): void

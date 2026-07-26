@@ -35,6 +35,21 @@ class TransactionalMailer
         ));
     }
 
+    public static function emailVerificationCode(User $user, string $code): void
+    {
+        self::send($user->email, new TransactionalEmail(
+            'Verify your BookMyMovie account',
+            'Your verification code',
+            'Enter this 8-character code to verify your email address. The code expires in 15 minutes.',
+            [
+                'Code' => $code,
+                'Expires' => now()->addMinutes(15)->format('M d, Y h:i A'),
+            ],
+            'Verify email',
+            route('user.verify.notice', ['email' => $user->email])
+        ));
+    }
+
     public static function passwordResetCode(string $email, string $code, string $url, bool $admin = false): void
     {
         self::send($email, new TransactionalEmail(

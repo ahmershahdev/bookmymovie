@@ -24,10 +24,14 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'address',
         'date_of_birth',
         'gender',
+        'profile_picture',
         'password',
         'is_blocked',
+        'email_verification_code',
+        'email_verification_expires_at',
     ];
 
     /**
@@ -38,6 +42,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_code',
     ];
 
     /**
@@ -49,6 +54,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_verification_expires_at' => 'datetime',
             'date_of_birth' => 'date',
             'is_blocked' => 'boolean',
             'password' => 'hashed',

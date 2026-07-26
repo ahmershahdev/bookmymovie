@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Booking Detail | BookMyMovie')
+@section('meta_description', 'View BookMyMovie booking details, ticket seats, checkout contact information, and tracking link.')
 
 @section('content')
     <section class="bg-gray-950 px-4 pb-16 pt-36 sm:px-6 lg:px-8">
@@ -24,6 +25,16 @@
                     <div class="rounded-md bg-gray-950 p-4">
                         <dt>Total</dt>
                         <dd class="mt-1 font-bold text-white">PKR {{ number_format((float) $booking->total_amount) }}</dd>
+                    </div>
+                    <div class="rounded-md bg-gray-950 p-4">
+                        <dt>Contact</dt>
+                        <dd class="mt-1 font-bold text-white">{{ $booking->customer_name ?: $booking->user->name }}</dd>
+                        <dd class="mt-1 text-xs text-gray-400">{{ $booking->customer_email ?: $booking->user->email }}</dd>
+                        <dd class="mt-1 text-xs text-gray-400">{{ $booking->customer_phone ?: $booking->user->phone }}</dd>
+                    </div>
+                    <div class="rounded-md bg-gray-950 p-4">
+                        <dt>Address</dt>
+                        <dd class="mt-1 font-bold text-white">{{ $booking->customer_address ?: $booking->user->address ?: 'Not provided' }}</dd>
                     </div>
                 </dl>
                 <a href="{{ route('user.tracking', $booking->booking_number) }}"

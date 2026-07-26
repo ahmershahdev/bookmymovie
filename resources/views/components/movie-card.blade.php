@@ -8,8 +8,8 @@
         class="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br {{ $movie['gradient'] ?? 'from-gray-900 via-gray-950 to-black' }}">
 
         <!-- Real Poster Image (If Available) or Fallback Gradient + Logo -->
-        @if(!empty($movie['poster']) || !empty($movie['image']))
-            <img src="{{ asset($movie['poster'] ?? $movie['image']) }}" alt="{{ $movie['title'] }}"
+        @if(!empty($movie['poster_url']))
+            <img src="{{ $movie['poster_url'] }}" alt="{{ $movie['title'] }}"
                 class="h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-110">
         @else
             <!-- Fallback Ambient Backdrop -->
@@ -85,7 +85,7 @@
         </div>
 
         <!-- Action Controls with Fly Animations -->
-        <div class="grid grid-cols-[1fr_auto_auto] gap-2 pt-1">
+        <div class="grid grid-cols-[1fr_auto_auto_auto] gap-2 pt-1">
 
             <!-- View Details CTA -->
             <a href="{{ route('movies.show', $movie['slug']) }}"
@@ -108,6 +108,20 @@
                     </svg>
                 </button>
             </form>
+
+            <!-- Compare -->
+            <button type="button" @click="addToCompare({{ Illuminate\Support\Js::from($movie) }})"
+                class="group/btn inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-300 transition-all duration-300 hover:border-amber-400/60 hover:bg-amber-500/10 hover:text-amber-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                aria-label="Add {{ $movie['title'] }} to compare">
+                <svg class="h-5 w-5 transition-transform duration-300 group-hover/btn:scale-110" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 19V5" />
+                    <path d="M20 19V5" />
+                    <path d="M8 17V9" />
+                    <path d="M16 17V7" />
+                    <path d="M3 19h18" />
+                </svg>
+            </button>
 
             <!-- Book Seats -->
             <a href="{{ !empty($movie['first_show_id']) ? route('movies.seats', ['slug' => $movie['slug'], 'show' => $movie['first_show_id']]) : route('movies.show', $movie['slug']) }}"

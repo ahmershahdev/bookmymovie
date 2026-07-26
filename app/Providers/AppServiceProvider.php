@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use Illuminate\Database\QueryException;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -46,39 +47,51 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         View::composer('*', function ($view) {
-            $view->with('initialWishlistCount', 0);
-            $view->with('initialCartCount', 0);
+            static $shared = null;
 
-            try {
-                $view->with('siteSettings', Schema::hasTable('site_settings') ? SiteSetting::publicMap() : []);
+            if ($shared === null) {
+                $shared = [
+                    'siteSettings' => [],
+                    'navMovies' => [],
+                    'initialWishlistCount' => 0,
+                    'initialCartCount' => 0,
+                ];
 
-                $view->with('navMovies', Schema::hasTable('movies')
-                    ? Movie::query()
-                        ->with('genres')
-                        ->whereIn('status', ['now_showing', 'coming_soon'])
-                        ->limit(8)
-                        ->get()
-                        ->map(fn (Movie $movie) => $movie->toCardArray())
-                        ->all()
-                    : []);
-            } catch (QueryException) {
-                $view->with('siteSettings', []);
-                $view->with('navMovies', []);
-            }
+                try {
+                    $shared['siteSettings'] = Schema::hasTable('site_settings')
+                        ? Cache::remember('site_settings.public', now()->addMinutes(5), fn () => SiteSetting::publicMap())
+                        : [];
 
-            try {
-                if (Auth::check()) {
-                    $cart = Cart::query()
-                        ->where('user_id', Auth::id())
-                        ->where('expires_at', '>', now())
-                        ->first();
-
-                    $view->with('initialWishlistCount', Auth::user()->wishlists()->count());
-                    $view->with('initialCartCount', $cart?->items()->count() ?? 0);
+                    $shared['navMovies'] = Schema::hasTable('movies')
+                        ? Cache::remember('nav.movies.cards', now()->addMinutes(5), fn () => Movie::query()
+                            ->with('genres')
+                            ->whereIn('status', ['now_showing', 'coming_soon'])
+                            ->limit(8)
+                            ->get()
+                            ->map(fn (Movie $movie) => $movie->toCardArray())
+                            ->all())
+                        : [];
+                } catch (QueryException) {
+                    $shared['siteSettings'] = [];
+                    $shared['navMovies'] = [];
                 }
-            } catch (QueryException) {
-                //
+
+                try {
+                    if (Auth::check()) {
+                        $cart = Cart::query()
+                            ->where('user_id', Auth::id())
+                            ->where('expires_at', '>', now())
+                            ->first();
+
+                        $shared['initialWishlistCount'] = Auth::user()->wishlists()->count();
+                        $shared['initialCartCount'] = $cart?->items()->count() ?? 0;
+                    }
+                } catch (QueryException) {
+                    //
+                }
             }
+
+            $view->with($shared);
         });
     }
 }

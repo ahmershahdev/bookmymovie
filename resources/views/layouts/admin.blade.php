@@ -39,6 +39,11 @@
             scrollbar-color: var(--admin-accent) var(--admin-scroll-track);
         }
 
+        ::selection {
+            background: color-mix(in srgb, var(--admin-accent) 38%, transparent);
+            color: #fff;
+        }
+
         ::-webkit-scrollbar {
             width: 10px;
             height: 10px;

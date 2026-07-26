@@ -12,7 +12,7 @@
         $inputClass = "mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 hover:border-white/20 focus:border-red-500 focus:bg-white/10 focus:ring-4 focus:ring-red-500/20 {$baseTransition}";
 
         // File Inputs: Clean custom button style
-        $fileClass = "mt-2 block w-full text-sm text-gray-400 file:mr-4 file:cursor-pointer file:rounded-xl file:border-0 file:bg-red-500/10 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-red-400 hover:file:bg-red-500/20 {$baseTransition}";
+        $fileClass = "block w-full cursor-pointer rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-sm text-gray-400 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-red-500/10 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-red-300 hover:border-red-400/40 hover:bg-red-500/5 hover:file:bg-red-500/20 {$baseTransition}";
 
         // Textareas: Matches inputs with appropriate padding
         $areaClass = "mt-2 block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 hover:border-white/20 focus:border-red-500 focus:bg-white/10 focus:ring-4 focus:ring-red-500/20 {$baseTransition}";
@@ -27,6 +27,24 @@
         $labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-400";
 
         $selectedGenreIds = $selectedMovie?->genres?->pluck('id')->all() ?? [];
+        $movieUploadCards = [
+            'poster' => [
+                'column' => 'poster_image',
+                'field' => 'poster_upload',
+                'title' => 'Poster image',
+                'ratio' => '9:16 vertical',
+                'usage' => 'Shown on movie cards, movie detail poster, search, wishlist, and catalog pages.',
+                'previewClass' => 'aspect-[9/16] max-w-[180px]',
+            ],
+            'hero' => [
+                'column' => 'hero_image',
+                'field' => 'hero_upload',
+                'title' => 'Carousel image',
+                'ratio' => '16:9 widescreen',
+                'usage' => 'Shown in the home carousel and movie detail backdrop.',
+                'previewClass' => 'aspect-video',
+            ],
+        ];
     @endphp
 
     <section class="space-y-8">
@@ -141,20 +159,31 @@
                     <label class="block lg:col-span-2"><span class="{{ $labelClass }}">Description</span><textarea name="description" rows="4" class="{{ $areaClass }}">{{ old('description', $selectedMovie->description) }}</textarea></label>
 
                     {{-- Image Uploads --}}
-                    @foreach(['poster' => 'poster_image', 'banner' => 'banner_image', 'hero' => 'hero_image'] as $label => $column)
-                        <div class="rounded-xl border border-white/5 bg-white/[0.02] p-5 {{ $baseTransition }} hover:bg-white/[0.04]">
-                            <span class="{{ $labelClass }}">{{ ucfirst($label) }} Image</span>
-                            @if($selectedMovie->publicMediaUrl($selectedMovie->{$column}))
-                                <div class="relative mt-3 group overflow-hidden rounded-xl border border-white/10">
-                                    <img src="{{ $selectedMovie->publicMediaUrl($selectedMovie->{$column}) }}" alt="{{ ucfirst($label) }} preview" class="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105">
+                    @foreach($movieUploadCards as $key => $upload)
+                        @php
+                            $currentImage = $key === 'hero'
+                                ? ($selectedMovie->hero_image ?: $selectedMovie->banner_image)
+                                : $selectedMovie->{$upload['column']};
+                            $currentUrl = $selectedMovie->publicMediaUrl($currentImage);
+                        @endphp
+                        <div class="rounded-lg border border-white/10 bg-white/[0.025] p-5 {{ $baseTransition }} hover:border-white/20 hover:bg-white/[0.04]">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <span class="{{ $labelClass }}">{{ $upload['title'] }}</span>
+                                    <p class="text-sm font-semibold text-white">{{ $upload['ratio'] }}</p>
+                                    <p class="mt-1 text-xs leading-5 text-gray-400">{{ $upload['usage'] }}</p>
+                                    <p class="mt-2 text-xs font-medium text-gray-500">PNG, JPG, JPEG, or WebP only. Maximum 3 MB. Saved as optimized WebP.</p>
                                 </div>
-                            @endif
-                            <input name="{{ $column }}" value="{{ old($column, $selectedMovie->{$column}) }}" placeholder="Path: images/movies/file.jpg" class="{{ $inputClass }}">
-                            <input name="{{ $label }}_upload" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }}">
-                            <label class="mt-4 flex cursor-pointer items-center gap-3 text-sm font-medium text-gray-400 hover:text-red-400 {{ $baseTransition }}">
-                                <input type="checkbox" name="delete_{{ $column }}" value="1" class="h-4 w-4 rounded border-white/20 bg-black text-red-500 focus:ring-red-500/30">
-                                Delete current {{ $label }} image
-                            </label>
+                                @if($currentUrl)
+                                    <div class="relative w-full overflow-hidden rounded-lg border border-white/10 bg-black/30 sm:w-40 {{ $upload['previewClass'] }}">
+                                        <img src="{{ $currentUrl }}" alt="{{ $upload['title'] }} preview" class="h-full w-full object-cover">
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="mt-4">
+                                <input name="{{ $upload['field'] }}" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }}">
+                            </div>
+                            <p class="mt-3 text-xs font-medium text-gray-500">Upload a new file here to replace the current {{ strtolower($upload['title']) }}.</p>
                         </div>
                     @endforeach
 
@@ -211,9 +240,15 @@
                 <label class="block"><span class="{{ $labelClass }}">Genres</span><select name="genre_ids[]" multiple class="{{ $inputClass }} min-h-[7rem] py-3 custom-scrollbar">@foreach($genres as $genre)<option value="{{ $genre->id }}">{{ $genre->name }}</option>@endforeach</select></label>
                 <label class="block"><span class="{{ $labelClass }}">Base price</span><input name="base_price" type="number" step="0.01" value="2500" class="{{ $inputClass }}"></label>
                 <label class="block"><span class="{{ $labelClass }}">Sale price</span><input name="sale_price" type="number" step="0.01" class="{{ $inputClass }}"></label>
-                <label class="block"><span class="{{ $labelClass }}">Poster upload</span><input name="poster_upload" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }}"></label>
-                <label class="block"><span class="{{ $labelClass }}">Banner upload</span><input name="banner_upload" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }}"></label>
-                <label class="block"><span class="{{ $labelClass }}">Hero upload</span><input name="hero_upload" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }}"></label>
+                @foreach($movieUploadCards as $upload)
+                    <div class="rounded-lg border border-white/10 bg-white/[0.025] p-5">
+                        <span class="{{ $labelClass }}">{{ $upload['title'] }}</span>
+                        <p class="text-sm font-semibold text-white">{{ $upload['ratio'] }}</p>
+                        <p class="mt-1 text-xs leading-5 text-gray-400">{{ $upload['usage'] }}</p>
+                        <p class="mt-2 text-xs font-medium text-gray-500">PNG, JPG, JPEG, or WebP only. Maximum 3 MB. Saved as optimized WebP.</p>
+                        <input name="{{ $upload['field'] }}" type="file" accept="image/png,image/jpeg,image/webp" class="{{ $fileClass }} mt-4" required>
+                    </div>
+                @endforeach
                 <label class="block"><span class="{{ $labelClass }}">Trailer URL</span><input name="trailer_url" class="{{ $inputClass }}"></label>
                 <label class="block"><span class="{{ $labelClass }}">Rating mode</span><select name="rating_mode" class="{{ $inputClass }}"><option value="real">Use real reviews</option><option value="fake">Use manual rating</option></select></label>
                 <label class="block"><span class="{{ $labelClass }}">Hero order</span><input name="hero_sort_order" type="number" min="0" value="0" class="{{ $inputClass }}"></label>

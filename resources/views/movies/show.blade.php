@@ -1,5 +1,10 @@
 @extends('layouts.app')
 
+@php
+    $posterUrl = $movie->publicMediaUrl($movie->poster_image) ?: asset('images/logo.png');
+    $backdropUrl = $movie->publicMediaUrl($movie->hero_image ?: $movie->banner_image ?: $movie->poster_image) ?: asset('images/logo.png');
+@endphp
+
 @section('title', ($movie->meta_title ?: $movie->title . ' Tickets') . ' | BookMyMovie')
 @section('meta_description', $movie->meta_description ?: \Illuminate\Support\Str::limit($movie->description ?: 'Book showtimes and seats for ' . $movie->title . ' with BookMyMovie.', 160, ''))
 @section('canonical', rtrim($siteSettings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev', '/') . route('movies.show', $movie->slug, false))
@@ -9,7 +14,7 @@
     '@type' => 'Movie',
     'name' => $movie->title,
     'description' => $movie->meta_description ?: $movie->description,
-    'image' => $movie->poster_image ? asset(ltrim($movie->poster_image, '/')) : asset('images/logo.png'),
+    'image' => $posterUrl,
     'datePublished' => optional($movie->release_date)->toDateString(),
     'aggregateRating' => [
         '@type' => 'AggregateRating',
@@ -34,7 +39,7 @@
         <div class="relative w-full h-[460px] md:h-[520px] overflow-hidden">
             <!-- Backdrop Image & Overlays -->
             <div class="absolute inset-0">
-                <img src="{{ $movie->banner_image ? asset(ltrim($movie->banner_image, '/')) : ($movie->poster_image ? asset(ltrim($movie->poster_image, '/')) : asset('images/logo.png')) }}"
+                <img src="{{ $backdropUrl }}"
                     alt="{{ $movie->title }} backdrop"
                     class="w-full h-full object-cover object-center filter blur-sm scale-105 opacity-30">
                 <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/80 to-transparent"></div>
@@ -48,7 +53,7 @@
                     <!-- Poster Card (Aspect 9:16) -->
                     <div
                         class="hidden md:block relative group rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-red-950/30 aspect-[9/16] bg-gray-900 w-full max-w-[250px]">
-                        <img src="{{ $movie->poster_image ? asset(ltrim($movie->poster_image, '/')) : asset('images/logo.png') }}"
+                        <img src="{{ $posterUrl }}"
                             alt="{{ $movie->title }} poster"
                             class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500">
 
@@ -135,6 +140,7 @@
                             </form>
 
                             <a href="{{ route('movies.compare') }}"
+                                @click.prevent="addToCompare({{ Illuminate\Support\Js::from($movie->toCardArray()) }}); window.location.href = '{{ route('movies.compare') }}'"
                                 class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3.5 text-sm font-bold text-white backdrop-blur-md hover:bg-white/10 hover:border-white/25 transition-all">
                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

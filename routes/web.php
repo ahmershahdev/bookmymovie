@@ -30,6 +30,8 @@ Route::post('/login', [AuthController::class, 'userLogin'])->middleware('throttl
 Route::get('/register', [AuthController::class, 'showUserRegister'])->name('user.register');
 Route::get('/signup', [AuthController::class, 'showUserRegister'])->name('user.signup');
 Route::post('/register', [AuthController::class, 'userRegister'])->middleware('throttle:6,1');
+Route::get('/verify-email', [AuthController::class, 'showEmailVerification'])->name('user.verify.notice');
+Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->name('user.verify')->middleware('throttle:6,1');
 Route::post('/logout', [AuthController::class, 'logout'])->name('user.logout');
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider'])
     ->whereIn('provider', ['google', 'facebook'])
@@ -60,9 +62,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/account/bookings/{number}', [AccountController::class, 'bookingShow'])->name('user.booking.show');
     Route::get('/account/bookings/{number}/track', [AccountController::class, 'tracking'])->name('user.tracking');
     Route::get('/account/wishlist', [AccountController::class, 'wishlist'])->name('user.wishlist');
-    Route::post('/account/wishlist', [AccountController::class, 'toggleWishlist'])->middleware('throttle:wishlist-actions');
+    Route::post('/account/wishlist', [AccountController::class, 'addWishlist'])->middleware('throttle:wishlist-actions');
+    Route::delete('/account/wishlist/{movie}', [AccountController::class, 'removeWishlist'])->name('user.wishlist.remove')->middleware('throttle:wishlist-actions');
     Route::get('/cart', [AccountController::class, 'cart'])->name('user.cart');
     Route::post('/cart', [AccountController::class, 'addToCart'])->middleware('throttle:cart-actions');
+    Route::delete('/cart/{item}', [AccountController::class, 'removeCartItem'])->name('user.cart.remove')->middleware('throttle:cart-actions');
     Route::get('/checkout', [AccountController::class, 'checkout'])->name('user.checkout');
     Route::post('/checkout', [AccountController::class, 'placeBooking'])->middleware('throttle:checkout-actions');
     Route::get('/account/profile', [AccountController::class, 'profile'])->name('user.profile');

@@ -310,6 +310,26 @@
                     this.fly(event, targetId, counterKey, increment);
                     window.setTimeout(() => form.submit(), 820);
                 },
+                addToCompare(movie) {
+                    const key = 'bookmymovie.compare.movies';
+                    const current = JSON.parse(localStorage.getItem(key) || '[]');
+                    const existing = current.findIndex(item => Number(item.id) === Number(movie.id));
+
+                    if (existing !== -1) {
+                        current.splice(existing, 1, movie);
+                        localStorage.setItem(key, JSON.stringify(current.slice(0, 4)));
+                        window.dispatchEvent(new CustomEvent('bookmymovie-compare-updated'));
+                        return;
+                    }
+
+                    if (current.length >= 4) {
+                        current.shift();
+                    }
+
+                    current.push(movie);
+                    localStorage.setItem(key, JSON.stringify(current));
+                    window.dispatchEvent(new CustomEvent('bookmymovie-compare-updated'));
+                },
                 scrollTop() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 },

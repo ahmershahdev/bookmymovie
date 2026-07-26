@@ -31,6 +31,14 @@ class AuthController extends Controller
         ]);
         $credentials['email'] = strtolower($credentials['email']);
 
+        $user = User::query()->where('email', $credentials['email'])->first();
+
+        if ($user && ! $user->email_verified_at) {
+            return redirect()
+                ->route('user.verify.notice', ['email' => $user->email])
+                ->withErrors(['email' => 'Please verify your email before logging in.']);
+        }
+
         if (Auth::attempt([...$credentials, 'is_blocked' => false], $request->boolean('remember'))) {
             $request->session()->regenerate();
             TransactionalMailer::userLogin($request->user());
@@ -60,12 +68,64 @@ class AuthController extends Controller
 
         unset($data['password_confirmation']);
 
-        $user = User::create($data);
-        Auth::login($user);
-        $request->session()->regenerate();
+        $code = strtoupper(Str::random(8));
+
+        $user = User::create([
+            ...$data,
+            'email_verification_code' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        TransactionalMailer::emailVerificationCode($user, $code);
+
+        return redirect()
+            ->route('user.verify.notice', ['email' => $user->email])
+            ->with('status', 'Account created. Check your email for the 8-character verification code.');
+    }
+
+    public function showEmailVerification(Request $request): View
+    {
+        return view('auth.verify-email', [
+            'email' => strtolower((string) $request->query('email')),
+        ]);
+    }
+
+    public function verifyEmail(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'exists:users,email'],
+            'code' => ['required', 'string', 'size:8'],
+        ]);
+
+        $user = User::query()->where('email', strtolower($data['email']))->firstOrFail();
+
+        if ($user->email_verified_at) {
+            return redirect()->route('user.login')->with('status', 'Account already verified. Please login.');
+        }
+
+        if (! $user->email_verification_code || ! $user->email_verification_expires_at || now()->greaterThan($user->email_verification_expires_at)) {
+            return back()
+                ->withInput(['email' => $user->email])
+                ->withErrors(['code' => 'Verification failed because the code expired. Please sign up again or request support.']);
+        }
+
+        if (! Hash::check(strtoupper($data['code']), $user->email_verification_code)) {
+            return back()
+                ->withInput(['email' => $user->email])
+                ->withErrors(['code' => 'Verification failed because the code is incorrect.']);
+        }
+
+        $user->forceFill([
+            'email_verified_at' => now(),
+            'email_verification_code' => null,
+            'email_verification_expires_at' => null,
+        ])->save();
+
         TransactionalMailer::userSignup($user);
 
-        return redirect()->route('user.dashboard')->with('status', 'Account created.');
+        return redirect()
+            ->route('user.login')
+            ->with('status', 'Verification successful. Account created successfully. Please login.');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -101,7 +161,7 @@ class AuthController extends Controller
             return redirect()
                 ->route('user.login')
                 ->withErrors([
-                    'oauth' => ucfirst($provider) . ' login could not be completed. Please try email login.',
+                    'oauth' => ucfirst($provider).' login could not be completed. Please try email login.',
                 ]);
         }
 
@@ -109,7 +169,7 @@ class AuthController extends Controller
             return redirect()
                 ->route('user.login')
                 ->withErrors([
-                    'oauth' => ucfirst($provider) . ' did not share an email address. Please use email registration.',
+                    'oauth' => ucfirst($provider).' did not share an email address. Please use email registration.',
                 ]);
         }
 
@@ -153,7 +213,7 @@ class AuthController extends Controller
             return redirect()
                 ->route('user.login')
                 ->withErrors([
-                    'oauth' => ucfirst($provider) . ' login needs client ID, client secret, and redirect URI in .env.',
+                    'oauth' => ucfirst($provider).' login needs client ID, client secret, and redirect URI in .env.',
                 ]);
         }
 
@@ -335,6 +395,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
         $request->session()->put('admin_id', $admin->id);
+        $request->session()->put('admin_authenticated_at', now()->timestamp);
 
         return redirect()->route('admin.dashboard')->with('status', 'Admin account created.');
     }

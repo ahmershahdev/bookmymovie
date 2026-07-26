@@ -13,12 +13,15 @@ use App\Models\Seat;
 use App\Models\Show;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Support\FormSecurity;
 use App\Support\TransactionalMailer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -81,7 +84,7 @@ class AccountController extends Controller
         return view('user.wishlist', compact('wishlistMovies'));
     }
 
-    public function toggleWishlist(Request $request): RedirectResponse
+    public function addWishlist(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'movie_id' => ['nullable', 'integer', 'exists:movies,id'],
@@ -92,20 +95,22 @@ class AccountController extends Controller
             ? Movie::findOrFail($data['movie_id'])
             : Movie::where('slug', $data['slug'] ?? '')->firstOrFail();
 
-        $existing = Wishlist::query()->where('user_id', Auth::id())->where('movie_id', $movie->id)->first();
-
-        if ($existing) {
-            $existing->delete();
-            return back()->with('status', 'Removed from wishlist.');
-        }
-
-        Wishlist::create([
-            'user_id' => Auth::id(),
-            'movie_id' => $movie->id,
-            'created_at' => now(),
-        ]);
+        Wishlist::query()->firstOrCreate(
+            ['user_id' => Auth::id(), 'movie_id' => $movie->id],
+            ['created_at' => now()]
+        );
 
         return back()->with('status', 'Added to wishlist.');
+    }
+
+    public function removeWishlist(Movie $movie): RedirectResponse
+    {
+        Wishlist::query()
+            ->where('user_id', Auth::id())
+            ->where('movie_id', $movie->id)
+            ->delete();
+
+        return back()->with('status', 'Removed from wishlist.');
     }
 
     public function cart(): View
@@ -170,14 +175,7 @@ class AccountController extends Controller
                     ->lockForUpdate()
                     ->exists();
 
-                $activelyReserved = CartItem::query()
-                    ->where('show_id', $show->id)
-                    ->whereIn('seat_id', $seatIds)
-                    ->whereHas('cart', fn ($query) => $query->where('expires_at', '>', now()))
-                    ->lockForUpdate()
-                    ->exists();
-
-                if ($alreadyBooked || $activelyReserved) {
+                if ($alreadyBooked) {
                     throw new \RuntimeException('seat-conflict');
                 }
 
@@ -193,6 +191,32 @@ class AccountController extends Controller
                     ]);
                 } else {
                     $cart->forceFill(['expires_at' => now()->addMinutes(10)])->save();
+                }
+
+                $existingSeatIds = $cart->items()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->lockForUpdate()
+                    ->pluck('seat_id')
+                    ->all();
+
+                $seatIds = array_values(array_diff($seatIds, $existingSeatIds));
+
+                if ($seatIds === []) {
+                    throw new \RuntimeException('cart-unchanged');
+                }
+
+                $activelyReserved = CartItem::query()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->whereHas('cart', fn ($query) => $query
+                        ->where('expires_at', '>', now())
+                        ->where('user_id', '<>', Auth::id()))
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($activelyReserved) {
+                    throw new \RuntimeException('seat-conflict');
                 }
 
                 $existingCount = $cart->items()->lockForUpdate()->count();
@@ -234,6 +258,10 @@ class AccountController extends Controller
                 return back()->withErrors(['cart' => 'Cart limit full. You can hold a maximum of 4 seats at once.']);
             }
 
+            if ($exception->getMessage() === 'cart-unchanged') {
+                return redirect()->route('user.cart')->with('status', 'Those seats are already in your cart.');
+            }
+
             if ($exception->getMessage() === 'show-unavailable') {
                 return back()->withErrors(['show_id' => 'This show is no longer available for booking.']);
             }
@@ -246,6 +274,21 @@ class AccountController extends Controller
         }
 
         return redirect()->route('user.cart')->with('status', 'Seats added to cart.');
+    }
+
+    public function removeCartItem(CartItem $item): RedirectResponse
+    {
+        $cart = $this->activeCart();
+
+        abort_unless($cart && $item->cart_id === $cart->id, 404);
+
+        $item->delete();
+
+        if ($cart->items()->count() === 0) {
+            $cart->delete();
+        }
+
+        return back()->with('status', 'Seat removed from cart.');
     }
 
     public function checkout(): View
@@ -265,16 +308,23 @@ class AccountController extends Controller
     public function placeBooking(Request $request): RedirectResponse
     {
         $this->clearExpiredCarts();
+        FormSecurity::validateRecaptcha($request, 'checkout');
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'max:20'],
+            'email' => ['required', 'email:rfc', 'max:150'],
+            'phone' => ['required', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/'],
+            'address' => ['required', 'string', 'min:10', 'max:500'],
             'coupon_code' => ['nullable', 'string', 'max:30'],
         ]);
 
         /** @var User $user */
         $user = Auth::user();
-        $user->forceFill(['name' => $data['name'], 'phone' => $data['phone']])->save();
+        $user->forceFill([
+            'name' => $data['name'],
+            'phone' => $data['phone'],
+            'address' => $data['address'],
+        ])->save();
 
         $cart = $this->activeCart();
         $items = $cart
@@ -348,6 +398,10 @@ class AccountController extends Controller
                 $booking = Booking::create([
                     'booking_number' => $this->bookingNumber(),
                     'user_id' => $user->id,
+                    'customer_name' => $data['name'],
+                    'customer_email' => strtolower($data['email']),
+                    'customer_phone' => $data['phone'],
+                    'customer_address' => $data['address'],
                     'show_id' => $show->id,
                     'coupon_id' => $coupon?->id,
                     'seat_count' => $items->count(),
@@ -430,8 +484,33 @@ class AccountController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', Rule::unique('users', 'phone')->ignore($user->id)],
+            'address' => ['nullable', 'string', 'max:500'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'current_password' => ['nullable', 'required_with:password', 'string'],
+            'password' => ['nullable', 'string', 'min:8', 'max:72', 'confirmed'],
+            'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
+
+        if (! empty($data['password']) && ! Hash::check((string) $data['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+        }
+
+        if ($request->hasFile('profile_picture')) {
+            if ($user->profile_picture) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+
+            $data['profile_picture'] = $request->file('profile_picture')->store('profile-pictures', 'public');
+        }
+
+        if (! empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        unset($data['current_password'], $data['password_confirmation']);
 
         $user->update($data);
 
@@ -458,7 +537,7 @@ class AccountController extends Controller
     private function userBooking(string $number): Booking
     {
         return Booking::query()
-            ->with(['show.movie', 'show.screen.theater', 'seats.seat', 'seats'])
+            ->with(['user', 'show.movie', 'show.screen.theater', 'seats.seat', 'seats'])
             ->where('user_id', Auth::id())
             ->where('booking_number', $number)
             ->firstOrFail();

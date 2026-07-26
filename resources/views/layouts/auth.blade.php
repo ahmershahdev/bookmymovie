@@ -136,6 +136,7 @@
             }
         }
     </style>
+    @stack('styles')
 </head>
 
 <body class="min-h-screen bg-ink font-sans text-gray-100 antialiased selection:bg-red-600 selection:text-white">
