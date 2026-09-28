@@ -3,518 +3,855 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\BookingEvent;
 use App\Models\BookingSeat;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Coupon;
 use App\Models\Movie;
+use App\Models\Notification;
 use App\Models\Payment;
 use App\Models\Seat;
 use App\Models\Show;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Payments\PaymentGateway;
+use App\Support\AuditLog;
 use App\Support\FormSecurity;
 use App\Support\TransactionalMailer;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Illuminate\Validation\Rules\Password;
+use Inertia\Response;
 
+/**
+ * Customer account, cart and booking lifecycle.
+ *
+ * Concurrency model (see SECURITY.md → "Race conditions"):
+ *  - Every mutation runs in a transaction retried up to 3 times on deadlock.
+ *  - Locks are always taken in the same order: user → show → seats → cart
+ *    → coupon, so two requests can never wait on each other in a cycle.
+ *  - The database is the final referee: UNIQUE(show_id, seat_id, seat_lock)
+ *    on booking_seats and UNIQUE(show_id, seat_id) on cart_items make a
+ *    double sale impossible even if application checks were bypassed.
+ *  - Counters (show capacity, coupon usage) change through guarded atomic
+ *    UPDATE ... WHERE statements rather than read-modify-write.
+ */
 class AccountController extends Controller
 {
-    private const MAX_CART_ITEMS = 4;
-
-    public function dashboard(): View
+    public function dashboard(): Response
     {
+        /** @var User $user */
         $user = Auth::user();
         $cart = $this->activeCart();
 
-        return view('user.dashboard', [
+        $upcoming = Booking::query()
+            ->with(['show.movie.genres', 'show.screen.theater.city', 'seats.seat'])
+            ->where('user_id', $user->id)
+            ->where('booking_status', 'confirmed')
+            ->whereHas('show', fn ($query) => $query->whereDate('show_date', '>=', now()->toDateString()))
+            ->get()
+            ->sortBy(fn (Booking $booking) => $booking->showStartsAt())
+            ->values();
+
+        $recommended = Movie::query()
+            ->withCardMetrics()
+            ->with('genres')
+            ->where('status', 'now_showing')
+            ->whereNotIn('id', $user->wishlists()->select('movie_id'))
+            ->orderByDesc('average_rating')
+            ->limit(4)
+            ->get()
+            ->map(fn (Movie $movie) => $movie->toCardArray());
+
+        $hour = now()->hour;
+
+        return $this->page('Account/Dashboard', [
+            'greeting' => $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good evening'),
+            'memberSince' => $user->created_at?->format('F Y'),
             'stats' => [
                 'bookings' => $user->bookings()->count(),
+                'upcoming' => $upcoming->count(),
                 'spent' => (float) $user->bookings()->where('booking_status', '<>', 'cancelled')->sum('total_amount'),
+                'tickets' => (int) $user->bookings()->where('booking_status', '<>', 'cancelled')->sum('seat_count'),
                 'wishlist' => $user->wishlists()->count(),
                 'cart' => $cart?->items()->count() ?? 0,
+                'reviews' => $user->reviews()->count(),
             ],
+            'next' => ($next = $upcoming->first()) ? $this->bookingSummary($next) : null,
+            'upcoming' => $upcoming->skip(1)->take(3)->map(fn (Booking $booking) => $this->bookingSummary($booking))->values(),
+            'cartExpiresAt' => $cart?->expires_at?->toIso8601String(),
+            'recommended' => $recommended->values(),
+            'notifications' => Notification::query()->where('user_id', $user->id)->latest('created_at')->limit(5)->get()
+                ->map(fn (Notification $note) => [
+                    'id' => $note->id,
+                    'title' => $note->title,
+                    'message' => $note->message,
+                    'read' => (bool) $note->is_read,
+                    'ago' => $note->created_at?->diffForHumans(),
+                ])->values(),
+        ], ['title' => 'Your account | BookMyMovie', 'description' => 'Your upcoming shows, bookings, watchlist and account settings.']);
+    }
+
+    public function bookings(): Response
+    {
+        $bookings = Booking::query()
+            ->with(['show.movie.genres', 'show.screen.theater.city', 'seats.seat'])
+            ->where('user_id', Auth::id())
+            ->latest('booked_at')
+            ->limit(200)
+            ->get();
+
+        return $this->page('Account/Bookings', [
+            'bookings' => $bookings->map(function (Booking $booking) {
+                $startsAt = $booking->showStartsAt();
+
+                return [
+                    ...$this->bookingSummary($booking),
+                    'group' => match (true) {
+                        $booking->booking_status === 'cancelled' => 'cancelled',
+                        $booking->booking_status === 'completed' || ($startsAt && $startsAt->isPast()) => 'past',
+                        default => 'upcoming',
+                    },
+                ];
+            })->values(),
+        ], ['title' => 'Your bookings | BookMyMovie', 'description' => 'Every booking, e-ticket and receipt in one place.']);
+    }
+
+    public function bookingShow(string $number): Response
+    {
+        $booking = $this->userBooking($number);
+
+        $startsAt = $booking->showStartsAt();
+        $theater = $booking->show->screen->theater;
+
+        return $this->page('Account/BookingShow', [
+            'booking' => [
+                ...$this->bookingSummary($booking),
+                'certificate' => $booking->show->movie->certificate_rating,
+                'format' => $booking->show->screen->formatLabel(),
+                'screen' => $booking->show->screen->screen_name,
+                'address' => $theater->address,
+                'date' => $startsAt?->format('D j M'),
+                'time' => $startsAt?->format('g:i A'),
+                'doors' => $startsAt?->copy()->subMinutes(20)->format('g:i A'),
+                'tickets' => $booking->seats
+                    ->sortBy(fn ($seat) => $seat->seat->row_label.str_pad((string) $seat->seat->seat_number, 3, '0', STR_PAD_LEFT))
+                    ->map(fn ($seat) => [
+                        'seat' => $seat->seat->row_label.$seat->seat->seat_number,
+                        'type' => $seat->ticket_type === 'kid' ? 'Child' : 'Adult',
+                        'price' => (float) $seat->price_paid,
+                        'code' => $seat->ticket_number,
+                    ])->values(),
+                // Visual booking code block; the counter reads the booking number.
+                'pattern' => array_map(fn ($nibble) => hexdec($nibble) % 2 === 1, str_split(substr(hash('sha256', $booking->booking_number), 0, 64))),
+                'adults' => (int) $booking->adult_count,
+                'kids' => (int) $booking->kids_count,
+                'subtotal' => (float) $booking->subtotal,
+                'discount' => (float) $booking->discount_amount,
+                'coupon' => $booking->coupon?->code,
+                'cancelled_at' => $booking->cancelled_at?->format('j M Y, g:i A'),
+                'paid_at' => $booking->payment?->paid_at?->format('j M, g:i A'),
+                'customer' => [
+                    'name' => $booking->customer_name ?: $booking->user->name,
+                    'email' => $booking->customer_email,
+                    'phone' => $booking->customer_phone,
+                ],
+                'booked_at' => $booking->booked_at?->format('j M Y, g:i A'),
+                'map_url' => 'https://www.google.com/maps/search/?api=1&query='.urlencode($theater->name.', '.$theater->address),
+                'cancellable' => $booking->isCancellableByCustomer(),
+                'cancel_until' => $startsAt?->copy()->subMinutes((int) config('bookmymovie.booking.cancellation_cutoff_minutes', 120))->format('D j M, g:i A'),
+            ],
+        ], ['title' => 'E-ticket '.$booking->booking_number, 'description' => 'Your BookMyMovie e-ticket.'], [
+            ['label' => 'Home', 'url' => route('home')],
+            ['label' => 'Account', 'url' => route('user.dashboard')],
+            ['label' => 'Bookings', 'url' => route('user.bookings')],
+            ['label' => $booking->booking_number, 'url' => null],
         ]);
     }
 
-    public function bookings(): View
-    {
-        $bookings = Booking::query()
-            ->with(['show.movie', 'show.screen.theater'])
-            ->where('user_id', Auth::id())
-            ->latest('booked_at')
-            ->get();
-
-        return view('user.bookings', compact('bookings'));
-    }
-
-    public function bookingShow(string $number): View
+    public function tracking(string $number): Response
     {
         $booking = $this->userBooking($number);
 
-        return view('user.booking-show', compact('booking', 'number'));
+        $startsAt = $booking->showStartsAt();
+        $cancelled = $booking->booking_status === 'cancelled';
+        $doors = $startsAt->copy()->subMinutes(20);
+
+        return $this->page('Account/Tracking', [
+            'booking' => [
+                ...$this->bookingSummary($booking),
+                'when' => $startsAt->format('l j F, g:i A'),
+                'cancelled_at' => $booking->cancelled_at?->format('j M Y, g:i A'),
+                'cancelled_by' => $booking->cancelled_by,
+                'cancellation_reason' => $booking->cancellation_reason,
+            ],
+            'milestones' => [
+                ['title' => 'Booked', 'copy' => 'Seats locked and booking confirmed.', 'done' => true, 'at' => $booking->booked_at?->format('D j M, g:i A')],
+                ['title' => 'Paid', 'copy' => 'Payment received at the box office.', 'done' => $booking->payment_status === 'paid', 'at' => $booking->payment?->paid_at?->format('D j M, g:i A')],
+                ['title' => 'Doors open', 'copy' => 'Head to '.$booking->show->screen->screen_name.'.', 'done' => $doors->isPast() && ! $cancelled, 'at' => $doors->format('D j M, g:i A')],
+                ['title' => 'Showtime', 'copy' => 'Enjoy the film.', 'done' => ($startsAt->isPast() || $booking->booking_status === 'completed') && ! $cancelled, 'at' => $startsAt->format('D j M, g:i A')],
+            ],
+            'events' => $booking->events->map(fn ($event) => [
+                'id' => $event->id,
+                'at' => $event->created_at?->format('D j M Y, g:i A'),
+                'actor' => $event->actor_type,
+                'event' => Str::headline($event->event),
+                'cancelled' => $event->event === 'cancelled',
+                'note' => $event->note,
+            ])->values(),
+        ], ['title' => 'Track '.$booking->booking_number, 'description' => 'Booking status and history.'], [
+            ['label' => 'Home', 'url' => route('home')],
+            ['label' => 'Account', 'url' => route('user.dashboard')],
+            ['label' => 'Bookings', 'url' => route('user.bookings')],
+            ['label' => $booking->booking_number, 'url' => route('user.booking.show', $booking->booking_number)],
+            ['label' => 'Track', 'url' => null],
+        ]);
     }
 
-    public function tracking(string $number): View
+    /**
+     * Customer cancellation of an unpaid booking before the cutoff. Releases
+     * the seats, restores show capacity and returns any coupon use.
+     */
+    public function cancelBooking(Request $request, string $number): RedirectResponse
     {
-        $booking = $this->userBooking($number);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:200'],
+        ]);
 
-        return view('user.tracking', compact('booking', 'number'));
+        $result = DB::transaction(function () use ($number, $data) {
+            $booking = Booking::query()
+                ->where('user_id', Auth::id())
+                ->where('booking_number', $number)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $booking->load('show');
+
+            if (! $booking->isCancellableByCustomer()) {
+                return 'not-cancellable';
+            }
+
+            Show::query()->whereKey($booking->show_id)->lockForUpdate()->first();
+
+            $released = BookingSeat::query()->where('booking_id', $booking->id)->update(['seat_lock' => null]);
+
+            Show::query()
+                ->whereKey($booking->show_id)
+                ->where('booked_seats', '>=', $released)
+                ->decrement('booked_seats', $released);
+
+            if ($booking->coupon_id) {
+                DB::table('coupon_usages')->where('booking_id', $booking->id)->delete();
+                Coupon::query()->whereKey($booking->coupon_id)->where('used_count', '>', 0)->decrement('used_count');
+            }
+
+            $booking->forceFill([
+                'booking_status' => 'cancelled',
+                'payment_status' => 'failed',
+                'cancelled_at' => now(),
+                'cancelled_by' => 'user',
+                'cancellation_reason' => $data['reason'] ?: 'Cancelled by customer',
+            ])->save();
+
+            Payment::query()->where('booking_id', $booking->id)->update(['status' => 'failed', 'notes' => 'Booking cancelled by customer before payment.']);
+
+            BookingEvent::create([
+                'booking_id' => $booking->id,
+                'event' => 'cancelled',
+                'from_status' => 'confirmed',
+                'to_status' => 'cancelled',
+                'note' => Str::limit('Cancelled by customer. '.($data['reason'] ?? ''), 250, ''),
+                'actor_type' => 'user',
+                'actor_id' => Auth::id(),
+            ]);
+
+            return $booking;
+        }, 3);
+
+        if ($result === 'not-cancellable') {
+            return back()->withErrors(['booking' => 'This booking can no longer be cancelled online. Paid bookings and shows starting within two hours are handled at the box office.']);
+        }
+
+        AuditLog::record('booking.cancelled', $result, ['reason' => $data['reason'] ?? null]);
+        TransactionalMailer::bookingCancelled(Auth::user(), $result);
+
+        return redirect()->route('user.booking.show', $number)->with('status', 'Booking cancelled. Your seats have been released.');
     }
 
-    public function wishlist(): View
+    public function wishlist(): Response
     {
-        $wishlistMovies = Wishlist::query()
-            ->with('movie.genres')
-            ->where('user_id', Auth::id())
-            ->latest('created_at')
+        $wishlistMovies = Movie::query()
+            ->withCardMetrics()
+            ->with('genres')
+            ->join('wishlists', 'wishlists.movie_id', '=', 'movies.id')
+            ->where('wishlists.user_id', Auth::id())
+            ->orderByDesc('wishlists.created_at')
             ->get()
-            ->pluck('movie')
-            ->filter()
             ->map(fn (Movie $movie) => $movie->toCardArray());
 
-        return view('user.wishlist', compact('wishlistMovies'));
+        return $this->page('Account/Wishlist', [
+            'movies' => $wishlistMovies->values(),
+        ], ['title' => 'Your watchlist | BookMyMovie', 'description' => 'Films you saved to watch.']);
     }
 
     public function addWishlist(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'movie_id' => ['nullable', 'integer', 'exists:movies,id'],
-            'slug' => ['nullable', 'string', 'exists:movies,slug'],
+            'movie_id' => ['nullable', 'integer', 'required_without:slug'],
+            'slug' => ['nullable', 'string', 'max:230'],
         ]);
 
         $movie = isset($data['movie_id'])
-            ? Movie::findOrFail($data['movie_id'])
-            : Movie::where('slug', $data['slug'] ?? '')->firstOrFail();
+            ? Movie::query()->findOrFail($data['movie_id'])
+            : Movie::query()->where('slug', $data['slug'] ?? '')->firstOrFail();
 
-        Wishlist::query()->firstOrCreate(
-            ['user_id' => Auth::id(), 'movie_id' => $movie->id],
-            ['created_at' => now()]
-        );
+        // INSERT IGNORE against UNIQUE(user_id, movie_id): safe under double clicks.
+        Wishlist::query()->insertOrIgnore(['user_id' => Auth::id(), 'movie_id' => $movie->id, 'created_at' => now()]);
 
-        return back()->with('status', 'Added to wishlist.');
+        return back()->with('status', '“'.$movie->title.'” saved to your watchlist.');
     }
 
     public function removeWishlist(Movie $movie): RedirectResponse
     {
-        Wishlist::query()
-            ->where('user_id', Auth::id())
-            ->where('movie_id', $movie->id)
-            ->delete();
+        Wishlist::query()->where('user_id', Auth::id())->where('movie_id', $movie->id)->delete();
 
-        return back()->with('status', 'Removed from wishlist.');
+        return back()->with('status', '“'.$movie->title.'” removed from your watchlist.');
     }
 
-    public function cart(): View
+    public function cart(): Response
     {
         $cart = $this->activeCart();
-        $items = $cart
-            ? $cart->items()->with(['show.movie', 'show.screen.theater', 'seat', 'category'])->get()
-            : collect();
+        $items = $this->cartItems($cart);
 
-        return view('user.cart', [
-            'cart' => $cart,
-            'cartItems' => $items,
-            'total' => (float) $items->sum('price'),
-        ]);
+        return $this->page('Account/Cart', [
+            ...$this->cartPayload($cart, $items),
+            'maxSeats' => $this->maxSeats(),
+        ], ['title' => 'Your cart | BookMyMovie', 'description' => 'Seats on hold for your booking.']);
     }
 
     public function addToCart(Request $request): RedirectResponse
     {
-        $this->clearExpiredCarts();
+        $maxSeats = $this->maxSeats();
 
         $data = $request->validate([
-            'show_id' => ['required', 'integer', 'exists:shows,id'],
-            'seats' => ['required', 'array', 'min:1', 'max:'.self::MAX_CART_ITEMS],
-            'seats.*' => ['integer', 'distinct', 'exists:seats,id'],
+            'show_id' => ['required', 'integer'],
+            'seats' => ['required', 'array', 'min:1', 'max:'.$maxSeats],
+            'seats.*' => ['integer', 'distinct'],
             'ticket_type' => ['nullable', Rule::in(['adult', 'kid'])],
+        ], [
+            'seats.required' => 'Select at least one seat on the map.',
+            'seats.max' => 'You can hold up to '.$maxSeats.' seats per booking.',
         ]);
 
-        $show = Show::findOrFail($data['show_id']);
-        if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
-            return back()->withErrors(['show_id' => 'This show is no longer available for booking.']);
-        }
-
-        $seatIds = array_values(array_unique($data['seats']));
+        $seatIds = array_values(array_unique(array_map('intval', $data['seats'])));
         $ticketType = $data['ticket_type'] ?? 'adult';
 
+        $this->clearExpiredCarts();
+
         try {
-            DB::transaction(function () use ($seatIds, $show, $ticketType) {
+            DB::transaction(function () use ($seatIds, $data, $ticketType, $maxSeats) {
+                // Serialises this user's cart operations (double clicks, two tabs).
                 User::query()->whereKey(Auth::id())->lockForUpdate()->firstOrFail();
 
-                $show = Show::query()->lockForUpdate()->findOrFail($show->id);
+                $show = Show::query()->lockForUpdate()->find($data['show_id']);
 
-                if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
+                if (! $show || ! $this->isOnSale($show)) {
                     throw new \RuntimeException('show-unavailable');
                 }
 
-                $lockedSeats = Seat::query()
+                $seatCount = Seat::query()
                     ->where('screen_id', $show->screen_id)
                     ->where('is_active', true)
                     ->whereIn('id', $seatIds)
                     ->lockForUpdate()
-                    ->get()
-                    ->keyBy('id');
+                    ->count();
 
-                if ($lockedSeats->count() !== count($seatIds)) {
+                if ($seatCount !== count($seatIds)) {
                     throw new \RuntimeException('seat-conflict');
                 }
 
-                $alreadyBooked = BookingSeat::query()
-                    ->where('show_id', $show->id)
-                    ->whereIn('seat_id', $seatIds)
-                    ->whereIn('booking_id', Booking::query()->select('id')->where('booking_status', '<>', 'cancelled'))
-                    ->lockForUpdate()
-                    ->exists();
+                $cart = Cart::query()->where('user_id', Auth::id())->lockForUpdate()->first()
+                    ?? Cart::create(['user_id' => Auth::id(), 'expires_at' => now()]);
 
-                if ($alreadyBooked) {
-                    throw new \RuntimeException('seat-conflict');
+                // One show per cart keeps checkout, pricing and tickets simple.
+                if ($cart->items()->where('show_id', '<>', $show->id)->exists()) {
+                    throw new \RuntimeException('mixed-show');
                 }
 
-                $cart = Cart::query()
-                    ->where('user_id', Auth::id())
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $cart) {
-                    $cart = Cart::create([
-                        'user_id' => Auth::id(),
-                        'expires_at' => now()->addMinutes(10),
-                    ]);
-                } else {
-                    $cart->forceFill(['expires_at' => now()->addMinutes(10)])->save();
-                }
-
-                $existingSeatIds = $cart->items()
-                    ->where('show_id', $show->id)
-                    ->whereIn('seat_id', $seatIds)
-                    ->lockForUpdate()
-                    ->pluck('seat_id')
-                    ->all();
-
-                $seatIds = array_values(array_diff($seatIds, $existingSeatIds));
+                $alreadyHeld = $cart->items()->where('show_id', $show->id)->whereIn('seat_id', $seatIds)->pluck('seat_id')->all();
+                $seatIds = array_values(array_diff($seatIds, $alreadyHeld));
 
                 if ($seatIds === []) {
                     throw new \RuntimeException('cart-unchanged');
                 }
 
-                $activelyReserved = CartItem::query()
-                    ->where('show_id', $show->id)
-                    ->whereIn('seat_id', $seatIds)
-                    ->whereHas('cart', fn ($query) => $query
-                        ->where('expires_at', '>', now())
-                        ->where('user_id', '<>', Auth::id()))
-                    ->lockForUpdate()
-                    ->exists();
-
-                if ($activelyReserved) {
-                    throw new \RuntimeException('seat-conflict');
-                }
-
-                $existingCount = $cart->items()->lockForUpdate()->count();
-                $newSeatCount = count($seatIds);
-
-                if ($existingCount + $newSeatCount > self::MAX_CART_ITEMS) {
+                if ($cart->items()->count() + count($seatIds) > $maxSeats) {
                     throw new \RuntimeException('cart-limit');
                 }
 
-                $availableSeats = DB::table('v_seat_availability')
+                $available = DB::table('v_seat_availability')
                     ->where('show_id', $show->id)
                     ->whereIn('seat_id', $seatIds)
                     ->where('seat_status', 'available')
                     ->get()
                     ->keyBy('seat_id');
 
-                if ($availableSeats->count() !== count($seatIds)) {
+                if ($available->count() !== count($seatIds)) {
                     throw new \RuntimeException('seat-conflict');
                 }
 
-                foreach ($seatIds as $seatId) {
-                    $seat = $availableSeats[$seatId];
+                // Rows left behind by other users' expired carts would trip the
+                // unique key; they no longer hold anything, so clear them.
+                CartItem::query()
+                    ->where('show_id', $show->id)
+                    ->whereIn('seat_id', $seatIds)
+                    ->whereHas('cart', fn ($query) => $query->where('expires_at', '<=', now()))
+                    ->delete();
 
-                    CartItem::create([
+                CartItem::insert(array_map(function (int $seatId) use ($available, $cart, $show, $ticketType) {
+                    $seat = $available[$seatId];
+                    [$type, $price] = $this->seatPrice($seat, $ticketType);
+
+                    return [
                         'cart_id' => $cart->id,
                         'show_id' => $show->id,
-                        'seat_id' => $seat->seat_id,
+                        'seat_id' => $seatId,
                         'seat_category_id' => $seat->seat_category_id,
-                        'ticket_type' => $ticketType,
-                        'price' => $this->seatPrice($seat, $ticketType),
+                        'ticket_type' => $type,
+                        'price' => $price,
                         'added_at' => now(),
-                    ]);
-                }
+                    ];
+                }, $seatIds));
+
+                $cart->forceFill(['expires_at' => now()->addMinutes($this->holdMinutes())])->save();
             }, 3);
         } catch (QueryException) {
-            return back()->withErrors(['seats' => 'Those seats were just reserved. Please choose different seats.']);
+            // UNIQUE(show_id, seat_id) on cart_items: someone else won the race.
+            return back()->withErrors(['seats' => 'Someone reserved one of those seats a moment ago. Please pick different seats.']);
         } catch (\RuntimeException $exception) {
-            if ($exception->getMessage() === 'cart-limit') {
-                return back()->withErrors(['cart' => 'Cart limit full. You can hold a maximum of 4 seats at once.']);
-            }
-
-            if ($exception->getMessage() === 'cart-unchanged') {
-                return redirect()->route('user.cart')->with('status', 'Those seats are already in your cart.');
-            }
-
-            if ($exception->getMessage() === 'show-unavailable') {
-                return back()->withErrors(['show_id' => 'This show is no longer available for booking.']);
-            }
-
-            if ($exception->getMessage() === 'seat-conflict') {
-                return back()->withErrors(['seats' => 'One or more selected seats are no longer available.']);
-            }
-
-            throw $exception;
+            return match ($exception->getMessage()) {
+                'cart-limit' => back()->withErrors(['seats' => 'You can hold up to '.$maxSeats.' seats per booking. Remove a seat from your cart first.']),
+                'cart-unchanged' => redirect()->route('user.cart')->with('status', 'Those seats are already in your cart.'),
+                'show-unavailable' => back()->withErrors(['show_id' => 'This show has started or is no longer on sale.']),
+                'mixed-show' => back()->withErrors(['seats' => 'Your cart already holds seats for a different show. Check out or clear it first.']),
+                'seat-conflict' => back()->withErrors(['seats' => 'One or more of those seats has just been taken. The map has been refreshed.']),
+                default => throw $exception,
+            };
         }
 
-        return redirect()->route('user.cart')->with('status', 'Seats added to cart.');
+        return redirect()->route('user.cart')->with('status', count($seatIds).' '.Str::plural('seat', count($seatIds)).' held for '.$this->holdMinutes().' minutes.');
     }
 
     public function removeCartItem(CartItem $item): RedirectResponse
     {
-        $cart = $this->activeCart();
+        DB::transaction(function () use ($item) {
+            $cart = Cart::query()->where('user_id', Auth::id())->lockForUpdate()->first();
 
-        abort_unless($cart && $item->cart_id === $cart->id, 404);
+            abort_unless($cart && $item->cart_id === $cart->id, 404);
 
-        $item->delete();
+            $item->delete();
 
-        if ($cart->items()->count() === 0) {
-            $cart->delete();
-        }
+            if (! $cart->items()->exists()) {
+                $cart->delete();
+            }
+        });
 
-        return back()->with('status', 'Seat removed from cart.');
+        return back()->with('status', 'Seat released.');
     }
 
-    public function checkout(): View
+    public function clearCart(): RedirectResponse
+    {
+        Cart::query()->where('user_id', Auth::id())->delete();
+
+        return redirect()->route('user.cart')->with('status', 'Cart cleared and seats released.');
+    }
+
+    public function checkout(): Response|RedirectResponse
     {
         $cart = $this->activeCart();
-        $items = $cart
-            ? $cart->items()->with(['show.movie', 'show.screen.theater', 'seat', 'category'])->get()
-            : collect();
+        $items = $this->cartItems($cart);
 
-        return view('user.checkout', [
-            'cart' => $cart,
-            'cartItems' => $items,
-            'total' => (float) $items->sum('price'),
-        ]);
+        if ($items->isEmpty()) {
+            return redirect()->route('user.cart')->withErrors(['cart' => 'Your cart is empty or your hold has expired.']);
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        return $this->page('Account/Checkout', [
+            ...$this->cartPayload($cart, $items),
+            // A fresh key per checkout page view; a resubmission reuses it.
+            'idempotencyKey' => (string) Str::uuid(),
+            'captcha' => FormSecurity::forPage('checkout'),
+            'paymentMethods' => PaymentGateway::available(),
+            'customer' => ['name' => $user->name, 'email' => $user->email, 'phone' => (string) $user->phone, 'address' => (string) $user->address],
+        ], ['title' => 'Checkout | BookMyMovie', 'description' => 'Confirm your booking.']);
     }
 
     public function placeBooking(Request $request): RedirectResponse
     {
-        $this->clearExpiredCarts();
         FormSecurity::validateRecaptcha($request, 'checkout');
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
+            'idempotency_key' => ['required', 'uuid'],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
             'email' => ['required', 'email:rfc', 'max:150'],
             'phone' => ['required', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/'],
-            'address' => ['required', 'string', 'min:10', 'max:500'],
-            'coupon_code' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'coupon_code' => ['nullable', 'string', 'max:30', 'regex:/^[A-Za-z0-9_-]*$/'],
+            'terms' => ['accepted'],
+            'payment_method' => ['nullable', Rule::in(array_column(PaymentGateway::available(), 'key'))],
+        ], [
+            'terms.accepted' => 'Please confirm you have read the cancellation policy.',
+            'payment_method.in' => 'Choose one of the payment options shown.',
         ]);
+        $data['payment_method'] ??= 'cod';
+
+        // A retried or double-clicked submit returns the booking it already made.
+        if ($existing = Booking::query()->where('idempotency_key', $data['idempotency_key'])->where('user_id', Auth::id())->first()) {
+            return redirect()->route('user.booking.show', $existing->booking_number);
+        }
 
         /** @var User $user */
         $user = Auth::user();
-        $user->forceFill([
-            'name' => $data['name'],
-            'phone' => $data['phone'],
-            'address' => $data['address'],
-        ])->save();
-
-        $cart = $this->activeCart();
-        $items = $cart
-            ? $cart->items()->with(['show', 'seat'])->get()
-            : collect();
-
-        if ($items->isEmpty()) {
-            return redirect()->route('user.cart')->withErrors(['cart' => 'Your cart is empty or expired.']);
-        }
-
-        if ($items->count() > self::MAX_CART_ITEMS) {
-            return redirect()->route('user.cart')->withErrors(['cart' => 'Cart limit full. You can order a maximum of 4 seats per booking.']);
-        }
-
-        $showIds = $items->pluck('show_id')->unique();
-        if ($showIds->count() !== 1) {
-            return redirect()->route('user.cart')->withErrors(['cart' => 'Please checkout one show at a time.']);
-        }
+        $maxSeats = $this->maxSeats();
 
         try {
-            $booking = DB::transaction(function () use ($cart, $user, $data) {
+            $booking = DB::transaction(function () use ($user, $data, $maxSeats) {
+                User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+                // Same lock order as addToCart: user → show → cart.
+                $showId = CartItem::query()
+                    ->whereHas('cart', fn ($query) => $query->where('user_id', $user->id))
+                    ->value('show_id');
+                $show = $showId ? Show::query()->lockForUpdate()->find($showId) : null;
+
                 $cart = Cart::query()
-                    ->whereKey($cart->id)
                     ->where('user_id', $user->id)
                     ->where('expires_at', '>', now())
                     ->lockForUpdate()
                     ->first();
 
-                if (! $cart) {
+                $items = $cart ? $cart->items()->with('seat')->lockForUpdate()->get() : collect();
+
+                if (! $show || $items->isEmpty()) {
                     throw new \RuntimeException('cart-empty');
                 }
 
-                $items = $cart->items()->with(['show', 'seat'])->lockForUpdate()->get();
-
-                if ($items->isEmpty()) {
-                    throw new \RuntimeException('cart-empty');
-                }
-
-                if ($items->count() > self::MAX_CART_ITEMS) {
+                if ($items->count() > $maxSeats) {
                     throw new \RuntimeException('cart-limit');
                 }
 
-                if ($items->pluck('show_id')->unique()->count() !== 1) {
+                if ($items->pluck('show_id')->unique()->all() !== [$show->id]) {
                     throw new \RuntimeException('mixed-show');
                 }
 
-                $show = Show::query()->lockForUpdate()->findOrFail($items->first()->show_id);
-
-                if ($show->status !== 'scheduled' || $show->show_date->lt(now()->startOfDay())) {
+                if (! $this->isOnSale($show)) {
                     throw new \RuntimeException('show-unavailable');
                 }
 
-                $alreadyBooked = BookingSeat::query()
+                $taken = BookingSeat::query()
                     ->where('show_id', $show->id)
                     ->whereIn('seat_id', $items->pluck('seat_id'))
-                    ->whereIn('booking_id', Booking::query()->select('id')->where('booking_status', '<>', 'cancelled'))
-                    ->lockForUpdate()
+                    ->where('seat_lock', 1)
                     ->exists();
 
-                if ($alreadyBooked) {
+                if ($taken) {
                     throw new \RuntimeException('seat-conflict');
                 }
 
-                $subtotal = (float) $items->sum('price');
-                $adultCount = $items->where('ticket_type', 'adult')->count();
-                $kidsCount = $items->where('ticket_type', 'kid')->count();
+                $subtotal = round((float) $items->sum('price'), 2);
                 $coupon = $this->lockedCoupon($data['coupon_code'] ?? null, $subtotal, $user->id);
-                $discountAmount = $coupon ? $this->discountAmount($coupon, $subtotal) : 0.0;
-                $totalAmount = max(0, $subtotal - $discountAmount);
+                $discount = $coupon ? $this->discountAmount($coupon, $subtotal) : 0.0;
+                $total = round($subtotal - $discount, 2);
 
                 $booking = Booking::create([
                     'booking_number' => $this->bookingNumber(),
+                    'idempotency_key' => $data['idempotency_key'],
                     'user_id' => $user->id,
                     'customer_name' => $data['name'],
                     'customer_email' => strtolower($data['email']),
                     'customer_phone' => $data['phone'],
-                    'customer_address' => $data['address'],
+                    'customer_address' => $data['address'] ?? null,
                     'show_id' => $show->id,
                     'coupon_id' => $coupon?->id,
                     'seat_count' => $items->count(),
-                    'adult_count' => $adultCount,
-                    'kids_count' => $kidsCount,
+                    'adult_count' => $items->where('ticket_type', 'adult')->count(),
+                    'kids_count' => $items->where('ticket_type', 'kid')->count(),
                     'subtotal' => $subtotal,
-                    'discount_amount' => $discountAmount,
-                    'total_amount' => $totalAmount,
-                    'payment_method' => 'cod',
+                    'discount_amount' => $discount,
+                    'total_amount' => $total,
+                    'payment_method' => $data['payment_method'],
                     'payment_status' => 'pending',
                     'booking_status' => 'confirmed',
                 ]);
 
-                foreach ($items as $item) {
-                    BookingSeat::create([
-                        'booking_id' => $booking->id,
-                        'seat_id' => $item->seat_id,
-                        'show_id' => $item->show_id,
-                        'seat_category_id' => $item->seat_category_id,
-                        'ticket_type' => $item->ticket_type,
-                        'price_paid' => $item->price,
-                        'ticket_number' => $booking->booking_number.'-'.$item->seat->row_label.$item->seat->seat_number,
-                        'created_at' => now(),
-                    ]);
-                }
+                BookingSeat::insert($items->map(fn (CartItem $item) => [
+                    'booking_id' => $booking->id,
+                    'seat_id' => $item->seat_id,
+                    'show_id' => $item->show_id,
+                    'seat_category_id' => $item->seat_category_id,
+                    'ticket_type' => $item->ticket_type,
+                    'price_paid' => $item->price,
+                    'ticket_number' => $booking->booking_number.'-'.$item->seat->row_label.$item->seat->seat_number,
+                    'seat_lock' => 1,
+                    'created_at' => now(),
+                ])->all());
 
                 Payment::create([
                     'booking_id' => $booking->id,
-                    'payment_method' => 'cod',
-                    'amount' => $totalAmount,
+                    'payment_method' => $data['payment_method'],
+                    'amount' => $total,
                     'status' => 'pending',
-                    'notes' => 'Cash on delivery at cinema counter.',
+                    'notes' => $data['payment_method'] === 'cod' ? 'Pay at the cinema box office before the show.' : 'Awaiting online payment.',
                 ]);
 
                 if ($coupon) {
+                    // Guarded increment: fails instead of overshooting max_uses.
+                    $claimed = Coupon::query()
+                        ->whereKey($coupon->id)
+                        ->where(fn ($query) => $query->whereNull('max_uses')->orWhereColumn('used_count', '<', 'max_uses'))
+                        ->increment('used_count');
+
+                    if ($claimed !== 1) {
+                        throw new \RuntimeException('coupon-invalid');
+                    }
+
                     DB::table('coupon_usages')->insert([
                         'coupon_id' => $coupon->id,
                         'user_id' => $user->id,
                         'booking_id' => $booking->id,
-                        'discount_applied' => $discountAmount,
+                        'discount_applied' => $discount,
                         'used_at' => now(),
                     ]);
-
-                    $coupon->forceFill(['used_count' => $coupon->used_count + 1])->save();
                 }
 
-                $show->forceFill(['booked_seats' => $show->booked_seats + $items->count()])->save();
+                $seated = Show::query()
+                    ->whereKey($show->id)
+                    ->whereRaw('booked_seats + ? <= total_seats', [$items->count()])
+                    ->increment('booked_seats', $items->count());
+
+                if ($seated !== 1) {
+                    throw new \RuntimeException('seat-conflict');
+                }
+
+                BookingEvent::create([
+                    'booking_id' => $booking->id,
+                    'event' => 'confirmed',
+                    'to_status' => 'confirmed',
+                    'note' => 'Booking confirmed online. Payment due at the counter.',
+                    'actor_type' => 'user',
+                    'actor_id' => $user->id,
+                ]);
+
+                $user->forceFill([
+                    'phone' => $user->phone ?: $data['phone'],
+                    'address' => $user->address ?: ($data['address'] ?? null),
+                ])->save();
+
                 $cart->delete();
 
                 return $booking;
             }, 3);
-        } catch (QueryException|\RuntimeException $exception) {
-            $message = match ($exception instanceof \RuntimeException ? $exception->getMessage() : null) {
-                'cart-empty' => 'Your cart is empty or expired.',
-                'show-unavailable' => 'This show is no longer available for booking.',
-                'cart-limit' => 'Cart limit full. You can order a maximum of 4 seats per booking.',
-                'mixed-show' => 'Please checkout one show at a time.',
-                'coupon-invalid' => 'That coupon is invalid, expired, exhausted, or does not apply to this order.',
-                'coupon-user-limit' => 'That coupon has already been used the maximum number of times for this account.',
-                default => 'One or more selected seats are no longer available. Please choose different seats.',
+        } catch (QueryException $exception) {
+            // Duplicate idempotency key: a concurrent twin of this request won.
+            if ($existing = Booking::query()->where('idempotency_key', $data['idempotency_key'])->where('user_id', $user->id)->first()) {
+                return redirect()->route('user.booking.show', $existing->booking_number);
+            }
+
+            report($exception);
+
+            return redirect()->route('user.cart')->withErrors(['cart' => 'One or more of your seats was just booked by someone else. Please choose again.']);
+        } catch (\RuntimeException $exception) {
+            $message = match ($exception->getMessage()) {
+                'cart-empty' => 'Your seat hold expired before checkout finished. Please select your seats again.',
+                'show-unavailable' => 'This show has started or is no longer on sale.',
+                'cart-limit' => 'You can book up to '.$maxSeats.' seats at once.',
+                'mixed-show' => 'Please check out one show at a time.',
+                'coupon-invalid' => 'That coupon is not valid for this booking (expired, used up, or below the minimum spend).',
+                'coupon-user-limit' => 'You have already used this coupon the maximum number of times.',
+                default => 'One or more of your seats was just booked by someone else. Please choose again.',
             };
 
-            return redirect()->route('user.cart')->withErrors(['cart' => $message]);
+            $target = in_array($exception->getMessage(), ['coupon-invalid', 'coupon-user-limit'], true) ? 'user.checkout' : 'user.cart';
+
+            return redirect()->route($target)->withErrors([$target === 'user.checkout' ? 'coupon_code' : 'cart' => $message])->withInput($request->except('custom_captcha_answer'));
         }
 
         $booking->load('user');
+        AuditLog::record('booking.created', $booking, ['seats' => $booking->seat_count, 'total' => (float) $booking->total_amount, 'method' => $booking->payment_method]);
         TransactionalMailer::bookingConfirmed($booking->user, $booking);
 
-        return redirect()->route('user.booking.show', $booking->booking_number)->with('status', 'Booking confirmed.');
+        if ($booking->payment_method !== 'cod') {
+            return redirect()->route('payments.start', $booking->booking_number);
+        }
+
+        return redirect()->route('user.booking.show', $booking->booking_number)->with('status', 'You are booked. See you at the movies.');
     }
 
-    public function profile(): View
+    public function profile(): Response
     {
-        return view('user.profile', ['user' => Auth::user()]);
+        $user = Auth::user();
+
+        $lastBooking = $user->bookings()->latest('booked_at')->with('show.movie')->first();
+
+        return $this->page('Account/Profile', [
+            'profile' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => (string) $user->phone,
+                'address' => (string) $user->address,
+                'date_of_birth' => $user->date_of_birth?->toDateString() ?? '',
+                'gender' => (string) $user->gender,
+                'avatar' => $user->profile_picture ? asset('storage/'.$user->profile_picture) : null,
+                'verified' => (bool) $user->email_verified_at,
+                'member_since' => $user->created_at?->format('j F Y'),
+                'last_film' => $lastBooking?->show?->movie?->title,
+                'max_birth_date' => now()->subYears(10)->toDateString(),
+            ],
+        ], ['title' => 'Profile & security | BookMyMovie', 'description' => 'Manage your details, photo and password.']);
     }
 
     public function updateProfile(Request $request): RedirectResponse
     {
+        /** @var User $user */
         $user = Auth::user();
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'email' => ['required', 'email:rfc', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', Rule::unique('users', 'phone')->ignore($user->id)],
             'address' => ['nullable', 'string', 'max:500'],
-            'date_of_birth' => ['nullable', 'date', 'before:today'],
-            'current_password' => ['nullable', 'required_with:password', 'string'],
-            'password' => ['nullable', 'string', 'min:8', 'max:72', 'confirmed'],
-            'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'date_of_birth' => ['nullable', 'date', 'before:-10 years', 'after:1900-01-01'],
+            'gender' => ['nullable', Rule::in(['male', 'female', 'other', 'prefer_not_to_say'])],
+            'current_password' => ['nullable', 'required_with:password', 'string', 'max:72'],
+            'password' => ['nullable', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()],
+            'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=96,min_height=96,max_width=4000,max_height=4000'],
         ]);
 
-        if (! empty($data['password']) && ! Hash::check((string) $data['current_password'], $user->password)) {
-            return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+        $emailChanged = strtolower($data['email']) !== $user->email;
+
+        // Changing the email or password requires proof of the current password.
+        if (($emailChanged || ! empty($data['password'])) && ! Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
+            return back()->withErrors(['current_password' => 'Enter your current password to change your email or password.'])->withInput($request->except('current_password', 'password', 'password_confirmation'));
         }
 
         if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('profile-pictures', 'public');
+
             if ($user->profile_picture) {
                 Storage::disk('public')->delete($user->profile_picture);
             }
 
-            $data['profile_picture'] = $request->file('profile_picture')->store('profile-pictures', 'public');
+            $user->profile_picture = $path;
         }
+
+        $user->fill([
+            'name' => $data['name'],
+            'email' => strtolower($data['email']),
+            'phone' => $data['phone'] ?? null,
+            'address' => $data['address'] ?? null,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
+            'gender' => $data['gender'] ?? $user->gender,
+        ]);
 
         if (! empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
+            $user->password = Hash::make($data['password']);
+            $user->setRememberToken(Str::random(60));
         }
 
-        unset($data['current_password'], $data['password_confirmation']);
+        $user->save();
 
-        $user->update($data);
+        AuditLog::record('account.profile_updated', $user, ['fields' => array_keys($user->getChanges())]);
 
-        return back()->with('status', 'Profile updated.');
+        if (! empty($data['password'])) {
+            // Keep this device signed in, sign out every other session.
+            DB::table('sessions')->where('user_id', $user->id)->where('id', '<>', $request->session()->getId())->delete();
+            $request->session()->regenerate();
+            AuditLog::record('account.password_changed', $user);
+            TransactionalMailer::passwordChanged($user, $request);
+        }
+
+        return back()->with('status', 'Profile saved.');
+    }
+
+    /**
+     * The shape the booking list rows, dashboard and e-ticket share.
+     *
+     * @return array<string, mixed>
+     */
+    private function bookingSummary(Booking $booking): array
+    {
+        $movie = $booking->show->movie;
+        $startsAt = $booking->showStartsAt();
+        [$state, $tone] = match (true) {
+            $booking->booking_status === 'cancelled' => ['Cancelled', 'signal'],
+            $booking->booking_status === 'completed' || ($startsAt && $startsAt->isPast()) => ['Watched', ''],
+            $booking->payment_status === 'paid' => ['Paid · upcoming', 'mint'],
+            default => ['Pay at counter', 'volt'],
+        };
+
+        return [
+            'number' => $booking->booking_number,
+            'state' => $state,
+            'tone' => $tone,
+            'cancelled' => $booking->booking_status === 'cancelled',
+            'paid' => $booking->payment_status === 'paid',
+            'method' => $booking->payment_method,
+            'method_label' => PaymentGateway::METHODS[$booking->payment_method]['label'] ?? 'Pay at the counter',
+            'can_pay_online' => $booking->payment_method !== 'cod' && $booking->payment_status !== 'paid' && $booking->booking_status !== 'cancelled' && PaymentGateway::enabled($booking->payment_method),
+            'movie' => $movie->toCardArray(0),
+            'title' => $movie->title,
+            'starts' => $startsAt?->format('D j M, g:i A'),
+            'relative' => $startsAt ? ($startsAt->isToday() ? 'Tonight' : ($startsAt->isTomorrow() ? 'Tomorrow' : $startsAt->format('l'))).' · in '.$startsAt->diffForHumans(null, true, false, 2) : null,
+            'theater' => $booking->show->screen->theater->name,
+            'seats' => $booking->seats->map(fn ($seat) => $seat->seat->row_label.$seat->seat->seat_number)->values(),
+            'seat_count' => (int) $booking->seat_count,
+            'total' => (float) $booking->total_amount,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function cartPayload(?Cart $cart, $items): array
+    {
+        $first = $items->first();
+        $show = $first?->show;
+        $startsAt = $show ? Carbon::parse($show->show_date->toDateString().' '.$show->show_time) : null;
+        $tiers = ['Gold' => 'Classic', 'Platinum' => 'Prime', 'Box' => 'Recliner'];
+
+        return [
+            'expiresAt' => $cart?->expires_at?->toIso8601String(),
+            'total' => (float) $items->sum('price'),
+            'show' => $show ? [
+                'id' => $show->id,
+                'movie' => $show->movie->toCardArray(0),
+                'title' => $show->movie->title,
+                'slug' => $show->movie->slug,
+                'when' => $startsAt->format('l j F · g:i A'),
+                'short' => $startsAt->format('D j M, g:i A'),
+                'theater' => $show->screen->theater->name,
+                'screen' => $show->screen->screen_name,
+                'format' => $show->screen->formatLabel(),
+            ] : null,
+            'items' => $items->map(fn (CartItem $item) => [
+                'id' => $item->id,
+                'seat' => $item->seat->row_label.$item->seat->seat_number,
+                'type' => $item->ticket_type === 'kid' ? 'Child' : 'Adult',
+                'tier' => $tiers[$item->category->name] ?? $item->category->name,
+                'price' => (float) $item->price,
+            ])->values(),
+        ];
     }
 
     private function activeCart(): ?Cart
@@ -527,38 +864,56 @@ class AccountController extends Controller
             ->first();
     }
 
+    private function cartItems(?Cart $cart)
+    {
+        return $cart
+            ? $cart->items()->with(['show.movie.genres', 'show.screen.theater.city', 'seat', 'category'])->get()->sortBy(fn (CartItem $item) => $item->seat->row_label.str_pad((string) $item->seat->seat_number, 3, '0', STR_PAD_LEFT))->values()
+            : collect();
+    }
+
     private function clearExpiredCarts(): void
     {
-        Cart::query()
-            ->where('expires_at', '<=', now())
-            ->delete();
+        Cart::query()->where('expires_at', '<=', now())->delete();
     }
 
     private function userBooking(string $number): Booking
     {
         return Booking::query()
-            ->with(['user', 'show.movie', 'show.screen.theater', 'seats.seat', 'seats'])
+            ->with(['user', 'show.movie.genres', 'show.screen.theater.city', 'seats.seat', 'seats.category', 'payment', 'coupon', 'events'])
             ->where('user_id', Auth::id())
             ->where('booking_number', $number)
             ->firstOrFail();
+    }
+
+    private function isOnSale(Show $show): bool
+    {
+        $startsAt = Carbon::parse($show->show_date->toDateString().' '.$show->show_time);
+
+        return $show->status === 'scheduled' && $startsAt->isFuture();
     }
 
     private function bookingNumber(): string
     {
         do {
             $number = 'BM-'.now()->format('Y').'-'.strtoupper(Str::random(8));
-        } while (Booking::where('booking_number', $number)->exists());
+        } while (Booking::query()->where('booking_number', $number)->exists());
 
         return $number;
     }
 
-    private function seatPrice(object $seat, string $ticketType): float
+    /**
+     * Child pricing only exists where the cinema set it (recliners are adult
+     * only); otherwise the seat is sold as an adult ticket.
+     *
+     * @return array{0: string, 1: float}
+     */
+    private function seatPrice(object $seat, string $ticketType): array
     {
-        if ($ticketType === 'kid') {
-            return (float) ($seat->kids_sale_price ?: $seat->kids_price ?: $seat->sale_price ?: $seat->price);
+        if ($ticketType === 'kid' && ($seat->kids_sale_price !== null || $seat->kids_price !== null)) {
+            return ['kid', (float) ($seat->kids_sale_price ?? $seat->kids_price)];
         }
 
-        return (float) ($seat->sale_price ?: $seat->price);
+        return ['adult', (float) ($seat->sale_price ?? $seat->price)];
     }
 
     private function lockedCoupon(?string $code, float $subtotal, int $userId): ?Coupon
@@ -569,10 +924,7 @@ class AccountController extends Controller
             return null;
         }
 
-        $coupon = Coupon::query()
-            ->where('code', $code)
-            ->lockForUpdate()
-            ->first();
+        $coupon = Coupon::query()->where('code', $code)->lockForUpdate()->first();
 
         if (
             ! $coupon
@@ -609,5 +961,15 @@ class AccountController extends Controller
         }
 
         return round(min($discount, $subtotal), 2);
+    }
+
+    private function maxSeats(): int
+    {
+        return (int) config('bookmymovie.booking.max_seats_per_booking', 4);
+    }
+
+    private function holdMinutes(): int
+    {
+        return (int) config('bookmymovie.booking.cart_hold_minutes', 10);
     }
 }

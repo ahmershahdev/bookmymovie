@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 class Booking extends Model
 {
@@ -12,6 +14,7 @@ class Booking extends Model
 
     protected $fillable = [
         'booking_number',
+        'idempotency_key',
         'user_id',
         'customer_name',
         'customer_email',
@@ -54,5 +57,42 @@ class Booking extends Model
     public function seats(): HasMany
     {
         return $this->hasMany(BookingSeat::class);
+    }
+
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
+    }
+
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(BookingEvent::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    public function showStartsAt(): ?Carbon
+    {
+        if (! $this->show) {
+            return null;
+        }
+
+        return Carbon::parse($this->show->show_date->toDateString().' '.$this->show->show_time);
+    }
+
+    /**
+     * Unpaid bookings may be cancelled by the customer until the cutoff.
+     */
+    public function isCancellableByCustomer(): bool
+    {
+        $startsAt = $this->showStartsAt();
+
+        return $this->booking_status === 'confirmed'
+            && $this->payment_status === 'pending'
+            && $startsAt !== null
+            && now()->addMinutes((int) config('bookmymovie.booking.cancellation_cutoff_minutes', 120))->lt($startsAt);
     }
 }

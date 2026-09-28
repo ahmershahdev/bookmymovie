@@ -1,4 +1,36 @@
+# BookMyMovie · https://bookmymovie.ahmershah.dev
+# Public film, cinema, offer and help pages are open to every crawler.
+# Account, cart, checkout, payment and admin areas are private and carry noindex.
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin/
+Disallow: /account
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payments/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /auth/
+Disallow: /search/
+Disallow: /compare
+Disallow: /*/book/
+Disallow: /*?
+
+# AI assistants: a plain-text overview lives at /llms.txt and /llms-full.txt.
+User-agent: GPTBot
+Allow: /
+Disallow: /admin/
+Disallow: /account
+Disallow: /payments/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin/
+Disallow: /account
+Disallow: /payments/
 
 Sitemap: https://bookmymovie.ahmershah.dev/sitemap.xml

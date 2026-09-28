@@ -59,9 +59,17 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Views compare against NOW(); keep the DB session in the app's timezone.
+            'timezone' => env('DB_TIMEZONE', '+05:00'),
+            // Native (server-side) prepared statements: bound values never get
+            // interpolated into SQL text, and integers come back as integers.
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            ]) + [
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ] : [],
         ],
 
         'mariadb' => [
@@ -79,9 +87,17 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Views compare against NOW(); keep the DB session in the app's timezone.
+            'timezone' => env('DB_TIMEZONE', '+05:00'),
+            // Native (server-side) prepared statements: bound values never get
+            // interpolated into SQL text, and integers come back as integers.
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            ]) + [
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ] : [],
         ],
 
         'pgsql' => [

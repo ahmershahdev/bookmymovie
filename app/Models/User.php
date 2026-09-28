@@ -29,7 +29,6 @@ class User extends Authenticatable
         'gender',
         'profile_picture',
         'password',
-        'is_blocked',
         'email_verification_code',
         'email_verification_expires_at',
     ];

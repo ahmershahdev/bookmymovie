@@ -7,9 +7,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
         "laravel/socialite": "^5.29",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "resend/resend-php": "^1.16",
+        "stripe/stripe-php": "^21.3",
+        "tightenco/ziggy": "^2.5"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

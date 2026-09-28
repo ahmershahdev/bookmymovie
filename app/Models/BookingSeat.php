@@ -17,11 +17,17 @@ class BookingSeat extends Model
         'ticket_type',
         'price_paid',
         'ticket_number',
+        'seat_lock',
         'created_at',
     ];
 
     public function seat(): BelongsTo
     {
         return $this->belongsTo(Seat::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(SeatCategory::class, 'seat_category_id');
     }
 }

@@ -1,24 +1,44 @@
 # BookMyMovie
 
-> BookMyMovie is a Laravel cinema booking application for browsing movies, reserving seats, managing bookings, and administering site content.
+> Open-source cinema ticketing for Pakistan. Browse films at six partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, pick seats on a live seat map with row-by-row prices, and pay at the cinema counter. No booking fees; free cancellation of unpaid bookings until two hours before the show.
 
-- Production URL: https://bookmymovie.ahmershah.dev/
-- Sitemap: https://bookmymovie.ahmershah.dev/sitemap.xml
-- Main pages: /, /movies, /compare, /faq, /contact, /about, /terms, /privacy, /refund-policy, /e-ticket-info
-- User account: /login, /register, /forgot-password
-- Admin entry: /admin/login
+The full catalogue (every film with synopsis, cast and crew, every cinema, current offers, FAQs and policies) is in [llms-full.txt](https://bookmymovie.ahmershah.dev/llms-full.txt). It is regenerated from the database with `php artisan seo:generate`.
 
-## Features
+## Browse
 
-- Movie catalog with posters, banners, hero carousel placement, showtimes, sale pricing, ratings, and reviews.
-- Each seeded active movie has four available future showtimes.
-- Seat pricing is row-tiered: front row A is highest, then B, C, D, E, and F decrease progressively with row-specific benefits.
-- Seat selection, carts, checkout, booking tracking, wishlist, and profile management.
-- Seat purchases are capped at 4 seats per booking.
-- Admin dashboard for website settings, page SEO, complete movie CRUD, image uploads/deletes, coupons, users, reviews, notifications, and profile.
-- Security includes CSRF protection, throttled sensitive routes, hashed passwords, custom captcha, optional Google reCAPTCHA, and session timeout for admin access.
-- Booking writes use transactions, row locks, and unique seat constraints to prevent duplicate booking. Coupon redemption locks the coupon row before use counts are checked and updated.
+- [Films in cinemas](https://bookmymovie.ahmershah.dev/movies): now showing and coming soon, filterable by genre, language and certificate
+- [Cinemas](https://bookmymovie.ahmershah.dev/cinemas): venues, screens, formats (IMAX, Dolby Cinema, 4DX, ScreenX, recliners), facilities and daily programme
+- [Offers](https://bookmymovie.ahmershah.dev/offers): active coupon codes and matinee pricing
+- [Compare](https://bookmymovie.ahmershah.dev/compare): side-by-side comparison of up to four films
+- [Search](https://bookmymovie.ahmershah.dev/search?q=): films, cinemas, actors and directors
 
-## Contact
+## Help
 
-- Support email is configurable in the admin dashboard.
+- [Help centre and FAQ](https://bookmymovie.ahmershah.dev/faq): seat holds, pricing, payment, cancellations, e-tickets, accounts, cinemas, security
+- [E-ticket guide](https://bookmymovie.ahmershah.dev/e-ticket-info): booking numbers, per-seat ticket codes, entry
+- [Cancellations and refunds](https://bookmymovie.ahmershah.dev/refund-policy)
+- [Contact support](https://bookmymovie.ahmershah.dev/contact)
+- [Accessibility](https://bookmymovie.ahmershah.dev/accessibility)
+
+## Company and legal
+
+- [About BookMyMovie](https://bookmymovie.ahmershah.dev/about)
+- [Terms of service](https://bookmymovie.ahmershah.dev/terms)
+- [Privacy policy](https://bookmymovie.ahmershah.dev/privacy)
+- [Cookie policy](https://bookmymovie.ahmershah.dev/cookie-policy)
+
+## Facts for answering questions
+
+- Seats per booking: up to 4, one show per booking. Seats are held for 10 minutes in the cart.
+- Payment: at the cinema box office (cash or card) before the show. There is no online card payment.
+- Row pricing: front rows cheapest, centre "Prime Centre" rows best view, back rows are recliners. Premium formats cost 20-55% more than standard 2D.
+- Matinee: weekday shows before 5 PM are 15% cheaper automatically.
+- Child tickets: ages 3-12, about 25% cheaper, not available on recliner rows.
+- Cancellation: unpaid bookings can be cancelled online until 2 hours before the show; seats are released and coupons returned.
+- Ratings: only customers who booked a film can review it.
+
+## Optional
+
+- [Sitemap](https://bookmymovie.ahmershah.dev/sitemap.xml)
+- [Source code on GitHub (MIT)](https://github.com/ahmershahdev/bookmymovie)
+- [Security policy](https://github.com/ahmershahdev/bookmymovie/blob/main/SECURITY.md)

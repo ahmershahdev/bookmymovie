@@ -19,4 +19,13 @@ class Notification extends Model
         'read_at',
         'created_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_read' => 'boolean',
+            'read_at' => 'datetime',
+            'created_at' => 'datetime',
+        ];
+    }
 }

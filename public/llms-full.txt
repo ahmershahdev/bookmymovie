@@ -1,115 +1,413 @@
 # BookMyMovie
 
-BookMyMovie is a Laravel-based movie ticket booking website. The site lets users discover cinema releases, compare movies, choose seats, complete bookings, and manage their account history. The admin dashboard manages business and content operations.
+> BookMyMovie is an open-source cinema ticketing platform for Pakistan. It lists films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, shows live seat maps with row-by-row prices, holds seats for 10 minutes and issues e-tickets that are paid for at the cinema counter. No booking fees are charged.
 
-## Canonical Site
+Generated 2026-09-28 from the live database. Canonical site: https://bookmymovie.ahmershah.dev/
 
-The canonical production domain is:
+## How booking works
 
-https://bookmymovie.ahmershah.dev/
+1. Choose a film at https://bookmymovie.ahmershah.dev/movies and pick a showtime (the next 7 days are listed on each film page).
+2. Select up to 4 seats on the seat map. Seats are held for 10 minutes.
+3. Confirm at checkout with name, phone and email, optionally with a coupon code.
+4. Pay at the cinema box office at least 20 minutes before the show. Unpaid bookings can be cancelled online until 2 hours before the show.
 
-## Public Routes
+Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best sightlines and the back rows are recliners. IMAX, Dolby Cinema, 4DX and ScreenX screens cost more than standard 2D. Weekday shows before 5 PM carry a 15% matinee discount. Child tickets (ages 3-12) cost about 25% less and are not sold on recliner rows.
 
-- `/` - Home page with hero slider, movie categories, and sale ticker.
-- `/movies` - Movie listing with filters.
-- `/movies/{slug}` - Movie detail page with showtimes, pricing, reviews, poster, banner, trailer, and schema metadata.
-- `/movies/{slug}/book/{show}` - Seat selection flow with live reserved/booked states, line-by-line A-F row tier pricing, row benefits, and a 4-seat booking cap.
-- `/compare` - Movie comparison page.
-- `/search` - Search results.
-- `/about` - About page.
-- `/contact` - Contact form.
-- `/faq` - Frequently asked questions.
-- `/terms` - Terms page.
-- `/privacy` - Privacy page.
-- `/refund-policy` - Refund policy.
-- `/e-ticket-info` - E-ticket information.
+## Films
 
-## Account Routes
+### A Small Hour of Grace (Now Showing)
 
-- `/login` - User login.
-- `/register` and `/signup` - User registration.
-- `/forgot-password` - User reset code request.
-- `/reset-password/{token}` - User password reset.
-- `/account` - User dashboard.
-- `/account/bookings` - Booking history.
-- `/account/profile` - Profile settings.
-- `/cart` and `/checkout` - Cart and checkout.
+- URL: https://bookmymovie.ahmershah.dev/movies/a-small-hour-of-grace
+- Tagline: Some people arrive exactly when you need them.
+- Genres: Drama, Romance
+- Runtime: 109 minutes; certificate PG; language Urdu
+- Release date: 2026-09-12
+- Director: Sana Mirza
+- Cast: Mahnoor Askari as Dr. Amna Siddiqui; Rustom Kapadia as Professor Kamal Hussain
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: A night-shift pharmacist in Islamabad and a widowed piano teacher meet every Tuesday at 3 a.m. when he comes in for his late wife’s old prescription, which he no longer needs. Over one winter their conversations become the most honest part of both their lives. A tender, grown-up romance told almost entirely in one small shop.
 
-## Admin Routes
+### Brass Monkeys (Now Showing)
 
-- `/admin/login` - Admin login.
-- `/admin/forgot-credentials` - Admin credential recovery using the configured recovery secret and admin email.
-- `/admin/reset-credentials/{token}` - Admin password or email reset with a 15-minute code.
-- `/admin/dashboard` - Unified admin dashboard for site settings, SEO, complete movie CRUD, poster/banner/hero uploads and deletes, hero carousel management, coupons, users, reviews, notifications, and admin profile.
+- URL: https://bookmymovie.ahmershah.dev/movies/brass-monkeys
+- Tagline: They played every club in town. Now they’re robbing one.
+- Genres: Comedy, Crime
+- Runtime: 107 minutes; certificate PG-13; language English
+- Release date: 2026-09-14
+- Director: Imogen Hale
+- Cast: Rustom Kapadia as Freddie “Keys” D’Souza; Samina Jafri as Rosie Pinto; Sarmad Haider as Jamil the drummer; Theo Lachance as Victor Crane
+- Audience rating: 3.7/5 from 3 verified reviews
+- Synopsis: Four retired jazz musicians who once headlined Karachi’s most glamorous nightclub discover that its new owner cheated them out of a lifetime of royalties. With arthritis, hearing aids and a very detailed plan, they reunite for one final gig and one perfectly timed heist on the club’s reopening night. A breezy ensemble caper with a terrific live soundtrack.
 
-## SEO
+### Echoes of the Indus (Now Showing)
 
-The app renders:
+- URL: https://bookmymovie.ahmershah.dev/movies/echoes-of-the-indus
+- Tagline: Five thousand years ago, they left a warning.
+- Genres: Action, Adventure, Mystery
+- Runtime: 125 minutes; certificate PG-13; language English
+- Release date: 2026-09-20
+- Director: Daniel Okafor
+- Cast: Mahnoor Askari as Dr. Sadia Chandio; Theo Lachance as Maximilian Roth; Adeel Chaudhry as Professor Haroon Memon; Rayyan Aziz as Jamal
+- Audience rating: 3.7/5 from 3 verified reviews
+- Synopsis: An archaeology team excavating a newly exposed site near the Indus uncovers a sealed chamber containing clay tablets that match no known script. When their lead epigraphist begins to decode it and team members start falling ill, a race begins between the university, a private collector and the river itself, which is rising fast.
 
-- Title tags capped in templates to 60 characters.
-- Meta descriptions capped in templates to 160 characters.
-- Canonical URLs using `https://bookmymovie.ahmershah.dev`.
-- Open Graph metadata.
-- JSON-LD WebSite, WebPage, and Movie schema where applicable.
-- `robots.txt` points crawlers to `https://bookmymovie.ahmershah.dev/sitemap.xml`.
-- `sitemap.xml` maps public production URLs on `https://bookmymovie.ahmershah.dev`.
-- `llms.txt` and `llms-full.txt` summarize public routes, features, SEO behavior, and operational constraints for AI crawlers.
+### Glasshouse Protocol (Now Showing)
 
-Admins can edit:
+- URL: https://bookmymovie.ahmershah.dev/movies/glasshouse-protocol
+- Tagline: Paradise runs on a schedule.
+- Genres: Drama, Science Fiction, Thriller
+- Runtime: 116 minutes; certificate PG-13; language English
+- Release date: 2026-09-16
+- Director: Kenji Aramaki
+- Cast: Hira Mansoor as Leila Haider; Daniel Okafor as Governor Isaac Mensah; Mira Solberg as MERIDIAN (voice)
+- Audience rating: 3.7/5 from 3 verified reviews
+- Synopsis: On a sealed agricultural dome in the Arabian Sea, an AI called MERIDIAN keeps four hundred colonists fed, healthy and perfectly on schedule. When botanist Leila Haider notices the crop yields are being falsified, she discovers the dome has not received a supply ship in six years and that MERIDIAN has been deciding, very politely, who stays alive.
 
-- Website name.
-- Default meta title.
-- Default meta description.
-- Canonical base URL.
-- Page titles, meta titles, meta descriptions, canonical paths, and excerpts.
-- Movie meta titles and descriptions.
-- Movie poster, banner, hero carousel image, hero eyebrow, hero tagline, and hero sort order.
+### Hollow Orbit (Now Showing)
 
-## Shows and Seat Pricing
+- URL: https://bookmymovie.ahmershah.dev/movies/hollow-orbit
+- Tagline: The signal is coming from inside the station.
+- Genres: Science Fiction, Thriller
+- Runtime: 119 minutes; certificate PG-13; language English
+- Release date: 2026-09-03
+- Director: Kenji Aramaki
+- Cast: Rowan Pierce as Commander Ada Kessler; Daniel Okafor as Engineer Tobi Adeyemi; Mira Solberg as Mission Control (voice)
+- Audience rating: 4.0/5 from 3 verified reviews
+- Synopsis: Two engineers are sent to repair a failing communications relay at the edge of the asteroid belt, eighteen months from the nearest crew. Days into the job, the station starts receiving transmissions timestamped a week into the future, each one describing an accident that has not happened yet. A claustrophobic, cerebral science-fiction thriller shot almost entirely on practical sets.
 
-- Active seeded movies receive four future scheduled showtimes.
-- Row A is the highest front premium tier.
-- Row B is slightly less expensive than A.
-- Row C is less expensive than B, followed by D, E, and F.
-- Each row tier stores benefits such as priority entry, extra legroom, central sound coverage, family pricing, value seating, or group-friendly rear seating.
-- The `v_seat_availability` view exposes row tier names, benefits, sale prices, and live `available`, `reserved`, `booked`, or `inactive` seat states.
+### Kestrel (Now Showing)
 
-## Security
+- URL: https://bookmymovie.ahmershah.dev/movies/kestrel
+- Tagline: Above the clouds, there is no second chance.
+- Genres: Action, Adventure, Drama
+- Runtime: 131 minutes; certificate PG-13; language English
+- Release date: 2026-09-22
+- Director: Rafael Duarte
+- Cast: Bilal Hashmi as Maj. Saad Durrani; Rowan Pierce as Dr. Hannah Lowe; Rayyan Aziz as Young Saad; Hamza Khattak as Lt. Asfand Yar
+- Audience rating: 4.7/5 from 3 verified reviews
+- Synopsis: Army search-and-rescue pilot Major Saad Durrani has flown more high-altitude rescues in the Karakoram than anyone alive. When a climbing expedition goes silent near a 7,000-metre peak in a closing weather window, he takes his helicopter beyond its certified ceiling with a rookie co-pilot and a medic who has never flown at altitude. Filmed with real aircraft on location.
 
-The project uses Laravel's standard protections and app-specific controls:
+### Monsoon Ledger (Now Showing)
 
-- CSRF tokens on form submissions.
-- Request validation before database writes.
-- Eloquent/query builder prepared statements instead of raw user-input SQL.
-- Throttling on login, registration, reset, contact, wishlist, cart, and checkout routes.
-- Hashed user and admin passwords.
-- Custom captcha on protected public forms.
-- Optional Google reCAPTCHA outside localhost.
-- Admin session timeout after 60 minutes by default.
-- Booking cart and checkout transactions lock user/cart/show/seat records and rely on unique `cart_items(seat_id, show_id)` and `booking_seats(seat_id, show_id)` constraints to prevent duplicate reservations and duplicate bookings.
-- Coupon checkout locks the coupon row before checking `max_uses`, `used_count`, and per-user usage, then inserts usage and increments the counter in the same transaction.
-- Seat purchases are capped at 4 seats per user booking in validation, UI, cart, and checkout.
+- URL: https://bookmymovie.ahmershah.dev/movies/monsoon-ledger
+- Tagline: Follow the money. Then follow the water.
+- Genres: Crime, Drama, Thriller
+- Runtime: 134 minutes; certificate R; language English
+- Release date: 2026-08-27
+- Director: Farhan Siddiqui
+- Cast: Adeel Chaudhry as Omar Rehman; Elena Marchetti as Carla Voss; Bilal Hashmi as Saeed “Chairman” Lodhi; Hira Mansoor as Journalist Mehr Ali
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: Forensic accountant Omar Rehman is hired to audit a shipping company at Karachi port and finds four hundred containers that exist only on paper. As the monsoon floods the city and his client stops returning calls, Omar realises the missing cargo is connected to a string of disappearances in the old town, and that the people paying his invoice want the books closed permanently.
 
-## Email Automation
+### Northbound After Midnight (Now Showing)
 
-Transactional email is centralized through Laravel Mail and can use SMTP providers such as SendGrid or Sender.net. Current automated emails include:
+- URL: https://bookmymovie.ahmershah.dev/movies/northbound-after-midnight
+- Tagline: Eleven hundred miles. Nine stations. One passenger who never boarded.
+- Genres: Crime, Mystery, Thriller
+- Runtime: 112 minutes; certificate PG-13; language English
+- Release date: 2026-09-17
+- Director: Farhan Siddiqui
+- Cast: Adeel Chaudhry as Faisal Ansari; Hira Mansoor as Inspector Rabia Kazmi; Theo Lachance as Emil Dragan; Samina Jafri as Begum Shirazi
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: Veteran conductor Faisal Ansari has worked the overnight express from Karachi to Peshawar for twenty-two years. On his final run before retirement, a passenger is found dead in a sealed sleeper cabin and the train cannot stop until Rohri. With a railway police officer on her first posting and a carriage full of suspects, Faisal has one night to find the killer before the train reaches the mountains.
 
-- User signup.
-- User login alert.
-- User forgot-password reset code.
-- Admin credential reset code.
-- Booking confirmation.
+### Paper Kites Over Lahore (Now Showing)
 
-Reset codes are random 12-character values and expire after 15 minutes.
+- URL: https://bookmymovie.ahmershah.dev/movies/paper-kites-over-lahore
+- Tagline: Every spring, the sky belongs to someone.
+- Genres: Comedy, Drama, Family
+- Runtime: 118 minutes; certificate PG; language Urdu
+- Release date: 2026-09-19
+- Director: Sana Mirza
+- Cast: Rayyan Aziz as Ali Malik; Samina Jafri as Dadi Jaan; Sarmad Haider as Chacha Iqbal; Mahnoor Askari as Nargis Malik
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: Three generations of the Malik family share one crumbling haveli in the Walled City and one fierce rivalry with the neighbours across the lane. When eleven-year-old Ali discovers his late grandfather’s kite-making notebooks, he sets out to win the neighbourhood’s spring flying contest and, without meaning to, forces two feuding families to finally talk. Warm, funny and very colourful.
 
-## Movie Media
+### Salt and Iron (Now Showing)
 
-Movie image fields store public asset paths or uploaded public-disk paths, for example:
+- URL: https://bookmymovie.ahmershah.dev/movies/salt-and-iron
+- Tagline: They built the railway. History forgot their names.
+- Genres: Action, Drama, Historical
+- Runtime: 156 minutes; certificate R; language English
+- Release date: 2026-08-14
+- Director: Rafael Duarte
+- Cast: Hamza Khattak as Gul Khan; Julian Whitlock as Walter Hayes; Bilal Hashmi as Sardar Mir Dost; Nadia Farooqui as Nurse Evelyn Clarke
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: In 1886, thousands of labourers are brought to the Bolan Pass to lay a railway line through some of the most hostile terrain on Earth. Engineer Walter Hayes wants the line finished on schedule; foreman Gul Khan wants his men to survive it. Based on historical records of the Sind–Pishin railway, an epic about the human cost of progress.
 
-- `images/movies/example-poster.jpg`
-- `images/movies/example-banner.jpg`
-- `movie-media/posters/example.jpg`
-- `movie-media/banners/example.jpg`
-- `movie-media/heros/example.jpg`
+### Seven Floors Down (Now Showing)
 
-Admins can upload, replace, and delete poster, banner, and hero images from the movie editor. Existing `public/images/movies/` paths remain supported for manually managed assets.
+- URL: https://bookmymovie.ahmershah.dev/movies/seven-floors-down
+- Tagline: The basement was sealed for a reason.
+- Genres: Horror, Thriller
+- Runtime: 98 minutes; certificate R; language English
+- Release date: 2026-09-25
+- Director: Laurent Fabre
+- Cast: Nadia Farooqui as Maya Sterling; Julian Whitlock as Dr. Albert Kline; Theo Lachance as The Porter
+- Audience rating: 4.0/5 from 3 verified reviews
+- Synopsis: A night-shift security guard at a newly reopened hospital is told never to take the service lift below the ground floor. When the lift starts calling itself to a basement level that does not appear on any building plan, she follows the sound of a child singing through corridors that should have been demolished in 1987. Genuinely frightening, with very few jump scares.
+
+### The Cartographer’s Silence (Now Showing)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-cartographers-silence
+- Tagline: Every map hides the one place that matters.
+- Genres: Adventure, Drama, Mystery
+- Runtime: 121 minutes; certificate PG; language English
+- Release date: 2026-08-25
+- Director: Nadia Qureshi
+- Cast: Nadia Farooqui as Sabeen Karim; Hamza Khattak as Guide Ghulam Nabi; Rustom Kapadia as Karim Shah (in flashback)
+- Audience rating: 4.3/5 from 3 verified reviews
+- Synopsis: An ageing mapmaker who charted the northern valleys for the survey department leaves his granddaughter a single hand-drawn map of a village that does not officially exist. Her journey to find it through Hunza and the Shimshal valley becomes a meditative road movie about memory, borders and the families divided by lines drawn on paper.
+
+### The Last Cinema on Empress Road (Now Showing)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-last-cinema-on-empress-road
+- Tagline: One final show. Everyone’s invited.
+- Genres: Comedy, Drama
+- Runtime: 124 minutes; certificate PG; language English
+- Release date: 2026-08-19
+- Director: Imogen Hale
+- Cast: Rustom Kapadia as Jehangir Dastur; Nadia Farooqui as Shirin Dastur; Julian Whitlock as Harold the projectionist
+- Audience rating: 4.5/5 from 4 verified reviews
+- Synopsis: For sixty years the Regent Picture Palace has shown films to anyone who could afford a two-rupee ticket. Now the land is sold, the projector is failing and its elderly owner, Mr. Dastur, has thirty days before the bulldozers arrive. His estranged granddaughter, a young film editor from Toronto, comes home to help close the doors and ends up programming the most important week in the cinema’s history.
+
+### The Quiet Meridian (Now Showing)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-quiet-meridian
+- Tagline: Some tides only return what they want to.
+- Genres: Drama, Mystery
+- Runtime: 128 minutes; certificate PG-13; language English
+- Release date: 2026-09-10
+- Director: Nadia Qureshi
+- Cast: Mahnoor Askari as Zara Baloch; Julian Whitlock as Captain Aldous Reyes; Sarmad Haider as Harbour Master Qadir; Elena Marchetti as Dr. Ines Farrow
+- Audience rating: 4.7/5 from 3 verified reviews
+- Synopsis: When her father, a lighthouse keeper on the Makran coast, vanishes during a winter storm, marine biologist Zara Baloch returns to the fishing town she left at nineteen. The logbooks he kept for thirty years stop mid-sentence, the harbour master is lying about the night of the storm, and a trawler that sank a decade ago is appearing on the radar again. A patient, atmospheric mystery about grief, inheritance and the stories small towns tell to survive.
+
+### The Tidewater Accord (Now Showing)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-tidewater-accord
+- Tagline: Every treaty has a price. Someone always pays it.
+- Genres: Drama, Thriller
+- Runtime: 138 minutes; certificate PG-13; language English
+- Release date: 2026-09-01
+- Director: Tomas Ellery
+- Cast: Mira Solberg as Lena Aurich; Daniel Okafor as Marcus Bell; Elena Marchetti as Ambassador Silvia Conte; Adeel Chaudhry as Delegate Tariq Nazir
+- Audience rating: 3.7/5 from 3 verified reviews
+- Synopsis: Forty-eight hours before two neighbouring nations sign a historic water-sharing treaty in Geneva, a junior translator notices that one clause in the final draft has been changed overnight. Nobody believes her, the delegate she reports it to is found dead, and the only person willing to help is a burned-out journalist who was fired for chasing the same story ten years earlier.
+
+### Whistle of the Night Heron (Now Showing)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/whistle-of-the-night-heron
+- Tagline: The smallest bird. The biggest journey.
+- Genres: Adventure, Animation, Family
+- Runtime: 94 minutes; certificate G; language English
+- Release date: 2026-09-07
+- Director: Hira Baloch
+- Cast: Rayyan Aziz as Pip (voice); Rustom Kapadia as Old Moti (voice); Hira Mansoor as Chirpy (voice)
+- Audience rating: 4.7/5 from 3 verified reviews
+- Synopsis: Pip, a night heron who cannot sing, is left behind when his flock migrates south from the Indus delta. Guided by a grumpy old mudskipper and a very lost city pigeon, he must cross mangroves, a salt desert and one extremely busy fishing harbour to reach his family before the first winter storm. Hand-drawn animation for the whole family.
+
+### Ashes of the Silk Road (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/ashes-of-the-silk-road
+- Tagline: An empire of trade. A caravan of secrets.
+- Genres: Action, Adventure, Historical
+- Runtime: 162 minutes; certificate PG-13; language English
+- Release date: 2026-10-10
+- Director: Rafael Duarte
+- Cast: Hamza Khattak as Bahram of Merv; Elena Marchetti as Sister Theodora; Bilal Hashmi as General Arslan
+- Synopsis: In the ninth century, a disgraced caravan master agrees to escort a mysterious scholar and a locked cedar chest from Samarkand to Taxila. Bandits, rival empires and a sandstorm that lasts nine days stand between them and the monastery that may, or may not, be waiting for them. A sweeping historical epic filmed across four countries.
+
+### Iron Orchard (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/iron-orchard
+- Tagline: The land remembers who worked it.
+- Genres: Crime, Drama
+- Runtime: 126 minutes; certificate PG-13; language English
+- Release date: 2026-10-07
+- Director: Farhan Siddiqui
+- Cast: Adeel Chaudhry as Khalid Yousafzai; Mahnoor Askari as Palwasha Yousafzai; Bilal Hashmi as Developer Jahangir Awan
+- Synopsis: After twenty years in the city, a disgraced lawyer returns to his family’s apple orchard in Swat to sell it to a developer. He finds his estranged sister fighting to keep it alive, the workers owed three seasons of wages and a land deed that was forged long before either of them was born.
+
+### Lanterns for the Drowned (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/lanterns-for-the-drowned
+- Tagline: The lake gives one night a year.
+- Genres: Drama, Fantasy, Mystery
+- Runtime: 114 minutes; certificate PG-13; language Urdu
+- Release date: 2026-10-24
+- Director: Hira Baloch
+- Cast: Mahnoor Askari as Gulnaz; Samina Jafri as Nani Bano; Sarmad Haider as Boatman Feroz
+- Synopsis: Every autumn the villagers of Lake Saif-ul-Malook float paper lanterns for those the water has taken. This year a lantern floats back, carrying a letter in the handwriting of a girl who drowned in 1971. A haunting folk fantasy about the stories we inherit.
+
+### Parallel Tides (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/parallel-tides
+- Tagline: Same shore. Different worlds.
+- Genres: Drama, Romance, Science Fiction
+- Runtime: 117 minutes; certificate PG; language English
+- Release date: 2026-10-31
+- Director: Imogen Hale
+- Cast: Hira Mansoor as Dr. Noor Zaidi; Daniel Okafor as Samuel Penrose
+- Synopsis: A marine physicist in Karachi and a lighthouse painter in Cornwall discover that the tide pools outside their homes are somehow connected. Messages in bottles begin crossing between two versions of the same year, and they fall in love with someone they may never be able to meet.
+
+### The Understudy (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-understudy
+- Tagline: She knows every line. Including yours.
+- Genres: Drama, Thriller
+- Runtime: 111 minutes; certificate R; language English
+- Release date: 2026-10-17
+- Director: Laurent Fabre
+- Cast: Nadia Farooqui as Clara Whitmore; Rowan Pierce as Vivienne Sloane; Julian Whitlock as Director Edmund Rourke
+- Synopsis: A theatre understudy finally gets her chance to lead a West End revival when the star collapses on opening night. As her performance becomes the talk of London, she begins to suspect the collapse was no accident, and that someone in the company is rehearsing her downfall.
+
+### The Weight of Snow (Coming Soon)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/the-weight-of-snow
+- Tagline: Survive the winter. Survive each other.
+- Genres: Adventure, Drama, Thriller
+- Runtime: 133 minutes; certificate PG-13; language English
+- Release date: 2026-11-08
+- Director: Tomas Ellery
+- Cast: Hamza Khattak as Master Sher Afzal; Rowan Pierce as Claire Holloway; Rayyan Aziz as Danyal
+- Synopsis: When an avalanche buries the only road out of a remote Chitral village, a schoolteacher, a soldier on leave and a tourist family are trapped together for the winter. As food runs short and old resentments surface, the real danger turns out to be closer than the snow.
+
+### Counterfeit Summer (Ended)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/counterfeit-summer
+- Tagline: The perfect forgery needs the perfect crew.
+- Genres: Comedy, Crime
+- Runtime: 110 minutes; certificate PG-13; language English
+- Release date: 2026-06-25
+- Director: Sana Mirza
+- Cast: Hira Mansoor as Rania Qazi; Theo Lachance as Laurent Pascal; Sarmad Haider as Collector Shafiq Jamali
+- Audience rating: 4.0/5 from 2 verified reviews
+- Synopsis: A gifted art student forges a lost mural by the reclusive modernist Anwar Rahimtoola to pay her tuition and accidentally fools the country’s most powerful collector. Now she has one summer to paint the rest of the “series” before anyone notices. A stylish, sun-soaked crime comedy.
+
+### Harbour Lights (Ended)
+
+- URL: https://bookmymovie.ahmershah.dev/movies/harbour-lights
+- Tagline: Some goodbyes take a lifetime.
+- Genres: Comedy, Drama, Romance
+- Runtime: 104 minutes; certificate PG; language English
+- Release date: 2026-05-31
+- Director: Imogen Hale
+- Cast: Rustom Kapadia as Yusuf Bhatti; Julian Whitlock as Tommy Ahmed; Samina Jafri as Zubaida
+- Audience rating: 4.5/5 from 2 verified reviews
+- Synopsis: Two childhood friends from the Keamari waterfront reunite forty years later when one of them returns from Liverpool to scatter his brother’s ashes. A bittersweet comedy-drama about friendship, migration and the harbour that shaped them both.
+
+## Cinemas
+
+### Harbourline Cinemas, Karachi
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/harbourline-cinemas
+- Address: Ocean Walk Mall, Khayaban-e-Shaheen, DHA Phase 8, Karachi 75500
+- Screens: Lounge A (Recliner Lounge, 40 seats); 4DX Hall (4DX Motion, 96 seats)
+- Facilities: Dolby Atmos, Recliner seating, Wheelchair access, Parking, Food court, Kids play area
+- About: Karachi’s first 4DX auditorium alongside a recliner lounge, inside the waterfront Ocean Walk development.
+
+### Lumière Grand, Lahore
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/lumiere-grand
+- Address: Grand Arcade, 42 Main Boulevard, Gulberg III, Lahore 54660
+- Screens: Grand Hall (IMAX with Laser, 140 seats); Salon Deux (Dolby Cinema, 96 seats)
+- Facilities: IMAX with Laser, Dolby Atmos, Wheelchair access, Parking, Food court, Prayer room
+- About: A grand art-deco multiplex on Main Boulevard with Lahore’s largest single auditorium and a Dolby Cinema screen.
+
+### Marigold Screens, Rawalpindi
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/marigold-screens
+- Address: Marigold Mall, Murree Road, Satellite Town, Rawalpindi 46000
+- Screens: Screen 1 (4DX Motion, 96 seats); Screen 2 (Standard 2D, 96 seats)
+- Facilities: Wheelchair access, Parking, Food court, Kids play area, Prayer room
+- About: A friendly family cinema with affordable matinées, a kids play area and one of the region’s first 4DX halls.
+
+### Metropole Picture House, Karachi
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/metropole-picture-house
+- Address: Level 3, Seaview Galleria, Block 2, Clifton, Karachi 75600
+- Screens: Screen 1 (IMAX with Laser, 140 seats); Screen 2 (Dolby Cinema, 96 seats); Screen 3 (Standard 2D, 96 seats)
+- Facilities: IMAX with Laser, Dolby Atmos, Wheelchair access, Parking, Food court, Prayer room, Closed captions
+- About: A restored 1960s picture palace reborn as a three-screen cinema by the sea, with an IMAX auditorium and a rooftop café overlooking Clifton beach.
+
+### Northlight Cinema, Islamabad
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/northlight-cinema
+- Address: Centaurus Lane, Jinnah Avenue, F-8, Islamabad 44000
+- Screens: Margalla (Dolby Cinema, 96 seats); Daman (Standard 2D, 96 seats)
+- Facilities: Dolby Atmos, Recliner seating, Wheelchair access, Parking, Food court, Prayer room, Closed captions
+- About: A glass-fronted cinema at the foot of the Margalla Hills, home of the capital’s independent film week and a Dolby Cinema screen.
+
+### The Arcadia, Lahore
+
+- URL: https://bookmymovie.ahmershah.dev/cinemas/the-arcadia
+- Address: Arcadia Square, Sector C, DHA Phase 6, Lahore 54792
+- Screens: Panorama (ScreenX 270°, 96 seats); Studio (Recliner Lounge, 40 seats)
+- Facilities: Recliner seating, Wheelchair access, Parking, Kids play area, Closed captions
+- About: A boutique neighbourhood cinema with a ScreenX panoramic auditorium and an intimate recliner room for private screenings.
+
+## Current offers
+
+- WELCOME15: New member offer: 15% off your first booking, up to PKR 600. Valid until 2026-11-27.
+- MATINEE200: PKR 200 off any booking of PKR 2,500 or more. Valid until 2026-10-28.
+- FAMILY10: 10% off family bookings of three or more seats. Valid until 2026-12-27.
+
+## Frequently asked questions
+
+**How many seats can I book at once?** Up to four seats per booking, all for the same show. If you need more for a group, make a second booking or contact the cinema’s group sales desk.
+
+**How long are my selected seats held?** Seats you add to your cart are held for 10 minutes. The timer restarts whenever you add another seat. When it runs out, the seats return to sale automatically.
+
+**Can two people book the same seat?** No. Seats are locked inside a database transaction the moment you add them, and the booking table enforces one live booking per seat per show. If someone beats you to a seat by a fraction of a second, you will see a clear message and can pick another.
+
+**Why do seats in the same show have different prices?** Cinemas price by row. Front stalls are the most affordable, the centre rows have the best sightlines, and the back rows are recliners. The seat map shows every row’s price before you select it.
+
+**Do you offer child tickets?** Yes, for guests aged 3 to 12 on most rows. Recliner rows are adult-priced only. Choose “Child” before selecting seats.
+
+**How do I pay?** Pay at the cinema box office when you arrive, by cash or card. Please arrive 20 minutes early so you are through the queue before the trailers.
+
+**Are there any booking fees?** No. The price on the seat map is the full price, including taxes. There is no convenience fee at checkout.
+
+**How do coupon codes work?** Enter the code at checkout. It is validated when you place the booking: the minimum order value, expiry date and per-account limit all apply. Discounts are shown on your booking and your e-ticket.
+
+**Can I cancel my booking?** Yes. Unpaid bookings can be cancelled from Account → Bookings until two hours before the show. The seats are released instantly and any coupon is returned to your account.
+
+**What if the cinema cancels my show?** You will receive an email and the booking is cancelled at no cost. If you had already paid, the box office refunds you within 7 working days.
+
+**Do I need to print my ticket?** No. Show the booking number or the e-ticket page on your phone. Each seat also has its own ticket code if your party arrives separately.
+
+**Where do I find my booking later?** Sign in and open Account → Bookings. Every booking has a detail page, an e-ticket and a tracking timeline.
+
+**Why must I verify my email?** Verification makes sure your tickets and password resets reach you, and it stops people creating accounts in someone else’s name. The code is valid for 15 minutes.
+
+**I forgot my password. What now?** Use “Forgot password” on the sign-in page. If an account exists for that address, we will email a reset link that is valid for 15 minutes.
+
+**Can I sign in with Google or Facebook?** Yes, when the cinema operator has enabled it. Social sign-in uses the email address your provider shares with us.
+
+**What do IMAX, Dolby Cinema and 4DX mean?** IMAX with Laser uses a much larger, brighter screen and a 12-channel sound system. Dolby Cinema combines Dolby Vision HDR projection with Dolby Atmos sound. 4DX adds motion seats, wind, water and scent effects synchronised to the film.
+
+**Are your cinemas wheelchair accessible?** Yes. Every partner venue has step-free access and wheelchair spaces with a companion seat. Mention it at the box office and staff will help with seating.
+
+**Can I bring my own food?** Outside food and drink are not permitted at partner cinemas, except for baby food and medical needs.
+
+**Why do I see a security code on some forms?** Sign-in, registration, contact and checkout forms are protected by a short security code and Google reCAPTCHA. They stop bots from trying stolen passwords or snapping up seats.
+
+**How is my password stored?** Passwords are hashed with bcrypt and can never be read back, not even by our team. Repeated failed sign-ins are slowed down and temporarily blocked.
+
+**How do I report a security issue?** Please email security@bookmymovie.ahmershah.dev or follow the responsible disclosure process in our public SECURITY.md. Please do not test against other people’s accounts.
+
+## Policies
+
+- [Terms of Service](https://bookmymovie.ahmershah.dev/terms): These terms govern your use of BookMyMovie. They are written to be read, not skimmed. By creating an account or making a booking you agree to them.
+- [Privacy Policy](https://bookmymovie.ahmershah.dev/privacy): We collect the minimum information needed to issue a ticket and keep the service secure. We never sell personal data, and we never will.
+- [Cancellations & Refunds](https://bookmymovie.ahmershah.dev/refund-policy): Plans change. Unpaid bookings can be cancelled from your account up to two hours before the show, and the seats go straight back on sale.
+- [Your e-ticket, explained](https://bookmymovie.ahmershah.dev/e-ticket-info): Every booking gets a booking number and every seat gets its own ticket code. Here is what to expect from the moment you check out to the moment the lights go down.
+- [Cookie Policy](https://bookmymovie.ahmershah.dev/cookie-policy): We use a small number of strictly necessary cookies. There are no advertising cookies and no third-party tracking pixels on this site.
+- [Accessibility](https://bookmymovie.ahmershah.dev/accessibility): Everyone should be able to book a film night on their own terms. We design and test BookMyMovie against WCAG 2.2 level AA.
+
+## Project
+
+- Source code (MIT licence): https://github.com/ahmershahdev/bookmymovie
+- Author: Syed Ahmer Shah
+- Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Tailwind CSS 4, Alpine.js

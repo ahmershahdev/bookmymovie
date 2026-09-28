@@ -4,445 +4,787 @@ namespace Database\Seeders;
 
 use App\Models\Admin;
 use App\Models\ContentPage;
-use App\Models\Coupon;
-use App\Models\Faq;
-use App\Models\Genre;
 use App\Models\Movie;
 use App\Models\Review;
-use App\Models\Screen;
-use App\Models\Seat;
-use App\Models\SeatCategory;
-use App\Models\Show;
-use App\Models\ShowSeatPrice;
-use App\Models\ShowSeatRowPrice;
 use App\Models\SiteSetting;
-use App\Models\Theater;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RuntimeException;
 
+/**
+ * Builds a complete, realistic demo: a six-venue cinema network, 24 original
+ * films with cast and crew, a week of showtimes with row-tier pricing, real
+ * reviews and live occupancy created through proper bookings.
+ *
+ * Every run truncates the domain tables, so it refuses to run in production
+ * unless SEED_ALLOW_PRODUCTION=true is set explicitly.
+ */
 class DatabaseSeeder extends Seeder
 {
-    private const ADMIN_EMAIL = 'admin@bookmymovie.test';
+    public const ADMIN_EMAIL = 'admin@bookmymovie.test';
 
-    private const ADMIN_PASSWORD = 'AdminReset@2026!';
+    public const ADMIN_PASSWORD = 'AdminReset@2026!';
+
+    public const DEMO_EMAIL = 'test@example.com';
+
+    public const DEMO_PASSWORD = 'Password@123';
+
+    private const SLOTS = ['11:00:00', '14:00:00', '17:00:00', '20:00:00', '22:45:00'];
+
+    private const PREMIUM_FORMATS = ['imax', 'dolby_cinema', '4dx', 'screenx'];
+
+    private const FORMAT_MULTIPLIER = [
+        'standard' => 1.0,
+        'screenx' => 1.2,
+        'dolby_cinema' => 1.3,
+        'imax' => 1.45,
+        '4dx' => 1.55,
+        'recliner' => 1.0,
+    ];
+
+    /** @var array<string, array{0: string, 1: int, 2: string}> tier => [category, base price, benefits] */
+    private const TIERS = [
+        'Front Stalls' => ['Gold', 1100, 'Closest to the screen and the most affordable seats in the house.'],
+        'Stalls' => ['Gold', 1250, 'Wide view with easy aisle access, a favourite for action films.'],
+        'Classic' => ['Gold', 1450, 'Comfortable padded seating with a clear, full-screen view.'],
+        'Prime' => ['Platinum', 1750, 'Raised rows with extra legroom and centred surround sound.'],
+        'Prime Centre' => ['Platinum', 1950, 'The sweet spot: eye level with the screen and dead centre of the mix.'],
+        'Recliner' => ['Box', 2600, 'Powered leather recliner, side table and blanket on request.'],
+        'Recliner Lounge' => ['Box', 2900, 'Back-row recliner pairs with in-seat service and priority entry.'],
+    ];
+
+    private int $adminId;
+
+    /** @var array<string, int> */
+    private array $genreIds = [];
+
+    /** @var array<string, int> */
+    private array $peopleIds = [];
+
+    /** @var list<int> */
+    private array $customerIds = [];
+
+    private int $demoUserId;
 
     public function run(): void
     {
-        $this->clearDemoData();
+        if (app()->isProduction() && ! filter_var(env('SEED_ALLOW_PRODUCTION', false), FILTER_VALIDATE_BOOL)) {
+            throw new RuntimeException('Refusing to seed demo data in production. Set SEED_ALLOW_PRODUCTION=true if you really mean it.');
+        }
 
-        $admin = $this->seedAdmins();
-        $reviewUser = $this->seedUsers();
-        $categories = $this->seedCategories();
-        $this->seedCinema($admin, $categories, $reviewUser);
+        mt_srand(2026);
+
+        $this->truncateDomainTables();
+        $this->seedAdmins();
+        $this->seedUsers();
+        $this->seedGenres();
+        $categories = $this->seedSeatCategories();
+        $screens = $this->seedCinemaNetwork($categories);
+        $movies = $this->seedMovies();
+        $shows = $this->seedShowtimes($screens, $movies);
+        $this->seedPricing($shows, $categories);
+        $this->seedReviews($movies);
+        $this->seedBookings($shows);
+        $this->seedCoupons();
         $this->seedSiteSettings();
-        $this->seedContentPages($admin);
-        $this->seedSupportContent($admin);
+        $this->seedContentPages();
+        $this->seedFaqs();
+        $this->seedInboxAndNotifications();
     }
 
-    private function clearDemoData(): void
+    private function truncateDomainTables(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        Schema::disableForeignKeyConstraints();
 
         foreach ([
-            'contact_messages',
-            'faqs',
-            'content_pages',
-            'site_settings',
-            'admin_activity_logs',
-            'admin_notifications',
-            'notifications',
-            'wishlists',
-            'reviews',
-            'coupon_usages',
-            'payments',
-            'booking_seats',
-            'bookings',
-            'cart_items',
-            'carts',
-            'coupons',
-            'show_seat_row_prices',
-            'show_seat_prices',
-            'shows',
-            'seats',
-            'seat_categories',
-            'screens',
-            'theaters',
-            'movie_genres',
-            'movies',
-            'genres',
-            'users',
-            'admins',
+            'security_events', 'booking_events', 'contact_messages', 'faqs', 'content_pages', 'site_settings',
+            'admin_activity_logs', 'admin_notifications', 'notifications', 'wishlists', 'reviews', 'coupon_usages',
+            'payments', 'booking_seats', 'bookings', 'cart_items', 'carts', 'coupons', 'show_seat_row_prices',
+            'show_seat_prices', 'shows', 'seats', 'seat_categories', 'screens', 'theater_amenity', 'amenities',
+            'theaters', 'cities', 'movie_credits', 'people', 'movie_genres', 'movies', 'genres', 'users', 'admins',
         ] as $table) {
             if (Schema::hasTable($table)) {
                 DB::table($table)->truncate();
             }
         }
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        Schema::enableForeignKeyConstraints();
     }
 
-    private function seedAdmins(): Admin
+    private function seedAdmins(): void
     {
-        $superAdmin = Admin::updateOrCreate(['email' => self::ADMIN_EMAIL], [
-            'name' => 'BookMyMovie Admin',
+        $this->adminId = Admin::create([
+            'name' => 'Box Office Admin',
+            'email' => self::ADMIN_EMAIL,
             'password' => Hash::make(self::ADMIN_PASSWORD),
             'role' => 'superadmin',
             'is_active' => true,
-            'last_login_at' => now(),
-        ]);
+        ])->id;
 
-        Admin::updateOrCreate(['email' => 'content@bookmymovie.test'], [
-            'name' => 'Content Admin',
+        Admin::create([
+            'name' => 'Programming Editor',
+            'email' => 'content@bookmymovie.test',
             'password' => Hash::make(self::ADMIN_PASSWORD),
             'role' => 'admin',
             'is_active' => true,
         ]);
-
-        return $superAdmin;
     }
 
-    private function seedUsers(): User
+    private function seedUsers(): void
     {
-        return User::create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $password = Hash::make(self::DEMO_PASSWORD);
+
+        $this->demoUserId = User::forceCreate([
+            'name' => 'Ayaan Sheikh',
+            'email' => self::DEMO_EMAIL,
             'email_verified_at' => now(),
-            'password' => Hash::make('Password@123'),
-            'phone' => '03001234567',
-            'date_of_birth' => '1998-07-24',
+            'password' => $password,
+            'phone' => '0300 1234567',
+            'address' => 'House 14, Street 7, F-7/2, Islamabad',
+            'date_of_birth' => '1997-03-14',
             'gender' => 'male',
-        ]);
-    }
+        ])->id;
 
-    /**
-     * @return array<string, Genre>
-     */
-    private function seedCategories(): array
-    {
-        return collect([
-            'broke-treat-friend' => 'The "Always Broke / Demanding Treat" Friend',
-            'single-romantic-friend' => 'The "Forever Single / Desperate Romantic" Friend',
-            'late-ghosting-friend' => 'The "Always Late / Ghosting" Friend',
-            'drama-overthinker-friend' => 'The "Drama Queen / Overthinker" Friend',
-            'lazy-sleepy-friend' => 'The "Lazy / Always Sleepy" Friend',
-        ])->mapWithKeys(fn (string $name, string $slug) => [
-            $slug => Genre::create(['name' => $name, 'slug' => $slug]),
-        ])->all();
-    }
-
-    /**
-     * @param array<string, Genre> $categories
-     */
-    private function seedCinema(Admin $admin, array $categories, User $reviewUser): void
-    {
-        SeatCategory::insert([
-            ['name' => 'Gold', 'description' => 'Standard seats with a clear screen view'],
-            ['name' => 'Platinum', 'description' => 'Premium seats with extra legroom'],
-            ['name' => 'Box', 'description' => 'Private box seating for groups'],
-        ]);
-
-        $theaters = [
-            Theater::create([
-                'name' => 'Cineplex Gold',
-                'address' => 'Shop 12, Dolmen Mall, Block-4 Clifton',
-                'city' => 'Karachi',
-                'state' => 'Sindh',
-                'pincode' => '75600',
-                'phone' => '021-35861010',
-                'email' => 'info@cineplexgold.pk',
-                'created_by' => $admin->id,
-            ]),
-            Theater::create([
-                'name' => 'Star Cinemas',
-                'address' => '3-KM Main Canal Bank Road, Emporium Mall',
-                'city' => 'Lahore',
-                'state' => 'Punjab',
-                'pincode' => '54000',
-                'phone' => '042-35880110',
-                'email' => 'bookings@starcinemas.pk',
-                'created_by' => $admin->id,
-            ]),
+        $customers = [
+            ['Maryam Qureshi', 'female'], ['Daniyal Khan', 'male'], ['Sara Ahmed', 'female'], ['Bilal Rana', 'male'],
+            ['Hania Malik', 'female'], ['Omer Farooq', 'male'], ['Zoya Hashmi', 'female'], ['Hamza Iqbal', 'male'],
+            ['Anaya Siddiqui', 'female'], ['Faraz Haider', 'male'], ['Iqra Nadeem', 'female'], ['Usman Javed', 'male'],
         ];
 
-        $screens = collect([
-            [$theaters[0]->id, 'Audi 1'],
-            [$theaters[0]->id, 'Audi 2'],
-            [$theaters[1]->id, 'Screen A'],
-            [$theaters[1]->id, 'Screen B'],
-        ])->map(fn (array $screen) => Screen::create([
-            'theater_id' => $screen[0],
-            'screen_name' => $screen[1],
-            'total_seats' => 60,
-            'is_active' => true,
-        ]))->values();
-
-        $screens->each(fn (Screen $screen) => $this->seedSeats($screen));
-
-        collect($this->movies())->each(function (array $movieData, int $index) use ($admin, $categories, $screens, $reviewUser) {
-            $movie = Movie::create([
-                'title' => $movieData['title'],
-                'slug' => Str::slug($movieData['title']),
-                'description' => $movieData['description'],
-                'language' => 'Urdu / Roman Urdu',
-                'duration_minutes' => $movieData['duration'],
-                'certificate_rating' => $movieData['certificate'],
-                'release_date' => now()->subDays(20 - $index)->toDateString(),
-                'status' => 'now_showing',
-                'poster_image' => null,
-                'banner_image' => null,
-                'hero_carousel_enabled' => $index < 5,
-                'hero_sort_order' => $index,
-                'hero_eyebrow' => $index < 5 ? 'Featured release' : null,
-                'hero_tagline' => $index < 5 ? $movieData['description'] : null,
-                'hero_image' => null,
-                'trailer_url' => 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-                'base_price' => 2500,
-                'sale_price' => 1999,
-                'kids_discount_eligible' => false,
-                'average_rating' => $movieData['rating'],
-                'total_reviews' => 1,
-                'created_by' => $admin->id,
-            ]);
-
-            $movie->genres()->attach($categories[$movieData['category']]->id);
-            Review::create([
-                'user_id' => $reviewUser->id,
-                'movie_id' => $movie->id,
-                'rating' => (int) round($movieData['rating']),
-                'review_text' => $movieData['review'],
-                'is_approved' => true,
-                'is_flagged' => false,
-                'approved_by' => $admin->id,
-                'approved_at' => now(),
-            ]);
-
-            $screen = $screens[$index % $screens->count()];
-
-            foreach (['10:00:00', '13:30:00', '17:00:00', '20:30:00'] as $timeIndex => $showTime) {
-                $show = Show::create([
-                    'movie_id' => $movie->id,
-                    'screen_id' => $screen->id,
-                    'show_date' => now()->addDays(intdiv($index, $screens->count()) + $timeIndex)->toDateString(),
-                    'show_time' => $showTime,
-                    'status' => 'scheduled',
-                    'total_seats' => 60,
-                    'booked_seats' => 0,
-                    'created_by' => $admin->id,
-                ]);
-
-                $this->seedShowPrices($show);
-            }
-        });
-    }
-
-    private function seedSeats(Screen $screen): void
-    {
-        $categoryByRow = [
-            'A' => 1,
-            'B' => 1,
-            'C' => 1,
-            'D' => 2,
-            'E' => 2,
-            'F' => 3,
-        ];
-
-        foreach ($categoryByRow as $row => $categoryId) {
-            for ($seatNumber = 1; $seatNumber <= 10; $seatNumber++) {
-                Seat::create([
-                    'screen_id' => $screen->id,
-                    'seat_category_id' => $categoryId,
-                    'row_label' => $row,
-                    'seat_number' => $seatNumber,
-                    'is_active' => true,
-                ]);
-            }
+        foreach ($customers as $index => [$name, $gender]) {
+            $this->customerIds[] = User::forceCreate([
+                'name' => $name,
+                'email' => Str::slug($name, '.').'@example.com',
+                'email_verified_at' => now()->subDays(30 + $index),
+                'password' => $password,
+                'phone' => sprintf('03%02d %07d', 10 + $index, 1000000 + $index * 7919),
+                'gender' => $gender,
+                'created_at' => now()->subDays(60 - $index * 3),
+            ])->id;
         }
     }
 
-    private function seedShowPrices(Show $show): void
+    private function seedGenres(): void
     {
-        ShowSeatPrice::insert([
-            ['show_id' => $show->id, 'seat_category_id' => 1, 'price' => 3400, 'sale_price' => 2799, 'kids_price' => 2600, 'kids_sale_price' => 2199],
-            ['show_id' => $show->id, 'seat_category_id' => 2, 'price' => 2800, 'sale_price' => 2249, 'kids_price' => 2100, 'kids_sale_price' => 1699],
-            ['show_id' => $show->id, 'seat_category_id' => 3, 'price' => 3200, 'sale_price' => 2499, 'kids_price' => null, 'kids_sale_price' => null],
-        ]);
-
-        ShowSeatRowPrice::insert([
-            ['show_id' => $show->id, 'row_label' => 'A', 'tier_name' => 'A Front Premium', 'benefits' => 'Closest screen view, recliner pitch, priority entry lane, complimentary drink upgrade', 'price' => 3800, 'sale_price' => 3299, 'kids_price' => 3000, 'kids_sale_price' => 2599, 'created_at' => now(), 'updated_at' => now()],
-            ['show_id' => $show->id, 'row_label' => 'B', 'tier_name' => 'B Premium', 'benefits' => 'Front-center view, extra legroom, faster counter support', 'price' => 3400, 'sale_price' => 2899, 'kids_price' => 2700, 'kids_sale_price' => 2299, 'created_at' => now(), 'updated_at' => now()],
-            ['show_id' => $show->id, 'row_label' => 'C', 'tier_name' => 'C Prime', 'benefits' => 'Balanced screen distance, central sound coverage, standard comfort seating', 'price' => 3000, 'sale_price' => 2499, 'kids_price' => 2350, 'kids_sale_price' => 1999, 'created_at' => now(), 'updated_at' => now()],
-            ['show_id' => $show->id, 'row_label' => 'D', 'tier_name' => 'D Comfort', 'benefits' => 'Mid-hall view, easy aisle access, family-friendly pricing', 'price' => 2700, 'sale_price' => 2199, 'kids_price' => 2100, 'kids_sale_price' => 1749, 'created_at' => now(), 'updated_at' => now()],
-            ['show_id' => $show->id, 'row_label' => 'E', 'tier_name' => 'E Saver', 'benefits' => 'Value seating, clear sightline, quick exit access', 'price' => 2400, 'sale_price' => 1999, 'kids_price' => 1900, 'kids_sale_price' => 1599, 'created_at' => now(), 'updated_at' => now()],
-            ['show_id' => $show->id, 'row_label' => 'F', 'tier_name' => 'F Back Value', 'benefits' => 'Lowest row price, relaxed rear view, good for groups', 'price' => 2100, 'sale_price' => 1749, 'kids_price' => null, 'kids_sale_price' => null, 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        foreach ([
+            'action' => 'Action', 'adventure' => 'Adventure', 'animation' => 'Animation', 'comedy' => 'Comedy',
+            'crime' => 'Crime', 'drama' => 'Drama', 'family' => 'Family', 'fantasy' => 'Fantasy',
+            'historical' => 'Historical', 'horror' => 'Horror', 'mystery' => 'Mystery', 'romance' => 'Romance',
+            'science-fiction' => 'Science Fiction', 'thriller' => 'Thriller',
+        ] as $slug => $name) {
+            $this->genreIds[$slug] = DB::table('genres')->insertGetId(['name' => $name, 'slug' => $slug, 'created_at' => now()]);
+        }
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return array<string, int> category name => id
      */
-    private function movies(): array
+    private function seedSeatCategories(): array
     {
-        return [
-            ['category' => 'broke-treat-friend', 'title' => 'Treat Kab Dera Hai?: The Never-Ending Struggle', 'description' => 'A broke friend dodges every bill while demanding celebration treats from everyone else.', 'duration' => 104, 'certificate' => 'UA', 'rating' => 4.4, 'review' => 'Painfully accurate, especially the bill-splitting scene.'],
-            ['category' => 'broke-treat-friend', 'title' => 'EasyPaisa Mein Rs. 15: Based on a True Story', 'description' => 'One suspicious wallet balance becomes the emotional center of a whole friend group.', 'duration' => 96, 'certificate' => 'U', 'rating' => 4.1, 'review' => 'The Rs. 15 reveal got the biggest laugh in the hall.'],
-            ['category' => 'broke-treat-friend', 'title' => 'Paisa Kahan Gaya?: An Unsolved Mystery', 'description' => 'A group investigates how pocket money vanishes before the bill arrives.', 'duration' => 111, 'certificate' => 'UA', 'rating' => 4.3, 'review' => 'A mystery every student understands too well.'],
-            ['category' => 'broke-treat-friend', 'title' => 'Bhai Account Blank Hai: The Saga Continues', 'description' => 'The classic excuse returns with bigger plans, smaller balances, and louder friends.', 'duration' => 118, 'certificate' => 'U', 'rating' => 4.0, 'review' => 'Solid sequel energy with very real account balance trauma.'],
-            ['category' => 'single-romantic-friend', 'title' => 'Chalo Shadi Karte Hain: Part 2: Ek Aur Kat Gaya', 'description' => 'A serial romantic restarts the wedding countdown after another almost-love story collapses.', 'duration' => 127, 'certificate' => 'UA', 'rating' => 4.5, 'review' => 'The romance panic is dramatic but weirdly wholesome.'],
-            ['category' => 'single-romantic-friend', 'title' => 'Bhabhi Dhoond Do Koi: A Tale of Hope and Rejection', 'description' => 'A hopeful single friend outsources romance to the most unqualified committee possible.', 'duration' => 115, 'certificate' => 'U', 'rating' => 4.2, 'review' => 'The friend group matchmaking committee was chaos.'],
-            ['category' => 'single-romantic-friend', 'title' => 'Mera Dil Hai Ya Sabzi Mandi?: Sab Aate Hain, Sab Jaate Hain', 'description' => 'Everyone visits, nobody stays, and one dramatic heart keeps reopening for business.', 'duration' => 122, 'certificate' => 'UA', 'rating' => 4.6, 'review' => 'Best title, best monologue, best heartbreak jokes.'],
-            ['category' => 'single-romantic-friend', 'title' => 'Rishta Confirm Karo: The Sequel Nobody Asked For', 'description' => 'Every casual conversation becomes a marriage proposal review meeting.', 'duration' => 109, 'certificate' => 'U', 'rating' => 4.1, 'review' => 'The family pressure scenes are too familiar.'],
-            ['category' => 'late-ghosting-friend', 'title' => 'Main Bas 5 Minute Door Hoon: The Biggest Lie Ever Told', 'description' => 'A friend claims to be nearby while the entire city waits in disbelief.', 'duration' => 101, 'certificate' => 'U', 'rating' => 4.7, 'review' => 'Everyone has heard this lie and everyone laughed.'],
-            ['category' => 'late-ghosting-friend', 'title' => 'Kahan Ho Tum?: A Thriller About Getting Ghosted', 'description' => 'Seen receipts, missing replies, and one chat window turn into a suspense case.', 'duration' => 108, 'certificate' => 'UA', 'rating' => 4.4, 'review' => 'The seen-zone suspense was better than expected.'],
-            ['category' => 'late-ghosting-friend', 'title' => 'Agli Sadi Mein Milte Hain: Directed by Delayed Expectations', 'description' => 'Plans are made, postponed, and emotionally rescheduled into the next century.', 'duration' => 113, 'certificate' => 'U', 'rating' => 4.0, 'review' => 'A slow-burn comedy about waiting forever.'],
-            ['category' => 'late-ghosting-friend', 'title' => 'Online Hai Par Reply Nahi Kar Raha: A Psychological Horror', 'description' => 'The green dot is active, the silence is louder, and nobody is coping well.', 'duration' => 117, 'certificate' => 'A', 'rating' => 4.8, 'review' => 'Genuinely hilarious horror for the WhatsApp era.'],
-            ['category' => 'drama-overthinker-friend', 'title' => 'Mera Gumshuda Bacha: Return of the Lost Braincells', 'description' => 'One misplaced thought launches a dramatic search party through bad decisions.', 'duration' => 103, 'certificate' => 'UA', 'rating' => 4.2, 'review' => 'The overthinking spiral was painfully detailed.'],
-            ['category' => 'drama-overthinker-friend', 'title' => 'Rona Dhona Ltd.: 100% Pure Drama, 0% Logic', 'description' => 'A corporate empire of tears expands faster than common sense can respond.', 'duration' => 99, 'certificate' => 'U', 'rating' => 4.3, 'review' => 'Pure drama with exactly the right amount of nonsense.'],
-            ['category' => 'drama-overthinker-friend', 'title' => 'Mujhe Pehle Hi Pata Tha: The Expert in Hindsight', 'description' => 'After every disaster, one friend explains how they predicted it all along.', 'duration' => 107, 'certificate' => 'U', 'rating' => 4.1, 'review' => 'The hindsight expert deserves a spin-off.'],
-            ['category' => 'drama-overthinker-friend', 'title' => 'Chhoti Si Baat, Bada Bawaal: An Epic Disaster', 'description' => 'A tiny misunderstanding mutates into a full-scale group chat emergency.', 'duration' => 119, 'certificate' => 'UA', 'rating' => 4.6, 'review' => 'Peak group-chat disaster cinema.'],
-            ['category' => 'lazy-sleepy-friend', 'title' => 'Kal Se Gym Jaunga: A Mythical Fantasy', 'description' => 'A legendary fitness plan keeps moving to tomorrow with heroic consistency.', 'duration' => 102, 'certificate' => 'U', 'rating' => 4.4, 'review' => 'The tomorrow joke never got old.'],
-            ['category' => 'lazy-sleepy-friend', 'title' => 'Mujhe Sone Do: The 14-Hour Sleep Spree', 'description' => 'One sleepy friend protects nap time from alarms, plans, and basic responsibility.', 'duration' => 95, 'certificate' => 'U', 'rating' => 4.2, 'review' => 'Comfort movie for anyone who loves sleeping in.'],
-            ['category' => 'lazy-sleepy-friend', 'title' => 'Sofa Se Bed Tak: An Action-Packed Journey of 3 Steps', 'description' => 'The shortest journey becomes the most exhausting mission of the day.', 'duration' => 90, 'certificate' => 'U', 'rating' => 4.0, 'review' => 'Three steps, huge stakes, excellent laziness.'],
-            ['category' => 'lazy-sleepy-friend', 'title' => 'Utho, Chai Piyo, Phir So Jao: The Eternal Cycle', 'description' => 'Wake up, drink tea, return to sleep, and repeat until the world gives up.', 'duration' => 106, 'certificate' => 'U', 'rating' => 4.5, 'review' => 'The chai-to-nap cycle is cinema truth.'],
+        $ids = [];
+
+        foreach ([
+            'Gold' => 'Classic seating: front and middle rows with standard comfort.',
+            'Platinum' => 'Prime seating: raised centre rows with extra legroom.',
+            'Box' => 'Recliners: powered leather seats in the back rows and lounge screens.',
+        ] as $name => $description) {
+            $ids[$name] = DB::table('seat_categories')->insertGetId(['name' => $name, 'description' => $description, 'created_at' => now()]);
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  array<string, int>  $categories
+     * @return list<array{id: int, format: string, rows: array<string, string>, seats: int}>
+     */
+    private function seedCinemaNetwork(array $categories): array
+    {
+        $data = require __DIR__.'/data/cinemas.php';
+
+        $cityIds = [];
+        foreach ($data['cities'] as $city) {
+            $cityIds[$city['name']] = DB::table('cities')->insertGetId([
+                'name' => $city['name'],
+                'slug' => Str::slug($city['name']),
+                'province' => $city['province'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $amenityIds = [];
+        foreach ($data['amenities'] as [$name, $description]) {
+            $amenityIds[$name] = DB::table('amenities')->insertGetId([
+                'name' => $name,
+                'slug' => Str::slug($name),
+                'description' => $description,
+            ]);
+        }
+
+        $screens = [];
+
+        foreach ($data['theaters'] as $theater) {
+            $theaterId = DB::table('theaters')->insertGetId([
+                'name' => $theater['name'],
+                'slug' => Str::slug($theater['name']),
+                'address' => $theater['address'],
+                'city_id' => $cityIds[$theater['city']],
+                'phone' => $theater['phone'],
+                'email' => $theater['email'],
+                'description' => $theater['description'],
+                'latitude' => $theater['lat'],
+                'longitude' => $theater['lng'],
+                'opens_at' => $theater['opens'],
+                'closes_at' => $theater['closes'],
+                'is_active' => true,
+                'created_by' => $this->adminId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('theater_amenity')->insert(array_map(
+                fn (string $amenity) => ['theater_id' => $theaterId, 'amenity_id' => $amenityIds[$amenity]],
+                $theater['amenities']
+            ));
+
+            foreach ($theater['screens'] as [$screenName, $format, $sound]) {
+                $rows = $this->rowTiersFor($format);
+                $seatsPerRow = match ($format) {
+                    'imax' => 14,
+                    'recliner' => 8,
+                    default => 12,
+                };
+
+                $screenId = DB::table('screens')->insertGetId([
+                    'theater_id' => $theaterId,
+                    'screen_name' => $screenName,
+                    'format' => $format,
+                    'sound_system' => $sound,
+                    'is_wheelchair_accessible' => true,
+                    'total_seats' => count($rows) * $seatsPerRow,
+                    'is_active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $seatRows = [];
+                foreach ($rows as $rowLabel => $tier) {
+                    for ($number = 1; $number <= $seatsPerRow; $number++) {
+                        $seatRows[] = [
+                            'screen_id' => $screenId,
+                            'seat_category_id' => $categories[self::TIERS[$tier][0]],
+                            'row_label' => $rowLabel,
+                            'seat_number' => $number,
+                            'is_active' => true,
+                            'created_at' => now(),
+                        ];
+                    }
+                }
+                DB::table('seats')->insert($seatRows);
+
+                $screens[] = ['id' => $screenId, 'format' => $format, 'rows' => $rows, 'seats' => count($seatRows)];
+            }
+        }
+
+        return $screens;
+    }
+
+    /**
+     * Front rows are cheapest, the centre rows have the best sightlines and
+     * the back rows are recliners, as in a real auditorium.
+     *
+     * @return array<string, string> row label => tier name
+     */
+    private function rowTiersFor(string $format): array
+    {
+        if ($format === 'recliner') {
+            return ['A' => 'Recliner', 'B' => 'Recliner', 'C' => 'Recliner', 'D' => 'Recliner Lounge', 'E' => 'Recliner Lounge'];
+        }
+
+        $labels = $format === 'imax' ? range('A', 'J') : range('A', 'H');
+        $count = count($labels);
+        $tiers = [];
+
+        foreach ($labels as $index => $label) {
+            $tiers[$label] = match (true) {
+                $index === 0 => 'Front Stalls',
+                $index === 1 => 'Stalls',
+                $index === 2 => 'Classic',
+                $index === $count - 1 => 'Recliner Lounge',
+                $index === $count - 2 => 'Recliner',
+                in_array($index, [intdiv($count, 2) - 1, intdiv($count, 2)], true) => 'Prime Centre',
+                default => 'Prime',
+            };
+        }
+
+        return $tiers;
+    }
+
+    /**
+     * @return array<string, array{id: int, status: string, genres: list<string>, duration: int}>
+     */
+    private function seedMovies(): array
+    {
+        $catalogue = require __DIR__.'/data/movies.php';
+        $movies = [];
+
+        foreach ($catalogue as $index => $film) {
+            $slug = Str::slug(str_replace('’', '', $film['title']));
+
+            $movie = Movie::create([
+                'title' => $film['title'],
+                'tagline' => $film['tagline'],
+                'slug' => $slug,
+                'description' => $film['description'],
+                'language' => $film['language'],
+                'studio' => $film['studio'],
+                'country' => $film['country'],
+                'duration_minutes' => $film['duration'],
+                'certificate_rating' => $film['certificate'],
+                'content_advisory' => $film['advisory'],
+                'release_date' => now()->addDays($film['release'])->toDateString(),
+                'status' => $film['status'],
+                'hero_carousel_enabled' => $film['hero'] !== null,
+                'hero_sort_order' => $index,
+                'hero_eyebrow' => $film['hero'],
+                'hero_tagline' => $film['tagline'],
+                'meta_title' => Str::limit($film['title'].' | Showtimes & Tickets', 60, ''),
+                'meta_description' => Str::limit($film['tagline'].' Book '.$film['title'].' seats online at BookMyMovie.', 150, ''),
+                'base_price' => 1750,
+                'sale_price' => 1500,
+                'kids_discount_eligible' => in_array($film['certificate'], ['G', 'PG', 'U'], true),
+                'rating_mode' => 'real',
+                'created_by' => $this->adminId,
+            ]);
+
+            DB::table('movie_genres')->insert(array_map(
+                fn (string $genre) => ['movie_id' => $movie->id, 'genre_id' => $this->genreIds[$genre]],
+                $film['genres']
+            ));
+
+            $credits = [];
+            $order = 0;
+            foreach (['director', 'writer', 'composer', 'cinematographer'] as $role) {
+                $credits[] = ['movie_id' => $movie->id, 'person_id' => $this->person($film[$role], $role), 'role' => $role, 'character_name' => null, 'billing_order' => $order++];
+            }
+            foreach ($film['cast'] as [$actor, $character]) {
+                $credits[] = ['movie_id' => $movie->id, 'person_id' => $this->person($actor, 'acting'), 'role' => 'cast', 'character_name' => $character, 'billing_order' => $order++];
+            }
+            // A writer-director gets one row per role; the unique key is (movie, person, role).
+            DB::table('movie_credits')->insert($credits);
+
+            $movies[$slug] = [
+                'id' => $movie->id,
+                'status' => $film['status'],
+                'genres' => $film['genres'],
+                'duration' => $film['duration'],
+                'reviews' => $film['reviews'],
+            ];
+        }
+
+        return $movies;
+    }
+
+    private function person(string $name, string $knownFor): int
+    {
+        if (! isset($this->peopleIds[$name])) {
+            $this->peopleIds[$name] = DB::table('people')->insertGetId([
+                'name' => $name,
+                'slug' => Str::slug($name),
+                'known_for' => ucfirst($knownFor),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $this->peopleIds[$name];
+    }
+
+    /**
+     * One week of shows. Premium formats run the spectacle-led titles; every
+     * other screen rotates the full now-showing slate.
+     *
+     * @param  list<array{id: int, format: string, rows: array<string, string>, seats: int}>  $screens
+     * @param  array<string, array{id: int, status: string, genres: list<string>, duration: int}>  $movies
+     * @return list<array{id: int, screen: array, date: string, time: string, status: string}>
+     */
+    private function seedShowtimes(array $screens, array $movies): array
+    {
+        $nowShowing = array_filter($movies, fn (array $movie) => $movie['status'] === 'now_showing');
+        $spectacle = array_filter($nowShowing, fn (array $movie) => array_intersect($movie['genres'], ['action', 'adventure', 'science-fiction', 'thriller', 'horror', 'historical']) !== []);
+        $nowShowing = array_values($nowShowing);
+        $spectacle = array_values($spectacle);
+
+        $shows = [];
+        $rows = [];
+
+        foreach ($screens as $screenIndex => $screen) {
+            $programme = in_array($screen['format'], self::PREMIUM_FORMATS, true) ? $spectacle : $nowShowing;
+
+            for ($day = 0; $day < 7; $day++) {
+                $date = now()->startOfDay()->addDays($day);
+
+                foreach (self::SLOTS as $slotIndex => $time) {
+                    $movie = $programme[($screenIndex * 3 + $day * 2 + $slotIndex) % count($programme)];
+                    $startsAt = Carbon::parse($date->toDateString().' '.$time);
+
+                    $rows[] = [
+                        'movie_id' => $movie['id'],
+                        'screen_id' => $screen['id'],
+                        'show_date' => $date->toDateString(),
+                        'show_time' => $time,
+                        'status' => $startsAt->isPast() ? 'completed' : 'scheduled',
+                        'total_seats' => $screen['seats'],
+                        'booked_seats' => 0,
+                        'created_by' => $this->adminId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+        }
+
+        foreach (array_chunk($rows, 200) as $chunk) {
+            DB::table('shows')->insert($chunk);
+        }
+
+        $screenById = collect($screens)->keyBy('id');
+
+        foreach (DB::table('shows')->orderBy('id')->get() as $show) {
+            $shows[] = [
+                'id' => $show->id,
+                'screen' => $screenById[$show->screen_id],
+                'date' => $show->show_date,
+                'time' => $show->show_time,
+                'status' => $show->status,
+            ];
+        }
+
+        return $shows;
+    }
+
+    /**
+     * Row-tier prices per show, plus a per-category fallback price. Weekday
+     * shows before 5 pm carry a matinée sale price.
+     *
+     * @param  list<array{id: int, screen: array, date: string, time: string, status: string}>  $shows
+     * @param  array<string, int>  $categories
+     */
+    private function seedPricing(array $shows, array $categories): void
+    {
+        $rowPrices = [];
+        $categoryPrices = [];
+
+        foreach ($shows as $show) {
+            $multiplier = self::FORMAT_MULTIPLIER[$show['screen']['format']];
+            $date = Carbon::parse($show['date']);
+            $isMatinee = ! $date->isWeekend() && $show['time'] < '17:00:00';
+            $perCategory = [];
+
+            foreach ($show['screen']['rows'] as $rowLabel => $tier) {
+                [$category, $base, $benefits] = self::TIERS[$tier];
+                $price = $this->roundPrice($base * $multiplier);
+                $sale = $isMatinee ? $this->roundPrice($price * 0.85) : null;
+                $kids = $category === 'Box' ? null : $this->roundPrice($price * 0.75);
+                $kidsSale = $kids !== null && $isMatinee ? $this->roundPrice($kids * 0.85) : null;
+
+                $rowPrices[] = [
+                    'show_id' => $show['id'],
+                    'row_label' => $rowLabel,
+                    'tier_name' => $tier,
+                    'benefits' => $benefits,
+                    'price' => $price,
+                    'sale_price' => $sale,
+                    'kids_price' => $kids,
+                    'kids_sale_price' => $kidsSale,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                if (! isset($perCategory[$category]) || $price < $perCategory[$category]['price']) {
+                    $perCategory[$category] = ['price' => $price, 'sale_price' => $sale, 'kids_price' => $kids, 'kids_sale_price' => $kidsSale];
+                }
+            }
+
+            foreach ($perCategory as $category => $price) {
+                $categoryPrices[] = ['show_id' => $show['id'], 'seat_category_id' => $categories[$category], ...$price, 'created_at' => now(), 'updated_at' => now()];
+            }
+        }
+
+        foreach (array_chunk($rowPrices, 500) as $chunk) {
+            DB::table('show_seat_row_prices')->insert($chunk);
+        }
+
+        foreach (array_chunk($categoryPrices, 500) as $chunk) {
+            DB::table('show_seat_prices')->insert($chunk);
+        }
+    }
+
+    private function roundPrice(float $price): int
+    {
+        return (int) (round($price / 50) * 50);
+    }
+
+    /**
+     * @param  array<string, array{id: int, reviews: list<array{0: int, 1: string}>}>  $movies
+     */
+    private function seedReviews(array $movies): void
+    {
+        $reviewers = $this->customerIds;
+        $offset = 0;
+
+        foreach ($movies as $movie) {
+            foreach ($movie['reviews'] as $index => [$rating, $text]) {
+                Review::create([
+                    'user_id' => $reviewers[($offset + $index) % count($reviewers)],
+                    'movie_id' => $movie['id'],
+                    'rating' => $rating,
+                    'review_text' => $text,
+                    'is_approved' => true,
+                    'is_flagged' => false,
+                    'approved_by' => $this->adminId,
+                    'approved_at' => now()->subDays(mt_rand(1, 14)),
+                    'created_at' => now()->subDays(mt_rand(1, 20)),
+                ]);
+            }
+
+            $offset += 5;
+            Movie::find($movie['id'])->refreshRating();
+        }
+    }
+
+    /**
+     * Creates real bookings, so seat maps show genuine occupancy that flows
+     * through the same tables, views and constraints as a live checkout.
+     *
+     * @param  list<array{id: int, screen: array, date: string, time: string, status: string}>  $shows
+     */
+    private function seedBookings(array $shows): void
+    {
+        $seatsByScreen = DB::table('seats')
+            ->orderBy('seat_number')
+            ->get(['id', 'screen_id', 'row_label', 'seat_number', 'seat_category_id'])
+            ->groupBy('screen_id');
+        $rowPrices = DB::table('show_seat_row_prices')->get()->groupBy('show_id');
+        $horizon = now()->startOfDay()->addDays(3)->toDateString();
+        $tomorrow = now()->startOfDay()->addDay()->toDateString();
+
+        // The demo account always has two upcoming bookings to explore.
+        $demoShows = collect($shows)
+            ->filter(fn (array $show) => $show['date'] === $tomorrow && $show['time'] === '20:00:00')
+            ->take(2)
+            ->pluck('id')
+            ->all();
+
+        foreach ($shows as $show) {
+            if ($show['date'] >= $horizon) {
+                continue;
+            }
+
+            $rows = $seatsByScreen[$show['screen']['id']]->groupBy('row_label')->map(fn ($seats) => $seats->values());
+            $prices = $rowPrices[$show['id']]->keyBy('row_label');
+            $target = (int) round($show['screen']['seats'] * mt_rand(8, 55) / 100);
+            $taken = 0;
+            $needsDemo = in_array($show['id'], $demoShows, true);
+
+            while ($taken < $target) {
+                $party = mt_rand(1, 4);
+                $candidates = $rows->filter(fn ($seats) => $seats->count() >= $party);
+
+                if ($candidates->isEmpty()) {
+                    break;
+                }
+
+                // Parties sit together: take a run of neighbouring free seats in one row.
+                $rowLabel = $candidates->keys()->random();
+                $start = mt_rand(0, $rows[$rowLabel]->count() - $party);
+                $seats = $rows[$rowLabel]->splice($start, $party);
+
+                $userId = $needsDemo ? $this->demoUserId : $this->customerIds[array_rand($this->customerIds)];
+                $needsDemo = false;
+
+                $this->createBooking($show, $userId, $seats, $prices);
+                $taken += $party;
+            }
+
+            DB::table('shows')->where('id', $show['id'])->update(['booked_seats' => $taken]);
+        }
+    }
+
+    private function createBooking(array $show, int $userId, $seats, $prices): void
+    {
+        $number = 'BM-'.now()->format('Y').'-'.strtoupper(Str::random(8));
+        $bookedAt = Carbon::parse($show['date'].' '.$show['time'])->subHours(mt_rand(3, 96));
+        $bookedAt = $bookedAt->isFuture() ? now()->subMinutes(mt_rand(5, 600)) : $bookedAt;
+        $completed = $show['status'] === 'completed';
+        $paid = $completed || mt_rand(1, 3) === 1;
+
+        $lines = $seats->map(function ($seat) use ($prices, $number) {
+            $row = $prices[$seat->row_label];
+            $isKid = $row->kids_price !== null && mt_rand(1, 6) === 1;
+            $price = $isKid ? ($row->kids_sale_price ?? $row->kids_price) : ($row->sale_price ?? $row->price);
+
+            return [
+                'seat_id' => $seat->id,
+                'seat_category_id' => $seat->seat_category_id,
+                'ticket_type' => $isKid ? 'kid' : 'adult',
+                'price_paid' => $price,
+                'ticket_number' => $number.'-'.$seat->row_label.$seat->seat_number,
+            ];
+        });
+
+        $subtotal = (float) $lines->sum('price_paid');
+        $user = DB::table('users')->where('id', $userId)->first(['name', 'email', 'phone', 'address']);
+
+        $bookingId = DB::table('bookings')->insertGetId([
+            'booking_number' => $number,
+            'user_id' => $userId,
+            'customer_name' => $user->name,
+            'customer_email' => $user->email,
+            'customer_phone' => $user->phone,
+            'customer_address' => $user->address ?: 'Provided at the counter',
+            'show_id' => $show['id'],
+            'seat_count' => $lines->count(),
+            'adult_count' => $lines->where('ticket_type', 'adult')->count(),
+            'kids_count' => $lines->where('ticket_type', 'kid')->count(),
+            'subtotal' => $subtotal,
+            'discount_amount' => 0,
+            'total_amount' => $subtotal,
+            'payment_method' => 'cod',
+            'payment_status' => $paid ? 'paid' : 'pending',
+            'booking_status' => $completed ? 'completed' : 'confirmed',
+            'booked_at' => $bookedAt,
+            'updated_at' => $bookedAt,
+        ]);
+
+        DB::table('booking_seats')->insert($lines->map(fn (array $line) => [
+            ...$line,
+            'booking_id' => $bookingId,
+            'show_id' => $show['id'],
+            'seat_lock' => 1,
+            'created_at' => $bookedAt,
+        ])->all());
+
+        DB::table('payments')->insert([
+            'booking_id' => $bookingId,
+            'payment_method' => 'cod',
+            'amount' => $subtotal,
+            'status' => $paid ? 'paid' : 'pending',
+            'transaction_reference' => $paid ? 'CTR-'.strtoupper(Str::random(10)) : null,
+            'notes' => 'Pay at the cinema box office.',
+            'paid_at' => $paid ? $bookedAt->copy()->addHours(2) : null,
+            'created_at' => $bookedAt,
+            'updated_at' => $bookedAt,
+        ]);
+
+        $events = [['event' => 'confirmed', 'from_status' => null, 'to_status' => 'confirmed', 'note' => 'Booking confirmed online.', 'actor_type' => 'user', 'created_at' => $bookedAt]];
+
+        if ($paid) {
+            $events[] = ['event' => 'payment_received', 'from_status' => 'pending', 'to_status' => 'paid', 'note' => 'Paid at the box office.', 'actor_type' => 'admin', 'created_at' => $bookedAt->copy()->addHours(2)];
+        }
+
+        if ($completed) {
+            $events[] = ['event' => 'checked_in', 'from_status' => 'confirmed', 'to_status' => 'completed', 'note' => 'Tickets scanned at the screen door.', 'actor_type' => 'system', 'created_at' => Carbon::parse($show['date'].' '.$show['time'])->subMinutes(10)];
+        }
+
+        DB::table('booking_events')->insert(array_map(fn (array $event) => [...$event, 'booking_id' => $bookingId, 'actor_id' => null], $events));
+    }
+
+    private function seedCoupons(): void
+    {
+        $coupons = [
+            ['WELCOME15', 'New member offer: 15% off your first booking, up to PKR 600.', 'percentage', 15, 600, 1500, 1000, 1, -2, 60],
+            ['MATINEE200', 'PKR 200 off any booking of PKR 2,500 or more.', 'fixed', 200, null, 2500, 500, 3, -5, 30],
+            ['FAMILY10', '10% off bookings of PKR 4,000 or more, up to PKR 1,000.', 'percentage', 10, 1000, 4000, null, 5, -10, 90],
+            ['SUMMERFEST', 'Summer festival offer (expired).', 'percentage', 20, 500, 1000, 300, 1, -120, -60],
         ];
+
+        foreach ($coupons as [$code, $description, $type, $value, $cap, $minimum, $maxUses, $perUser, $from, $until]) {
+            DB::table('coupons')->insert([
+                'code' => $code,
+                'description' => $description,
+                'discount_type' => $type,
+                'discount_value' => $value,
+                'max_discount_amount' => $cap,
+                'min_order_amount' => $minimum,
+                'max_uses' => $maxUses,
+                'used_count' => 0,
+                'max_uses_per_user' => $perUser,
+                'valid_from' => now()->addDays($from),
+                'valid_until' => now()->addDays($until),
+                'is_active' => true,
+                'created_by' => $this->adminId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function seedSiteSettings(): void
     {
-        collect([
+        $settings = [
             'site_name' => 'BookMyMovie',
-            'default_meta_title' => 'BookMyMovie - Book Cinema Tickets Online',
-            'default_meta_description' => 'Book movie tickets, compare shows, reserve seats, and manage cinema bookings online with BookMyMovie.',
-            'canonical_base_url' => 'https://bookmymovie.ahmershah.dev',
-            'site_tagline' => 'Database-powered cinema booking with live shows, sale pricing, reviews, and seat selection.',
-            'footer_description' => 'BookMyMovie is your all-in-one digital cinema companion for showtimes, sale prices, reviews, wishlists, and secure seat booking.',
-            'copyright_note' => 'Created by Syed Ahmer Shah',
-            'support_email' => 'support@bookmymovie.ahmershah.dev',
-            'support_phone' => '021-111-266-566',
-            'service_area' => 'Pakistan',
-            'response_sla' => 'Under 24 hours',
-            'contact_heading' => 'Talk to BookMyMovie support.',
-            'contact_intro' => 'Send booking inquiries, cinema partnership requests, or account assistance. Provide your city, booking number, and showtime so support can resolve your query efficiently.',
-            'catalog_heading' => 'Explore Movies',
-            'catalog_intro' => 'Filter through the database catalog by genre, language, age certification, and availability status.',
-            'home_ticker_messages' => 'Sale is live: every movie starts around PKR 2,500 with database sale prices.|All 20 friend-category movies are now showing in five database categories.|Reviews, ratings, showtimes, and prices are loaded from the database.|Secure forms use Laravel CSRF, validation, throttling, and CSP nonce headers.',
-        ])->each(fn (string $value, string $key) => SiteSetting::updateOrCreate(
-            ['key' => $key],
-            ['value' => $value, 'type' => 'string', 'is_public' => true]
-        ));
-    }
+            'default_meta_title' => 'BookMyMovie | Cinema Tickets, Showtimes & Seats',
+            'default_meta_description' => 'Book cinema tickets online across Pakistan. Live seat maps, honest row pricing, IMAX and Dolby showtimes, and no booking fees.',
+            'canonical_base_url' => config('bookmymovie.canonical_url'),
+            'site_tagline' => 'Every seat, every showtime, honestly priced.',
+            'footer_description' => 'An independent, open-source cinema booking platform. Live seat maps, row-by-row pricing and tickets that just work at the door.',
+            'copyright_note' => 'Designed and built by Syed Ahmer Shah. Open source under the MIT licence.',
+            'support_email' => 'support@ahmershah.dev',
+            'support_phone' => '+92 370 4831994',
+            'service_area' => 'Karachi, Lahore, Islamabad and Rawalpindi',
+            'response_sla' => 'Within one working day',
+            'contact_heading' => 'We read every message.',
+            'contact_intro' => 'Questions about a booking, a partnership enquiry or a bug report. Include your booking number and city and we will get back to you within one working day.',
+            'catalog_heading' => 'In cinemas',
+            'catalog_intro' => 'Every film playing across our partner cinemas this week, plus what is coming next. Filter by genre, language, rating or status.',
+            'home_ticker_messages' => 'No booking fees, ever|Weekday matinées from PKR 950|IMAX with Laser now in Karachi and Lahore|Kids’ tickets on most rows|Pay at the counter, cancel free until 2 hours before',
+        ];
 
-    private function seedContentPages(Admin $admin): void
-    {
-        foreach ($this->pages() as $page) {
-            ContentPage::updateOrCreate(
-                ['slug' => $page['slug']],
-                [...$page, 'created_by' => $admin->id, 'is_active' => true]
-            );
+        foreach ($settings as $key => $value) {
+            SiteSetting::updateOrCreate(['key' => $key], ['value' => $value, 'type' => 'string', 'is_public' => true]);
         }
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function pages(): array
+    private function seedContentPages(): void
     {
-        return [
-            [
-                'slug' => 'about',
-                'title' => 'About BookMyMovie',
-                'meta_title' => 'About',
-                'hero_label' => 'Company',
-                'excerpt' => 'BookMyMovie stores site content, movies, categories, reviews, showtimes, seat prices, FAQs, and booking records in Laravel database tables.',
-                'body' => 'BookMyMovie is a Laravel cinema booking project designed around database-first content management. The public website reads seeded content and operational data from migrations, seeders, Eloquent models, controllers, and database views.',
-                'sections' => [
-                    ['title' => 'Database First', 'items' => ['Site name and footer copy come from site_settings.', 'Policies and about content come from content_pages.', 'Movies, categories, reviews, shows, and prices come from cinema tables.']],
-                    ['title' => 'Booking Flow', 'items' => ['Users browse movies by category.', 'Seats are checked through the availability view.', 'Bookings are stored with tickets and COD payment records.']],
-                ],
-            ],
-            [
-                'slug' => 'terms',
-                'title' => 'Terms of Service',
-                'meta_title' => 'Terms of Service',
-                'hero_label' => 'Legal',
-                'excerpt' => 'These terms describe responsible use of BookMyMovie accounts, movies, carts, seat selection, and booking records.',
-                'body' => 'Use accurate account details, keep credentials private, and only reserve seats you intend to book. Seat availability can change when another user books or reserves the same seat first.',
-                'sections' => [
-                    ['title' => 'Accounts', 'items' => ['Use a valid email address.', 'Do not share admin or user credentials.', 'Blocked accounts cannot login or book.']],
-                    ['title' => 'Bookings', 'items' => ['Cart seats expire after the configured hold window.', 'Bookings are confirmed only after checkout completes.', 'COD payments are collected at the cinema counter.']],
-                ],
-            ],
-            [
-                'slug' => 'privacy',
-                'title' => 'Privacy Policy',
-                'meta_title' => 'Privacy Policy',
-                'hero_label' => 'Privacy',
-                'excerpt' => 'This policy explains how BookMyMovie handles account, booking, contact, wishlist, review, and session data.',
-                'body' => 'BookMyMovie stores only the information needed to run cinema booking workflows, authenticate accounts, protect forms, and display user-owned booking history.',
-                'sections' => [
-                    ['title' => 'Stored Data', 'items' => ['Account name, email, phone, and hashed passwords.', 'Bookings, selected seats, payments, carts, wishlists, reviews, and contact messages.', 'Session, IP, and user-agent details needed for security logs and sessions.']],
-                    ['title' => 'Protection', 'items' => ['Passwords are hashed by Laravel casts.', 'Forms use CSRF tokens and validation.', 'Public pages are protected by CSP, frame, referrer, and content-type headers.']],
-                ],
-            ],
-            [
-                'slug' => 'refund',
-                'title' => 'Refund & Cancellation Policy',
-                'meta_title' => 'Refund Policy',
-                'hero_label' => 'Support',
-                'excerpt' => 'BookMyMovie supports clear cancellation guidance for COD bookings, expired carts, unavailable seats, and cancelled shows.',
-                'body' => 'Because this project uses cash on delivery at the cinema counter, most unpaid bookings can be cancelled operationally before the show starts. Paid or counter-confirmed cases require admin review.',
-                'sections' => [
-                    ['title' => 'Eligible Cases', 'items' => ['Cancelled shows.', 'Duplicate booking records.', 'Seats made unavailable by a cinema operation issue.']],
-                    ['title' => 'Not Eligible', 'items' => ['Expired carts that were never checked out.', 'No-shows after the show begins.', 'Incorrect details entered by the customer without contacting support.']],
-                ],
-            ],
-            [
-                'slug' => 'eticket-info',
-                'title' => 'E-Ticket Information',
-                'meta_title' => 'E-Ticket Info',
-                'hero_label' => 'Tickets',
-                'excerpt' => 'Booking numbers, ticket numbers, show details, seat labels, and COD payment status are stored in the database.',
-                'body' => 'After checkout, BookMyMovie creates a booking number and ticket number for each selected seat. Users can view booking details, tracking, and seat information from their account.',
-                'sections' => [
-                    ['title' => 'What You Receive', 'items' => ['Booking number.', 'Movie, theater, screen, date, and time.', 'Seat labels and ticket numbers.']],
-                    ['title' => 'At The Counter', 'items' => ['Show your booking number.', 'Pay the COD amount if still pending.', 'Collect the physical ticket where required by the cinema.']],
-                ],
-            ],
-        ];
+        foreach (require __DIR__.'/data/pages.php' as $page) {
+            ContentPage::updateOrCreate(['slug' => $page['slug']], [...$page, 'created_by' => $this->adminId, 'is_active' => true]);
+        }
     }
 
-    private function seedSupportContent(Admin $admin): void
+    private function seedFaqs(): void
     {
-        Coupon::create([
-            'code' => 'FRIENDS20',
-            'description' => 'Opening offer for friend-category movies',
-            'discount_type' => 'percentage',
-            'discount_value' => 20,
-            'max_discount_amount' => 300,
-            'min_order_amount' => 1000,
-            'max_uses' => 200,
-            'max_uses_per_user' => 1,
-            'valid_from' => now()->subDay(),
-            'valid_until' => now()->addMonth(),
-            'is_active' => true,
-            'created_by' => $admin->id,
+        foreach (require __DIR__.'/data/faqs.php' as $index => [$category, $question, $answer]) {
+            DB::table('faqs')->insert([
+                'category' => $category,
+                'question' => $question,
+                'answer' => $answer,
+                'sort_order' => $index + 1,
+                'is_active' => true,
+                'created_by' => $this->adminId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function seedInboxAndNotifications(): void
+    {
+        DB::table('contact_messages')->insert([
+            ['name' => 'Rehan Aslam', 'email' => 'rehan.aslam@example.com', 'subject' => 'Group booking', 'message' => 'Hi, we are a school group of 28 students. Can we reserve a full row block for a Saturday matinée of Whistle of the Night Heron?', 'user_id' => null, 'is_read' => false, 'is_replied' => false, 'created_at' => now()->subHours(5)],
+            ['name' => 'Maryam Qureshi', 'email' => 'maryam.qureshi@example.com', 'subject' => 'Accessibility', 'message' => 'Does the Lumière Grand IMAX screen have wheelchair spaces near the middle rows? My father uses a wheelchair.', 'user_id' => $this->customerIds[0], 'is_read' => true, 'is_replied' => false, 'created_at' => now()->subDay()],
         ]);
 
-        collect([
-            ['Booking', 'Can I book seats for these movies?', 'Yes. Every seeded movie has an active scheduled show and seat pricing.'],
-            ['Account', 'Which admin login should I use?', 'Use admin@bookmymovie.test with the refreshed project password.'],
-            ['Movies', 'Are the five friend types categories?', 'Yes. They are stored in the genres table and used by the movie filters.'],
-            ['Security', 'Do forms use CSRF protection?', 'Yes. POST forms include Laravel CSRF tokens, server-side validation, throttling on sensitive routes, and CSP nonce headers.'],
-        ])->each(fn (array $faq, int $index) => Faq::create([
-            'category' => $faq[0],
-            'question' => $faq[1],
-            'answer' => $faq[2],
-            'sort_order' => $index + 1,
-            'is_active' => true,
-            'created_by' => $admin->id,
-        ]));
+        DB::table('notifications')->insert([
+            ['user_id' => $this->demoUserId, 'type' => 'offer', 'title' => 'Welcome to BookMyMovie', 'message' => 'Use WELCOME15 for 15% off your first booking.', 'is_read' => false, 'created_at' => now()->subDays(2)],
+            ['user_id' => $this->demoUserId, 'type' => 'release', 'title' => 'Iron Orchard opens soon', 'message' => 'A film on your radar opens in cinemas next week.', 'is_read' => false, 'created_at' => now()->subHours(8)],
+        ]);
     }
 }

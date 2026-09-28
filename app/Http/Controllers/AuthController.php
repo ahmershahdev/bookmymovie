@@ -4,21 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\User;
+use App\Support\AuditLog;
 use App\Support\FormSecurity;
+use App\Support\SecurityLog;
 use App\Support\TransactionalMailer;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
+use Illuminate\Validation\Rules\Password;
+use Inertia\Response;
 
 class AuthController extends Controller
 {
-    public function showUserLogin(): View
+    private const RESET_TOKEN_MINUTES = 15;
+
+    public function showUserLogin(): Response
     {
-        return view('auth.user-login');
+        return $this->page('Auth/Login', [
+            'captcha' => FormSecurity::forPage('user_login'),
+            'providers' => $this->socialProviders(),
+        ], ['title' => 'Sign in | BookMyMovie', 'description' => 'Sign in to hold seats, see your e-tickets and manage bookings.']);
     }
 
     public function userLogin(Request $request): RedirectResponse
@@ -26,32 +36,47 @@ class AuthController extends Controller
         FormSecurity::validateRecaptcha($request, 'user_login');
 
         $credentials = $request->validate([
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150', FormSecurity::disposableEmailRule()],
-            'password' => ['required', 'string', 'min:8', 'max:72'],
+            'email' => ['required', 'email:rfc', 'max:150'],
+            'password' => ['required', 'string', 'max:72'],
         ]);
-        $credentials['email'] = strtolower($credentials['email']);
+        $credentials['email'] = strtolower(trim($credentials['email']));
 
-        $user = User::query()->where('email', $credentials['email'])->first();
+        // Check the password before revealing anything about the account, so the
+        // response cannot be used to discover which emails are registered.
+        if (! Auth::validate($credentials)) {
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['email_hash' => hash('sha256', $credentials['email'])]);
 
-        if ($user && ! $user->email_verified_at) {
+            return back()->withErrors(['email' => 'That email and password combination did not match an active account.'])->onlyInput('email');
+        }
+
+        $user = User::query()->where('email', $credentials['email'])->firstOrFail();
+
+        if ($user->is_blocked) {
+            return back()->withErrors(['email' => 'This account has been suspended. Please contact support.'])->onlyInput('email');
+        }
+
+        if (! $user->email_verified_at) {
+            $request->session()->put('verify_email', $user->email);
+
             return redirect()
-                ->route('user.verify.notice', ['email' => $user->email])
-                ->withErrors(['email' => 'Please verify your email before logging in.']);
+                ->route('user.verify.notice')
+                ->withErrors(['code' => 'Please verify your email address to finish setting up your account.']);
         }
 
-        if (Auth::attempt([...$credentials, 'is_blocked' => false], $request->boolean('remember'))) {
-            $request->session()->regenerate();
-            TransactionalMailer::userLogin($request->user());
+        Auth::login($user, $request->boolean('remember'));
+        $request->session()->regenerate();
+        AuditLog::record('auth.login', $user, ['method' => 'password'], $request, 'user', $user->id);
+        TransactionalMailer::userLogin($user, $request);
 
-            return redirect()->intended(route('user.dashboard'));
-        }
-
-        return back()->withErrors(['email' => 'Invalid credentials or blocked account.'])->onlyInput('email');
+        return redirect()->intended(route('user.dashboard'));
     }
 
-    public function showUserRegister(): View
+    public function showUserRegister(): Response
     {
-        return view('auth.user-register');
+        return $this->page('Auth/Register', [
+            'captcha' => FormSecurity::forPage('user_register'),
+            'providers' => $this->socialProviders(),
+        ], ['title' => 'Create an account | BookMyMovie', 'description' => 'Create a free BookMyMovie account to book cinema seats in under a minute.']);
     }
 
     public function userRegister(Request $request): RedirectResponse
@@ -59,60 +84,74 @@ class AuthController extends Controller
         FormSecurity::validateRecaptcha($request, 'user_register');
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:100'],
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'unique:users,email', FormSecurity::disposableEmailRule()],
+            'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[\pL\s.\'-]+$/u'],
+            'email' => ['required', 'email:rfc', 'max:150', 'unique:users,email', FormSecurity::disposableEmailRule()],
             'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', 'unique:users,phone'],
-            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
+            'password' => ['required', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()],
+            'terms' => ['accepted'],
+        ], [
+            'name.regex' => 'Please use letters, spaces, apostrophes and hyphens only.',
+            'terms.accepted' => 'Please accept the terms of service to create an account.',
         ]);
-        $data['email'] = strtolower($data['email']);
-
-        unset($data['password_confirmation']);
 
         $code = strtoupper(Str::random(8));
 
-        $user = User::create([
-            ...$data,
-            'email_verification_code' => Hash::make($code),
-            'email_verification_expires_at' => now()->addMinutes(15),
-        ]);
+        try {
+            $user = User::create([
+                'name' => trim($data['name']),
+                'email' => strtolower($data['email']),
+                'phone' => $data['phone'] ?? null,
+                'password' => $data['password'],
+                'email_verification_code' => Hash::make($code),
+                'email_verification_expires_at' => now()->addMinutes(15),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Two sign-ups for the same email raced past validation.
+            return back()->withErrors(['email' => 'An account with this email already exists.'])->onlyInput('name', 'email', 'phone');
+        }
 
         TransactionalMailer::emailVerificationCode($user, $code);
+        AuditLog::record('auth.register', $user, [], $request, 'user', $user->id);
+        $request->session()->put('verify_email', $user->email);
 
         return redirect()
-            ->route('user.verify.notice', ['email' => $user->email])
-            ->with('status', 'Account created. Check your email for the 8-character verification code.');
+            ->route('user.verify.notice')
+            ->with('status', 'Account created. We have emailed you an 8-character verification code.');
     }
 
-    public function showEmailVerification(Request $request): View
+    public function showEmailVerification(Request $request): Response
     {
-        return view('auth.verify-email', [
-            'email' => strtolower((string) $request->query('email')),
-        ]);
+        return $this->page('Auth/VerifyEmail', [
+            'email' => strtolower((string) ($request->old('email') ?: $request->session()->get('verify_email', ''))),
+        ], ['title' => 'Verify your email | BookMyMovie', 'description' => 'Enter the 8-character code we emailed to finish creating your account.']);
     }
 
     public function verifyEmail(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'email' => ['required', 'email:rfc', 'exists:users,email'],
+            'email' => ['required', 'email:rfc', 'max:150'],
             'code' => ['required', 'string', 'size:8'],
         ]);
 
-        $user = User::query()->where('email', strtolower($data['email']))->firstOrFail();
+        $user = User::query()->where('email', strtolower($data['email']))->first();
+        $invalid = fn (string $message) => back()->withInput(['email' => $data['email']])->withErrors(['code' => $message]);
+
+        if (! $user) {
+            return $invalid('That code is not valid for this email address.');
+        }
 
         if ($user->email_verified_at) {
-            return redirect()->route('user.login')->with('status', 'Account already verified. Please login.');
+            return redirect()->route('user.login')->with('status', 'Your email is already verified. Please sign in.');
         }
 
         if (! $user->email_verification_code || ! $user->email_verification_expires_at || now()->greaterThan($user->email_verification_expires_at)) {
-            return back()
-                ->withInput(['email' => $user->email])
-                ->withErrors(['code' => 'Verification failed because the code expired. Please sign up again or request support.']);
+            return $invalid('This code has expired. Request a new one below.');
         }
 
         if (! Hash::check(strtoupper($data['code']), $user->email_verification_code)) {
-            return back()
-                ->withInput(['email' => $user->email])
-                ->withErrors(['code' => 'Verification failed because the code is incorrect.']);
+            SecurityLog::record(SecurityLog::CAPTCHA_FAILED, $request, ['layer' => 'email_code']);
+
+            return $invalid('That code is not valid for this email address.');
         }
 
         $user->forceFill([
@@ -122,19 +161,43 @@ class AuthController extends Controller
         ])->save();
 
         TransactionalMailer::userSignup($user);
+        AuditLog::record('auth.email_verified', $user, [], $request, 'user', $user->id);
+        $request->session()->forget('verify_email');
 
-        return redirect()
-            ->route('user.login')
-            ->with('status', 'Verification successful. Account created successfully. Please login.');
+        return redirect()->route('user.login')->with('status', 'Email verified. Your account is ready, please sign in.');
+    }
+
+    public function resendVerification(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:150']]);
+        $user = User::query()->where('email', strtolower($data['email']))->whereNull('email_verified_at')->first();
+
+        if ($user) {
+            $code = strtoupper(Str::random(8));
+            $user->forceFill([
+                'email_verification_code' => Hash::make($code),
+                'email_verification_expires_at' => now()->addMinutes(15),
+            ])->save();
+
+            TransactionalMailer::emailVerificationCode($user, $code);
+        }
+
+        return back()
+            ->withInput(['email' => $data['email']])
+            ->with('status', 'If that address is waiting for verification, a new code is on its way.');
     }
 
     public function logout(Request $request): RedirectResponse
     {
+        if ($request->user()) {
+            AuditLog::record('auth.logout', $request->user(), [], $request);
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('home');
+        return redirect()->route('home')->with('status', 'You have been signed out.');
     }
 
     public function redirectToProvider(string $provider): RedirectResponse
@@ -157,38 +220,34 @@ class AuthController extends Controller
         try {
             $socialite = 'Laravel\\Socialite\\Facades\\Socialite';
             $socialUser = $socialite::driver($provider)->user();
-        } catch (\Throwable $exception) {
-            return redirect()
-                ->route('user.login')
-                ->withErrors([
-                    'oauth' => ucfirst($provider).' login could not be completed. Please try email login.',
-                ]);
+        } catch (\Throwable) {
+            return redirect()->route('user.login')->withErrors(['oauth' => ucfirst($provider).' sign-in could not be completed. Please use email instead.']);
         }
 
         if (! $socialUser->getEmail()) {
-            return redirect()
-                ->route('user.login')
-                ->withErrors([
-                    'oauth' => ucfirst($provider).' did not share an email address. Please use email registration.',
-                ]);
+            return redirect()->route('user.login')->withErrors(['oauth' => ucfirst($provider).' did not share an email address. Please register with email.']);
         }
 
-        $user = User::firstOrCreate(
-            ['email' => $socialUser->getEmail()],
-            [
-                'name' => $socialUser->getName() ?: $socialUser->getNickname() ?: 'BookMyMovie Member',
-                'password' => Str::random(40),
-            ]
-        );
+        $user = User::query()->where('email', strtolower($socialUser->getEmail()))->first();
+
+        if (! $user) {
+            $user = User::forceCreate([
+                'name' => Str::limit($socialUser->getName() ?: $socialUser->getNickname() ?: 'BookMyMovie member', 100, ''),
+                'email' => strtolower($socialUser->getEmail()),
+                'password' => Hash::make(Str::random(64)),
+                // The provider has verified ownership of this address.
+                'email_verified_at' => now(),
+            ]);
+        }
 
         if ($user->is_blocked) {
-            return redirect()
-                ->route('user.login')
-                ->withErrors(['email' => 'Invalid credentials or blocked account.']);
+            return redirect()->route('user.login')->withErrors(['email' => 'This account has been suspended. Please contact support.']);
         }
 
         Auth::login($user, true);
         $request->session()->regenerate();
+        AuditLog::record('auth.login', $user, ['method' => $provider], $request, 'user', $user->id);
+        TransactionalMailer::userLogin($user, $request, ucfirst($provider));
 
         return redirect()->intended(route('user.dashboard'));
     }
@@ -200,195 +259,293 @@ class AuthController extends Controller
         }
 
         if (! class_exists('Laravel\\Socialite\\Facades\\Socialite')) {
-            return redirect()
-                ->route('user.login')
-                ->withErrors([
-                    'oauth' => 'OAuth is ready in the UI, but laravel/socialite must be installed to enable provider login.',
-                ]);
+            return redirect()->route('user.login')->withErrors(['oauth' => 'Social sign-in is not installed on this server.']);
         }
 
         $config = config("services.{$provider}");
 
         if (empty($config['client_id']) || empty($config['client_secret']) || empty($config['redirect'])) {
-            return redirect()
-                ->route('user.login')
-                ->withErrors([
-                    'oauth' => ucfirst($provider).' login needs client ID, client secret, and redirect URI in .env.',
-                ]);
+            return redirect()->route('user.login')->withErrors(['oauth' => ucfirst($provider).' sign-in has not been configured yet. Please use email.']);
         }
 
         return null;
     }
 
-    public function showForgotPassword(): View
+    public function showForgotPassword(): Response
     {
-        return view('auth.forgot-password');
+        return $this->page('Auth/ForgotPassword', [
+            'captcha' => FormSecurity::forPage('forgot_password'),
+        ], ['title' => 'Reset your password | BookMyMovie', 'description' => 'Get a one-time code to reset your BookMyMovie password.']);
     }
 
+    /**
+     * Emails an 8-character, single-use code. Always answers the same way,
+     * whether or not the account exists.
+     */
     public function sendResetLink(Request $request): RedirectResponse
     {
         FormSecurity::validateRecaptcha($request, 'forgot_password');
 
         $data = $request->validate([
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
+            'email' => ['required', 'email:rfc', 'max:150'],
         ]);
-        $data['email'] = strtolower($data['email']);
-        $token = strtoupper(Str::random(12));
+        $email = strtolower(trim($data['email']));
 
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $data['email']],
-            ['token' => Hash::make($token), 'created_at' => now()]
-        );
-        TransactionalMailer::passwordResetCode($data['email'], $token, route('password.reset', $token));
+        if (User::query()->where('email', $email)->where('is_blocked', false)->exists()) {
+            $code = self::oneTimeCode();
 
-        return back()
-            ->with('status', 'Password reset link generated.')
-            ->with('reset_link', route('password.reset', $token));
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $email],
+                ['token' => Hash::make($code), 'created_at' => now()]
+            );
+            Cache::forget('reset-attempts:'.$email);
+
+            TransactionalMailer::passwordResetCode($email, $code, route('password.reset'));
+            SecurityLog::record(SecurityLog::PASSWORD_RESET, $request, ['stage' => 'requested']);
+        }
+
+        $request->session()->put('reset_email', $email);
+
+        return redirect()->route('password.reset')->with('status', 'If an account exists for '.$email.', a reset code is on its way. It expires in '.self::RESET_TOKEN_MINUTES.' minutes.');
     }
 
-    public function showResetPassword(string $token): View
+    public function showResetPassword(Request $request): Response
     {
-        return view('auth.reset-password', compact('token'));
+        return $this->page('Auth/ResetPassword', [
+            'email' => strtolower((string) $request->session()->get('reset_email', '')),
+            'captcha' => FormSecurity::forPage('reset_password'),
+        ], ['title' => 'Choose a new password | BookMyMovie', 'description' => 'Enter your reset code and set a new password.']);
     }
 
-    public function resetPassword(Request $request, string $token): RedirectResponse
+    public function resetPassword(Request $request): RedirectResponse
     {
         FormSecurity::validateRecaptcha($request, 'reset_password');
 
         $data = $request->validate([
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'exists:users,email', FormSecurity::disposableEmailRule()],
-            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
+            'email' => ['required', 'email:rfc', 'max:150'],
+            'code' => ['required', 'string', 'size:8'],
+            'password' => ['required', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()->uncompromised()],
         ]);
-        $data['email'] = strtolower($data['email']);
+        $email = strtolower(trim($data['email']));
+        $code = strtoupper($data['code']);
+        $invalid = back()->withErrors(['code' => 'That code is invalid or has expired. Request a new one.'])->onlyInput('email');
 
-        $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();
+        // Five wrong guesses burn the code, on top of the route's rate limit.
+        if (Cache::get('reset-attempts:'.$email, 0) >= 5) {
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
 
-        if (! $record || now()->subMinutes(15)->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
-            return back()->withErrors(['email' => 'Invalid reset token.']);
+            return $invalid;
         }
 
-        User::where('email', $data['email'])->update(['password' => Hash::make($data['password'])]);
-        DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
+        $user = DB::transaction(function () use ($email, $code, $data) {
+            // Lock the row so a code can only ever be redeemed once.
+            $record = DB::table('password_reset_tokens')->where('email', $email)->lockForUpdate()->first();
 
-        return redirect()->route('user.login')->with('status', 'Password updated. Please login.');
-    }
+            if (! $record
+                || now()->subMinutes(self::RESET_TOKEN_MINUTES)->greaterThan($record->created_at)
+                || ! Hash::check($code, $record->token)) {
+                return null;
+            }
 
-    public function showAdminLogin(): View
-    {
-        return view('auth.admin-login');
-    }
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
 
-    public function showAdminForgotCredentials(): View
-    {
-        return view('auth.admin-forgot-credentials');
-    }
+            $user = User::query()->where('email', $email)->lockForUpdate()->first();
+            $user?->forceFill([
+                'password' => Hash::make($data['password']),
+                'remember_token' => Str::random(60),
+            ])->save();
 
-    public function sendAdminCredentialReset(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'secret_key' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'max:150', 'exists:admins,email'],
-        ]);
+            return $user;
+        });
 
-        if (! hash_equals((string) env('BOOKMYMOVIE_ADMIN_RECOVERY_SECRET', env('BOOKMYMOVIE_ADMIN_INVITE', 'BOOKMYMOVIE-ADMIN')), (string) $data['secret_key'])) {
-            return back()->withErrors(['secret_key' => 'Invalid recovery secret.'])->onlyInput('email');
+        if (! $user) {
+            Cache::add('reset-attempts:'.$email, 0, now()->addMinutes(self::RESET_TOKEN_MINUTES));
+            Cache::increment('reset-attempts:'.$email);
+            SecurityLog::record(SecurityLog::PASSWORD_RESET, $request, ['stage' => 'bad_code']);
+
+            return $invalid;
         }
 
-        $token = strtoupper(Str::random(12));
-        $email = strtolower($data['email']);
+        Cache::forget('reset-attempts:'.$email);
+        $request->session()->forget('reset_email');
 
-        DB::table('admin_password_resets')->updateOrInsert(
-            ['email' => $email],
-            ['token' => Hash::make($token), 'created_at' => now()]
-        );
+        // Sign the account out everywhere else: a reset usually means a leak.
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        SecurityLog::record(SecurityLog::PASSWORD_RESET, $request, ['stage' => 'completed', 'user_id' => $user->id]);
+        AuditLog::record('auth.password_reset', $user, [], $request, 'user', $user->id);
+        TransactionalMailer::passwordChanged($user, $request);
 
-        TransactionalMailer::passwordResetCode($email, $token, route('admin.credentials.reset', $token), true);
-
-        return back()
-            ->with('status', 'Admin recovery link generated and emailed.')
-            ->with('reset_link', route('admin.credentials.reset', $token));
+        return redirect()->route('user.login')->with('status', 'Password updated and other devices signed out. Please sign in.');
     }
 
-    public function showAdminResetCredentials(string $token): View
+    /** Eight characters from an alphabet without look-alikes (no O/0, I/1). */
+    private static function oneTimeCode(): string
     {
-        return view('auth.admin-reset-credentials', compact('token'));
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $code = '';
+
+        for ($index = 0; $index < 8; $index++) {
+            $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        return $code;
     }
 
-    public function resetAdminCredentials(Request $request, string $token): RedirectResponse
+    public function showAdminLogin(): Response
     {
-        $data = $request->validate([
-            'email' => ['required', 'email', 'max:150', 'exists:admins,email'],
-            'change_target' => ['required', 'in:password,email'],
-            'new_email' => ['nullable', 'required_if:change_target,email', 'email', 'max:150', 'unique:admins,email'],
-            'password' => ['nullable', 'required_if:change_target,password', 'string', 'min:8', 'confirmed'],
-        ]);
-
-        $email = strtolower($data['email']);
-        $record = DB::table('admin_password_resets')->where('email', $email)->first();
-
-        if (! $record || now()->subMinutes(15)->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
-            return back()->withErrors(['email' => 'Invalid or expired admin recovery code.']);
-        }
-
-        $admin = Admin::query()->where('email', $email)->firstOrFail();
-
-        if ($data['change_target'] === 'email') {
-            $admin->email = strtolower($data['new_email']);
-        } else {
-            $admin->password = Hash::make($data['password']);
-        }
-
-        $admin->save();
-        DB::table('admin_password_resets')->where('email', $email)->delete();
-
-        return redirect()->route('admin.login')->with('status', 'Admin credentials updated. Please login.');
+        return $this->page('Auth/AdminLogin', [
+            'captcha' => FormSecurity::forPage('admin_login'),
+            'sessionMinutes' => (int) config('session.admin_lifetime', 60),
+            'recoveryEnabled' => $this->adminRecoveryEnabled(),
+        ], ['title' => 'Admin sign in | BookMyMovie', 'description' => 'Restricted area for BookMyMovie staff.', 'robots' => 'noindex, nofollow']);
     }
 
     public function adminLogin(Request $request): RedirectResponse
     {
+        FormSecurity::validateRecaptcha($request, 'admin_login');
+
         $credentials = $request->validate([
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150'],
-            'password' => ['required', 'string', 'min:8', 'max:72'],
+            'email' => ['required', 'email:rfc', 'max:150'],
+            'password' => ['required', 'string', 'max:72'],
         ]);
-        $credentials['email'] = strtolower($credentials['email']);
+        $email = strtolower(trim($credentials['email']));
 
-        $admin = Admin::query()->where('email', $credentials['email'])->where('is_active', true)->first();
+        $admin = Admin::query()->where('email', $email)->where('is_active', true)->first();
 
-        if (! $admin || ! Hash::check($credentials['password'], $admin->password)) {
+        // Hash a dummy value when the admin is unknown so response timing does
+        // not reveal which admin emails exist.
+        $valid = Hash::check($credentials['password'], $admin?->password ?? Hash::make(Str::random(40)));
+
+        if (! $admin || ! $valid) {
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['guard' => 'admin', 'email_hash' => hash('sha256', $email)]);
+
             return back()->withErrors(['email' => 'Invalid admin credentials.'])->onlyInput('email');
         }
 
         $admin->forceFill(['last_login_at' => now()])->save();
         $request->session()->regenerate();
+        AuditLog::record('admin.login', $admin, [], $request, 'admin', $admin->id);
         $request->session()->put('admin_id', $admin->id);
         $request->session()->put('admin_authenticated_at', now()->timestamp);
+        SecurityLog::record(SecurityLog::ADMIN_LOGIN, $request, ['admin_id' => $admin->id]);
 
         return redirect()->route('admin.dashboard');
     }
 
-    public function showAdminRegister(): View
+    public function showAdminForgotCredentials(): Response
     {
-        return view('auth.admin-register');
+        abort_unless($this->adminRecoveryEnabled(), 404);
+
+        return $this->page('Auth/AdminForgot', [], ['title' => 'Recover admin access | BookMyMovie', 'description' => 'Staff account recovery.', 'robots' => 'noindex, nofollow']);
+    }
+
+    public function sendAdminCredentialReset(Request $request): RedirectResponse
+    {
+        abort_unless($this->adminRecoveryEnabled(), 404);
+
+        $data = $request->validate([
+            'secret_key' => ['required', 'string', 'max:200'],
+            'email' => ['required', 'email', 'max:150'],
+        ]);
+
+        if (! hash_equals((string) config('bookmymovie.admin.recovery_secret'), (string) $data['secret_key'])) {
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['guard' => 'admin_recovery']);
+
+            return back()->withErrors(['secret_key' => 'Invalid recovery secret.'])->onlyInput('email');
+        }
+
+        $email = strtolower($data['email']);
+
+        if (Admin::query()->where('email', $email)->exists()) {
+            $token = Str::random(64);
+
+            DB::table('admin_password_resets')->updateOrInsert(
+                ['email' => $email],
+                ['token' => Hash::make($token), 'created_at' => now()]
+            );
+
+            TransactionalMailer::passwordResetCode($email, $token, route('admin.credentials.reset', $token), true);
+        }
+
+        return back()->with('status', 'If that admin exists, a recovery link has been emailed. It expires in '.self::RESET_TOKEN_MINUTES.' minutes.');
+    }
+
+    public function showAdminResetCredentials(string $token): Response
+    {
+        abort_unless($this->adminRecoveryEnabled(), 404);
+
+        return $this->page('Auth/AdminReset', ['token' => $token], ['title' => 'Update admin credentials | BookMyMovie', 'description' => 'Staff account recovery.', 'robots' => 'noindex, nofollow']);
+    }
+
+    public function resetAdminCredentials(Request $request, string $token): RedirectResponse
+    {
+        abort_unless($this->adminRecoveryEnabled(), 404);
+
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:150'],
+            'change_target' => ['required', 'in:password,email'],
+            'new_email' => ['nullable', 'required_if:change_target,email', 'email', 'max:150', 'unique:admins,email'],
+            'password' => ['nullable', 'required_if:change_target,password', 'string', 'max:72', 'confirmed', Password::min(12)->mixedCase()->numbers()->symbols()],
+        ]);
+
+        $email = strtolower($data['email']);
+
+        $updated = DB::transaction(function () use ($email, $token, $data) {
+            $record = DB::table('admin_password_resets')->where('email', $email)->lockForUpdate()->first();
+
+            if (! $record || now()->subMinutes(self::RESET_TOKEN_MINUTES)->greaterThan($record->created_at) || ! Hash::check($token, $record->token)) {
+                return false;
+            }
+
+            DB::table('admin_password_resets')->where('email', $email)->delete();
+            $admin = Admin::query()->where('email', $email)->lockForUpdate()->firstOrFail();
+
+            if ($data['change_target'] === 'email') {
+                $admin->email = strtolower($data['new_email']);
+            } else {
+                $admin->password = Hash::make($data['password']);
+            }
+
+            $admin->save();
+
+            return true;
+        });
+
+        if (! $updated) {
+            return back()->withErrors(['email' => 'Invalid or expired admin recovery link.']);
+        }
+
+        return redirect()->route('admin.login')->with('status', 'Admin credentials updated. Please sign in.');
+    }
+
+    public function showAdminRegister(): Response
+    {
+        abort_unless($this->adminInviteEnabled(), 404);
+
+        return $this->page('Auth/AdminRegister', [], ['title' => 'Admin invitation | BookMyMovie', 'description' => 'Create a staff account with an invitation code.', 'robots' => 'noindex, nofollow']);
     }
 
     public function adminRegister(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'invite_code' => ['required', 'string'],
-            'name' => ['required', 'string', 'min:3', 'max:100'],
-            'email' => ['required', 'email:rfc', 'min:6', 'max:150', 'unique:admins,email'],
-            'password' => ['required', 'string', 'min:8', 'max:72', 'confirmed'],
-        ]);
-        $data['email'] = strtolower($data['email']);
+        abort_unless($this->adminInviteEnabled(), 404);
 
-        if ($data['invite_code'] !== env('BOOKMYMOVIE_ADMIN_INVITE', 'BOOKMYMOVIE-ADMIN')) {
+        $data = $request->validate([
+            'invite_code' => ['required', 'string', 'max:200'],
+            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'email' => ['required', 'email:rfc', 'max:150', 'unique:admins,email'],
+            'password' => ['required', 'string', 'max:72', 'confirmed', Password::min(12)->mixedCase()->numbers()->symbols()],
+        ]);
+
+        if (! hash_equals((string) config('bookmymovie.admin.invite_code'), (string) $data['invite_code'])) {
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['guard' => 'admin_invite']);
+
             return back()->withErrors(['invite_code' => 'Invalid invite code.'])->onlyInput('name', 'email');
         }
 
         $admin = Admin::create([
             'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => $data['password'],
+            'email' => strtolower($data['email']),
+            'password' => Hash::make($data['password']),
             'role' => 'admin',
             'is_active' => true,
         ]);
@@ -402,10 +559,34 @@ class AuthController extends Controller
 
     public function adminLogout(Request $request): RedirectResponse
     {
-        $request->session()->forget('admin_id');
-        $request->session()->forget('admin_authenticated_at');
+        $request->session()->forget(['admin_id', 'admin_authenticated_at']);
+        $request->session()->regenerate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('admin.login');
+        return redirect()->route('admin.login')->with('status', 'Signed out of the admin panel.');
+    }
+
+    /**
+     * Social sign-in buttons are only shown for providers with credentials.
+     *
+     * @return list<array{key: string, label: string, url: string}>
+     */
+    private function socialProviders(): array
+    {
+        return collect(['google' => 'Google', 'facebook' => 'Facebook'])
+            ->filter(fn ($label, $provider) => filled(config("services.{$provider}.client_id")) && filled(config("services.{$provider}.client_secret")))
+            ->map(fn ($label, $provider) => ['key' => $provider, 'label' => $label, 'url' => route('oauth.redirect', $provider)])
+            ->values()
+            ->all();
+    }
+
+    private function adminInviteEnabled(): bool
+    {
+        return filled(config('bookmymovie.admin.invite_code'));
+    }
+
+    private function adminRecoveryEnabled(): bool
+    {
+        return filled(config('bookmymovie.admin.recovery_secret'));
     }
 }

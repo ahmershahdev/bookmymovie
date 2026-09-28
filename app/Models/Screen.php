@@ -8,7 +8,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Screen extends Model
 {
-    protected $fillable = ['theater_id', 'screen_name', 'total_seats', 'is_active'];
+    protected $fillable = ['theater_id', 'screen_name', 'format', 'sound_system', 'is_wheelchair_accessible', 'total_seats', 'is_active'];
+
+    public const FORMAT_LABELS = [
+        'standard' => 'Standard 2D',
+        'imax' => 'IMAX with Laser',
+        'dolby_cinema' => 'Dolby Cinema',
+        '4dx' => '4DX Motion',
+        'screenx' => 'ScreenX 270°',
+        'recliner' => 'Recliner Lounge',
+    ];
+
+    public function formatLabel(): string
+    {
+        return self::FORMAT_LABELS[$this->format] ?? 'Standard 2D';
+    }
 
     public function theater(): BelongsTo
     {

@@ -65,7 +65,8 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Showtimes are local wall-clock times, so the app runs in cinema time.
+    'timezone' => env('APP_TIMEZONE', 'Asia/Karachi'),
 
     /*
     |--------------------------------------------------------------------------

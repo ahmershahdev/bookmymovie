@@ -19,8 +19,22 @@ class Review extends Model
         'approved_at',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'is_approved' => 'boolean',
+            'is_flagged' => 'boolean',
+            'approved_at' => 'datetime',
+        ];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function movie(): BelongsTo
+    {
+        return $this->belongsTo(Movie::class);
     }
 }

@@ -1,58 +1,388 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://bookmymovie.ahmershah.dev/</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/default.png</image:loc><image:title>BookMyMovie</image:title></image:image>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/movies</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://bookmymovie.ahmershah.dev/compare</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <loc>https://bookmymovie.ahmershah.dev/movies/now-showing</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://bookmymovie.ahmershah.dev/search</loc>
+    <loc>https://bookmymovie.ahmershah.dev/movies/coming-soon</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/ended</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/offers</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://bookmymovie.ahmershah.dev/about</loc>
+    <loc>https://bookmymovie.ahmershah.dev/faq</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/contact</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://bookmymovie.ahmershah.dev/faq</loc>
+    <loc>https://bookmymovie.ahmershah.dev/about</loc>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/terms</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/privacy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/refund-policy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
   </url>
   <url>
     <loc>https://bookmymovie.ahmershah.dev/e-ticket-info</loc>
-    <changefreq>yearly</changefreq>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cookie-policy</loc>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/accessibility</loc>
+    <lastmod>2026-09-28T00:14:52+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/action</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/adventure</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/animation</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/comedy</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/crime</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/drama</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/family</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/fantasy</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/historical</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/horror</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/mystery</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/romance</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/science-fiction</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/genres/thriller</loc>
+    <lastmod>2026-09-28T14:37:12+05:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-quiet-meridian</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-quiet-meridian.png</image:loc><image:title>The Quiet Meridian</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/northbound-after-midnight</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/northbound-after-midnight.png</image:loc><image:title>Northbound After Midnight</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/hollow-orbit</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/hollow-orbit.png</image:loc><image:title>Hollow Orbit</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/paper-kites-over-lahore</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/paper-kites-over-lahore.png</image:loc><image:title>Paper Kites Over Lahore</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/monsoon-ledger</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/monsoon-ledger.png</image:loc><image:title>Monsoon Ledger</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-last-cinema-on-empress-road</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-last-cinema-on-empress-road.png</image:loc><image:title>The Last Cinema on Empress Road</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/kestrel</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/kestrel.png</image:loc><image:title>Kestrel</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/brass-monkeys</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/brass-monkeys.png</image:loc><image:title>Brass Monkeys</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/seven-floors-down</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/seven-floors-down.png</image:loc><image:title>Seven Floors Down</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/whistle-of-the-night-heron</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/whistle-of-the-night-heron.png</image:loc><image:title>Whistle of the Night Heron</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-tidewater-accord</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-tidewater-accord.png</image:loc><image:title>The Tidewater Accord</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/a-small-hour-of-grace</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/a-small-hour-of-grace.png</image:loc><image:title>A Small Hour of Grace</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/salt-and-iron</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/salt-and-iron.png</image:loc><image:title>Salt and Iron</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/glasshouse-protocol</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/glasshouse-protocol.png</image:loc><image:title>Glasshouse Protocol</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-cartographers-silence</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-cartographers-silence.png</image:loc><image:title>The Cartographer’s Silence</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/echoes-of-the-indus</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/echoes-of-the-indus.png</image:loc><image:title>Echoes of the Indus</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/ashes-of-the-silk-road</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/ashes-of-the-silk-road.png</image:loc><image:title>Ashes of the Silk Road</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/lanterns-for-the-drowned</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/lanterns-for-the-drowned.png</image:loc><image:title>Lanterns for the Drowned</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-understudy</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-understudy.png</image:loc><image:title>The Understudy</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/parallel-tides</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/parallel-tides.png</image:loc><image:title>Parallel Tides</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/iron-orchard</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/iron-orchard.png</image:loc><image:title>Iron Orchard</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/the-weight-of-snow</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/the-weight-of-snow.png</image:loc><image:title>The Weight of Snow</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/harbour-lights</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.4</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/harbour-lights.png</image:loc><image:title>Harbour Lights</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/movies/counterfeit-summer</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+    <image:image><image:loc>https://bookmymovie.ahmershah.dev/images/og/movies/counterfeit-summer.png</image:loc><image:title>Counterfeit Summer</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/harbourline-cinemas</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/lumiere-grand</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/marigold-screens</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/metropole-picture-house</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/northlight-cinema</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bookmymovie.ahmershah.dev/cinemas/the-arcadia</loc>
+    <lastmod>2026-09-28T00:14:15+05:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>
