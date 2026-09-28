@@ -1,9 +1,11 @@
-import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Link, router, useForm } from '@inertiajs/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import { SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
 import QrCode from '@/components/QrCode';
+import Tilt from '@/components/Tilt';
 import { Alert, Breadcrumbs, Select } from '@/components/ui';
 import { useLocale, useT } from '@/lib/i18n';
 import { cn, money, route, useShared } from '@/lib/utils';
@@ -38,8 +40,18 @@ interface Props {
         points_earned: number;
         qr: string;
         wallet: { apple: string | null; google: string | null };
+        admitted: boolean;
+        split: { allowed: boolean; card: boolean; max: number; shares: Share[] };
     };
 }
+
+type Share = { id: number; label: string; amount: number; status: 'pending' | 'paid' | 'cancelled'; host: boolean; payer: string | null; url: string; method: string | null };
+
+/** A ragged, torn-paper edge along the top or bottom of a panel. */
+const tornEdge = (side: 'top' | 'bottom') => {
+    const teeth = Array.from({ length: 41 }, (_, index) => `${index * 2.5}% ${index % 2 ? (side === 'top' ? '7px' : 'calc(100% - 7px)') : (side === 'top' ? '0' : '100%')}`);
+    return side === 'top' ? `polygon(${teeth.join(',')}, 100% 100%, 0 100%)` : `polygon(0 0, 100% 0, ${teeth.reverse().join(',')})`;
+};
 
 export default function BookingShow({ booking }: Props) {
     const { errors } = useShared();
@@ -47,6 +59,18 @@ export default function BookingShow({ booking }: Props) {
     const locale = useLocale();
     const [confirm, setConfirm] = useState(false);
     const cancel = useForm({ reason: '' });
+    const reduce = useReducedMotion();
+    // The tear plays once per ticket after it is scanned, then stays torn.
+    const [tearKey, setTearKey] = useState(0);
+    const [animateTear, setAnimateTear] = useState(false);
+    useEffect(() => {
+        if (!booking.admitted) return;
+        const key = `bmm-torn-${booking.number}`;
+        try {
+            if (!localStorage.getItem(key)) { setAnimateTear(true); localStorage.setItem(key, '1'); }
+        } catch { setAnimateTear(false); }
+    }, [booking.admitted, booking.number]);
+    const torn = booking.admitted && !booking.cancelled;
 
     return (
         <section className="pb-24 pt-[calc(var(--header)+2.5rem)]">
@@ -55,7 +79,10 @@ export default function BookingShow({ booking }: Props) {
                 {errors.booking && <div className="mb-8"><Alert tone="error">{errors.booking}</Alert></div>}
 
                 <div className="grid gap-10 lg:grid-cols-12">
-                    <article className={cn('ticket overflow-hidden lg:col-span-8', booking.cancelled && 'opacity-70')} style={{ ['--tear' as string]: '66%' }} aria-label="E-ticket">
+                    <div className="lg:col-span-8">
+                    <Tilt max={torn ? 4 : 6} scale={1.01} depth={1600}>
+                    <article className={cn(torn ? 'relative' : 'ticket overflow-hidden', booking.cancelled && 'opacity-70')} style={{ ['--tear' as string]: '66%' }} aria-label="E-ticket">
+                        <div className={cn(torn && 'border border-b-0 border-line bg-ink-2')} style={torn ? { clipPath: tornEdge('bottom'), paddingBottom: 7 } : undefined}>
                         <div className="grid gap-8 p-7 sm:grid-cols-[10rem_1fr] sm:p-10">
                             <Poster movie={booking.movie} size="sm" />
                             <div>
@@ -74,9 +101,15 @@ export default function BookingShow({ booking }: Props) {
                                 </dl>
                             </div>
                         </div>
+                        </div>
 
-                        <div className="perforation" />
+                        {!torn && <div className="perforation" />}
 
+                        <motion.div key={tearKey} className={cn(torn && 'border border-t-0 border-line bg-ink-2 shadow-2xl shadow-black/40')}
+                            style={torn ? { clipPath: tornEdge('top'), paddingTop: 7, transformOrigin: '8% 0%' } : undefined}
+                            initial={torn && animateTear && !reduce ? { rotate: 0, y: 0, x: 0 } : false}
+                            animate={torn ? { rotate: 2.5, y: 22, x: 10 } : { rotate: 0, y: 0, x: 0 }}
+                            transition={{ duration: 1.1, ease: [0.34, 1.56, 0.64, 1], delay: animateTear ? 0.6 : 0 }}>
                         <div className="grid gap-8 p-7 sm:grid-cols-[1fr_auto] sm:p-10">
                             <div>
                                 <p className="label">Seats & ticket codes</p>
@@ -99,10 +132,24 @@ export default function BookingShow({ booking }: Props) {
                                     <QrCode value={booking.qr} label={t('Ticket QR code for :number', { number: booking.number })} />
                                 )}
                                 <p className="num text-sm font-semibold tracking-[.14em]">{booking.number}</p>
-                                <p className="label text-[9px]">{t('Scan at the door')}</p>
+                                <p className="label text-[9px]">{torn ? 'Stub torn at the door' : t('Scan at the door')}</p>
                             </div>
                         </div>
+                        </motion.div>
+                        <AnimatePresence>
+                            {torn && (
+                                <motion.p initial={{ opacity: 0, scale: 1.6, rotate: -14 }} animate={{ opacity: 1, scale: 1, rotate: -8 }} transition={{ delay: animateTear ? 1.4 : 0, type: 'spring', stiffness: 260, damping: 14 }}
+                                    className="pointer-events-none absolute right-6 top-6 z-30 border-2 border-mint px-3 py-1 text-sm font-extrabold uppercase tracking-[.2em] text-mint [font-stretch:125%]">Admitted</motion.p>
+                            )}
+                        </AnimatePresence>
                     </article>
+                    </Tilt>
+                    {torn && (
+                        <button type="button" data-print-hide onClick={() => { setAnimateTear(true); setTearKey((key) => key + 1); }} className="mt-10 text-xs text-mute hover:text-paper">
+                            <Icon name="refresh" size={12} className="me-1 inline" /> Replay the tear
+                        </button>
+                    )}
+                    </div>
 
                     <aside className="space-y-4 lg:col-span-4" data-print-hide>
                         <div className="panel p-7">
@@ -128,6 +175,8 @@ export default function BookingShow({ booking }: Props) {
                                 <p className="mt-4 flex items-center gap-2 border-t border-line pt-4 text-xs text-paper-2"><Icon name="star" size={14} className="text-accent" /> {t('You earned :points loyalty points with this booking.', { points: booking.points_earned })}</p>
                             )}
                         </div>
+
+                        {(booking.split.allowed || booking.split.shares.length > 0) && !booking.cancelled && <SplitPanel number={booking.number} split={booking.split} total={booking.total} />}
 
                         {!booking.cancelled && (
                             <div className="panel p-7">
@@ -181,5 +230,65 @@ export default function BookingShow({ booking }: Props) {
                 </div>
             </div>
         </section>
+    );
+}
+
+/** Split the bill: equal shares, one private link per friend. */
+function SplitPanel({ number, split, total }: { number: string; split: Props['booking']['split']; total: number }) {
+    const { errors } = useShared();
+    const [people, setPeople] = useState(Math.min(2, split.max));
+    const [copied, setCopied] = useState<number | null>(null);
+    const paid = split.shares.filter((share) => share.status === 'paid');
+    const anyPaid = paid.length > 0;
+    const copy = (share: Share) => {
+        navigator.clipboard?.writeText(share.url).then(() => { setCopied(share.id); window.setTimeout(() => setCopied(null), 1600); }).catch(() => undefined);
+    };
+
+    return (
+        <div className="panel p-7">
+            <p className="label label-accent flex items-center gap-2"><Icon name="user" size={13} /> Split the bill</p>
+            {errors.split && <p className="field-error mt-3">{errors.split}</p>}
+            {split.shares.length === 0 ? (
+                <>
+                    <p className="mt-3 text-sm text-paper-2">Going as a group? Split {money(total)} into equal shares and send each friend a private link. {split.card ? 'They can pay by card online or at the counter.' : 'They pay their share at the counter.'}</p>
+                    <div className="mt-5 flex items-center gap-3">
+                        <div className="flex border border-line-2" role="radiogroup" aria-label="How many people">
+                            {Array.from({ length: split.max - 1 }, (_, index) => index + 2).map((count) => (
+                                <button key={count} type="button" role="radio" aria-checked={people === count} onClick={() => setPeople(count)}
+                                    className={cn('num h-10 w-10 text-sm transition', people === count ? 'bg-paper text-ink' : 'text-mute hover:text-paper')}>{count}</button>
+                            ))}
+                        </div>
+                        <span className="num text-sm text-mute">≈ {money(Math.round((total / people) * 100) / 100)} each</span>
+                    </div>
+                    <button type="button" className="btn btn-primary mt-5 w-full" onClick={() => router.post(route('user.booking.split', number), { people }, { preserveScroll: true })}>Split {people} ways</button>
+                </>
+            ) : (
+                <>
+                    <div className="mt-4 flex items-center gap-3">
+                        <div className="h-1.5 flex-1 bg-line"><motion.div className="h-full bg-mint" initial={false} animate={{ width: `${(paid.length / split.shares.length) * 100}%` }} /></div>
+                        <span className="num text-xs text-mute">{paid.length}/{split.shares.length} paid</span>
+                    </div>
+                    <ul className="mt-4 space-y-2">
+                        {split.shares.map((share) => (
+                            <li key={share.id} className="flex items-center justify-between gap-3 border border-line p-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="block font-semibold">{share.host ? 'You' : share.payer ?? share.label}</span>
+                                    <span className="num text-xs text-mute">{money(share.amount)} · <span className={cn(share.status === 'paid' ? 'text-mint' : share.status === 'cancelled' ? 'text-signal' : '')}>{share.status === 'paid' ? `paid${share.method ? ` (${share.method})` : ''}` : share.status}</span></span>
+                                </span>
+                                {!share.host && share.status === 'pending' && (
+                                    <span className="flex shrink-0 gap-1">
+                                        <button type="button" onClick={() => copy(share)} className="btn btn-ghost btn-sm">{copied === share.id ? 'Copied' : 'Copy link'}</button>
+                                        <a href={`https://wa.me/?text=${encodeURIComponent(`Your share for our movie night: ${share.url}`)}`} target="_blank" rel="noopener" className="btn btn-ghost btn-icon btn-sm" aria-label="Send on WhatsApp"><Icon name="chat" size={14} /></a>
+                                    </span>
+                                )}
+                                {share.host && share.status === 'pending' && <span className="text-xs text-mute">Pay yours with the booking</span>}
+                            </li>
+                        ))}
+                    </ul>
+                    {!anyPaid && <button type="button" className="mt-4 text-xs text-mute hover:text-signal" onClick={() => router.delete(route('user.booking.split.destroy', number), { preserveScroll: true })}>Remove the split</button>}
+                    <p className="mt-4 text-xs text-mute">Anything still unpaid is settled at the counter before the show.</p>
+                </>
+            )}
+        </div>
     );
 }

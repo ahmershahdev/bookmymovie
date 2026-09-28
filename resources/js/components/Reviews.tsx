@@ -1,16 +1,21 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import { SectionHeading, StarRating } from '@/components/ui';
+import { lockScroll } from '@/lib/scroll';
 import { cn, plural, route, useShared } from '@/lib/utils';
+
+export type Photo = { id: number; url: string; thumb: string; width: number; height: number };
 
 export type ReviewItem = {
     id: number; author: string; username: string | null; avatar: string | null; city: string | null; member_since: string | null;
     rating: number; title: string | null; text: string; spoilers: boolean; verified: boolean; watched: string | null; watched_on: string | null;
     helpful: number; voted: boolean; ago: string | null; date: string | null;
+    photos?: Photo[];
 };
 
 export type ReviewPage = { items: ReviewItem[]; next: number | null; total: number };
@@ -74,6 +79,7 @@ export function ReviewCard({ review, film }: { review: ReviewItem; film?: { titl
                 )}
             </div>
             {long && revealed && <button type="button" onClick={() => setExpanded(!expanded)} className="link mt-2 text-sm text-accent">{expanded ? 'Show less' : 'Read the whole review'}</button>}
+            {review.photos && review.photos.length > 0 && <PhotoStrip photos={review.photos} blurred={!revealed} author={review.author} />}
 
             <footer className="mt-5 flex items-center gap-3 text-xs text-mute">
                 {!own && (
@@ -198,13 +204,13 @@ export default function ReviewsSection({ movie, initial, summary, canReview, use
     );
 }
 
-function ReviewForm({ slug, existing }: { slug: string; existing: { rating: number; title: string; text: string; spoilers: boolean } | null }) {
-    const form = useForm({ rating: existing?.rating ?? 0, title: existing?.title ?? '', review_text: existing?.text ?? '', contains_spoilers: existing?.spoilers ?? false });
+function ReviewForm({ slug, existing }: { slug: string; existing: { rating: number; title: string; text: string; spoilers: boolean; photos?: Photo[] } | null }) {
+    const form = useForm<{ rating: number; title: string; review_text: string; contains_spoilers: boolean; photos: File[]; remove_photos: number[] }>({ rating: existing?.rating ?? 0, title: existing?.title ?? '', review_text: existing?.text ?? '', contains_spoilers: existing?.spoilers ?? false, photos: [], remove_photos: [] });
     const [hover, setHover] = useState(0);
     const words = ['', 'Poor', 'Not great', 'Good', 'Great', 'Loved it'];
 
     return (
-        <form onSubmit={(event) => { event.preventDefault(); form.post(route('movies.reviews.store', slug), { preserveScroll: true }); }} className="panel mb-10 p-7">
+        <form onSubmit={(event) => { event.preventDefault(); form.post(route('movies.reviews.store', slug), { preserveScroll: true, forceFormData: true, onSuccess: () => form.setData({ ...form.data, photos: [], remove_photos: [] }) }); }} className="panel mb-10 p-7">
             <p className="headline text-3xl">{existing ? 'Update your review' : 'You saw it. What did you think?'}</p>
             <fieldset className="mt-5">
                 <legend className="label">Your rating</legend>
@@ -233,11 +239,103 @@ function ReviewForm({ slug, existing }: { slug: string; existing: { rating: numb
                 <p className="field-hint num text-right">{form.data.review_text.length}/1200</p>
                 {form.errors.review_text && <p className="field-error">{form.errors.review_text}</p>}
             </div>
+            <PhotoPicker existing={(existing?.photos ?? []).filter((photo) => !form.data.remove_photos.includes(photo.id))} files={form.data.photos}
+                onFiles={(files) => form.setData('photos', files)} onRemoveExisting={(id) => form.setData('remove_photos', [...form.data.remove_photos, id])}
+                error={Object.entries(form.errors).find(([key]) => key.startsWith('photos'))?.[1]} />
             <label className="mt-4 flex cursor-pointer items-center gap-3 text-sm text-paper-2">
                 <input type="checkbox" className="checkbox" checked={form.data.contains_spoilers} onChange={(event) => form.setData('contains_spoilers', event.target.checked)} />
                 My review gives away the plot (it will be blurred until someone taps it)
             </label>
             <button type="submit" disabled={form.processing} className="btn btn-primary mt-6">{form.processing ? 'Publishing…' : existing ? 'Update review' : 'Publish review'}</button>
         </form>
+    );
+}
+
+/** Thumbnails under a review; tap opens a full-screen viewer (arrows, Esc). */
+function PhotoStrip({ photos, blurred, author }: { photos: Photo[]; blurred: boolean; author: string }) {
+    const [open, setOpen] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (open === null) return;
+        lockScroll(true);
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setOpen(null);
+            if (event.key === 'ArrowRight') setOpen((index) => (index === null ? null : (index + 1) % photos.length));
+            if (event.key === 'ArrowLeft') setOpen((index) => (index === null ? null : (index - 1 + photos.length) % photos.length));
+        };
+        window.addEventListener('keydown', onKey);
+        return () => { window.removeEventListener('keydown', onKey); lockScroll(false); };
+    }, [open, photos.length]);
+
+    return (
+        <>
+            <div className="mt-4 flex gap-2">
+                {photos.map((photo, index) => (
+                    <button key={photo.id} type="button" onClick={() => !blurred && setOpen(index)} className="group relative h-24 w-24 overflow-hidden border border-line sm:h-28 sm:w-28" aria-label={`Open photo ${index + 1} of ${photos.length} from ${author}`}>
+                        <img src={photo.thumb} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-cover transition duration-500 group-hover:scale-105', blurred && 'blur-md')} />
+                    </button>
+                ))}
+            </div>
+            {createPortal(
+                <AnimatePresence>
+                    {open !== null && (
+                        <motion.div role="dialog" aria-modal="true" aria-label={`Photo from ${author}`} data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[120] grid place-items-center bg-ink/95 p-4 backdrop-blur" onClick={() => setOpen(null)}>
+                            <motion.img key={photos[open].id} src={photos[open].url} alt={`Photo ${open + 1} from ${author}`} initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                className="max-h-[85svh] max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+                            <button type="button" className="btn btn-ghost btn-icon absolute right-4 top-4" onClick={() => setOpen(null)} aria-label="Close"><Icon name="close" size={18} /></button>
+                            {photos.length > 1 && <p className="num absolute bottom-6 text-xs text-mute">{open + 1} / {photos.length} · ← →</p>}
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body,
+            )}
+        </>
+    );
+}
+
+/** Up to three photos: drop or pick, previewed before upload, removable. */
+function PhotoPicker({ existing, files, onFiles, onRemoveExisting, error }: {
+    existing: Photo[]; files: File[]; onFiles: (files: File[]) => void; onRemoveExisting: (id: number) => void; error?: string;
+}) {
+    const [drag, setDrag] = useState(false);
+    const room = 3 - existing.length - files.length;
+    const previews = useMemo(() => files.map((file) => URL.createObjectURL(file)), [files]);
+    useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
+
+    const add = (list: FileList | null) => {
+        if (!list) return;
+        const images = Array.from(list).filter((file) => /^image\/(jpeg|png|webp)$/.test(file.type) && file.size <= 5 * 1024 * 1024);
+        onFiles([...files, ...images].slice(0, 3 - existing.length));
+    };
+
+    return (
+        <div className="field mt-5">
+            <span className="label">Photos <span className="text-dim">(optional, up to 3)</span></span>
+            <div className="flex flex-wrap gap-2">
+                {existing.map((photo) => (
+                    <span key={photo.id} className="relative h-24 w-24 border border-line">
+                        <img src={photo.thumb} alt="" className="h-full w-full object-cover" />
+                        <button type="button" onClick={() => onRemoveExisting(photo.id)} className="absolute right-1 top-1 grid h-6 w-6 place-items-center bg-ink/80 text-paper hover:bg-signal" aria-label="Remove photo"><Icon name="close" size={12} /></button>
+                    </span>
+                ))}
+                {previews.map((url, index) => (
+                    <span key={url} className="relative h-24 w-24 border border-accent">
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                        <button type="button" onClick={() => onFiles(files.filter((_, position) => position !== index))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center bg-ink/80 text-paper hover:bg-signal" aria-label="Remove photo"><Icon name="close" size={12} /></button>
+                    </span>
+                ))}
+                {room > 0 && (
+                    <label onDragOver={(event) => { event.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+                        onDrop={(event) => { event.preventDefault(); setDrag(false); add(event.dataTransfer.files); }}
+                        className={cn('grid h-24 w-24 cursor-pointer place-items-center border border-dashed text-center text-[10px] uppercase tracking-[.08em] transition', drag ? 'border-accent text-accent' : 'border-line-2 text-mute hover:border-paper hover:text-paper')}>
+                        <span><Icon name="plus" size={16} className="mx-auto mb-1" />Add photo</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(event) => { add(event.target.files); event.target.value = ''; }} />
+                    </label>
+                )}
+            </div>
+            <p className="field-hint">JPG, PNG or WebP, 5 MB each. Location data is removed before anything is saved.</p>
+            {error && <p className="field-error">{error}</p>}
+        </div>
     );
 }

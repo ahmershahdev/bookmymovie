@@ -448,14 +448,15 @@ function MessagePanel() {
 }
 
 function ProfilePanel({ admin }: { admin: Props['admin'] }) {
-    const form = useForm({ _action: 'update_profile', name: admin.name, email: admin.email, password: '' });
+    const form = useForm({ _action: 'update_profile', name: admin.name, email: admin.email, current_password: '', password: '' });
 
     return (
         <Panel id="profile" label="Profile" title="Administrator" description="Your name, sign-in email and password.">
-            <form onSubmit={(event) => { event.preventDefault(); form.post(route('admin.dashboard'), { preserveScroll: true, onSuccess: () => form.reset('password') }); }} className="grid gap-5 border border-line p-5 md:grid-cols-2">
+            <form onSubmit={(event) => { event.preventDefault(); form.post(route('admin.dashboard'), { preserveScroll: true, onSuccess: () => form.reset('password', 'current_password') }); }} className="grid gap-5 border border-line p-5 md:grid-cols-2">
                 <Field label="Full name" value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} error={form.errors.name} />
                 <Field label="Email address" type="email" value={form.data.email} onChange={(event) => form.setData('email', event.target.value)} error={form.errors.email} />
-                <Field className="md:col-span-2" label="New password (optional)" type="password" placeholder="Leave blank to keep current" value={form.data.password} onChange={(event) => form.setData('password', event.target.value)} error={form.errors.password} autoComplete="new-password" />
+                <Field label="Current password" type="password" placeholder="Needed to change email or password" value={form.data.current_password} onChange={(event) => form.setData('current_password', event.target.value)} error={(form.errors as Record<string, string>).current_password} autoComplete="current-password" />
+                <Field label="New password (optional)" type="password" placeholder="10+ chars, upper, lower, number, symbol" value={form.data.password} onChange={(event) => form.setData('password', event.target.value)} error={form.errors.password} autoComplete="new-password" />
                 <div className="md:col-span-2"><button type="submit" disabled={form.processing} className="btn btn-primary">Save changes</button></div>
             </form>
         </Panel>

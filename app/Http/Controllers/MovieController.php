@@ -10,6 +10,7 @@ use App\Models\Screen;
 use App\Models\Wishlist;
 use App\Support\CleanText;
 use App\Support\ReviewData;
+use App\Support\ReviewPhotos;
 use App\Support\Seo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -264,7 +265,7 @@ class MovieController extends Controller
             'cast' => $movie->creditsFor('cast')->map($person)->values(),
             'inWishlist' => $user ? Wishlist::query()->where('user_id', $user->id)->where('movie_id', $movie->id)->exists() : false,
             'canReview' => $canReview,
-            'userReview' => $userReview ? ['rating' => (int) $userReview->rating, 'title' => (string) $userReview->title, 'text' => $userReview->review_text, 'spoilers' => (bool) $userReview->contains_spoilers] : null,
+            'userReview' => $userReview ? ['rating' => (int) $userReview->rating, 'title' => (string) $userReview->title, 'text' => $userReview->review_text, 'spoilers' => (bool) $userReview->contains_spoilers, 'photos' => ReviewPhotos::forReview($userReview->load('photos'))] : null,
         ], [
             'title' => $movie->meta_title ?: $movie->title.' | Showtimes & Tickets',
             'description' => $movie->meta_description ?: $movie->tagline.' '.$movie->durationLabel().', '.$movie->certificate_rating.'. Book seats at BookMyMovie.',
@@ -295,13 +296,18 @@ class MovieController extends Controller
             'title' => ['nullable', 'string', 'max:90', CleanText::noProfanity('Your headline')],
             'review_text' => ['required', 'string', 'min:20', 'max:1200', CleanText::noProfanity('Your review')],
             'contains_spoilers' => ['nullable', 'boolean'],
-        ]);
+            'photos' => ['nullable', 'array', 'max:'.ReviewPhotos::MAX_PER_REVIEW],
+            // Raster only (no SVG), real image dimensions, 5 MB each.
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:min_width=200,min_height=200,max_width=8000,max_height=8000'],
+            'remove_photos' => ['nullable', 'array', 'max:'.ReviewPhotos::MAX_PER_REVIEW],
+            'remove_photos.*' => ['integer'],
+        ], ['photos.max' => 'Up to '.ReviewPhotos::MAX_PER_REVIEW.' photos per review.', 'photos.*.max' => 'Each photo must be under 5 MB.']);
 
         $booking = $this->watchedBooking((int) Auth::id(), $movie->id);
 
         abort_unless($booking, 403, 'Reviews open once you have watched this film with a BookMyMovie booking.');
 
-        Review::query()->updateOrCreate(
+        $review = Review::query()->updateOrCreate(
             ['user_id' => Auth::id(), 'movie_id' => $movie->id],
             [
                 'booking_id' => $booking->id,
@@ -314,6 +320,9 @@ class MovieController extends Controller
                 'approved_at' => now(),
             ]
         );
+
+        // Only the author's own review is touched: remove_photos ids are scoped to it.
+        ReviewPhotos::sync($review, $request->file('photos', []), array_map('intval', $data['remove_photos'] ?? []));
 
         $movie->refreshRating();
 
@@ -406,6 +415,10 @@ class MovieController extends Controller
                 'ends' => $startsAt->copy()->addMinutes($movie->duration_minutes + 20)->format('g:i A'),
             ],
             'onSale' => $onSale,
+            'waitlist' => [
+                'joined' => Auth::check() && DB::table('show_waitlists')->where('show_id', $show)->where('user_id', Auth::id())->exists(),
+                'count' => DB::table('show_waitlists')->where('show_id', $show)->whereNull('notified_at')->count(),
+            ],
             // Aisles split the room into blocks, as in the real auditorium.
             'aisles' => match (true) {
                 $seatsPerRow >= 14 => [4, 10],

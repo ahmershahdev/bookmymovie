@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
+import PushToggle from '@/components/PushToggle';
 import { Alert, Breadcrumbs } from '@/components/ui';
 import { SplitHeading } from '@/components/motion';
 import { useT } from '@/lib/i18n';
+import { computeLayout, viewStats } from '@/three/hallLayout';
 import { cn, money, route, useShared } from '@/lib/utils';
 import type { MovieCard } from '@/types';
 
@@ -25,6 +27,7 @@ interface Props {
     otherTimes: { id: number; time: string; format: string }[];
     maxSeats: number;
     holdMinutes: number;
+    waitlist: { joined: boolean; count: number };
 }
 
 /**
@@ -55,11 +58,12 @@ function bestSeats(rows: Props['rows'], aisles: number[], count: number): Seat[]
     return best ? (best as { seats: Seat[] }).seats : null;
 }
 
-export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, pricingTiers, otherTimes, maxSeats, holdMinutes }: Props) {
+export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, pricingTiers, otherTimes, maxSeats, holdMinutes, waitlist }: Props) {
     const t = useT();
     const { auth, errors } = useShared();
     const [selected, setSelected] = useState<Seat[]>([]);
-    const [ticketType, setTicketType] = useState<'adult' | 'kid'>('adult');
+    // Each seat has its own ticket type, so a family can book adults and children together.
+    const [types, setTypes] = useState<Record<number, 'adult' | 'kid'>>({});
     const [message, setMessage] = useState('');
     const [processing, setProcessing] = useState(false);
     const [view, setView] = useState<'map' | 'hall'>('map');
@@ -69,9 +73,30 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
     const seatById = useMemo(() => new Map(rows.flatMap((row) => row.seats).map((seat) => [seat.id, seat])), [rows]);
     const lastPicked = selected[selected.length - 1];
     const focusSeat = focus !== null ? seatById.get(focus) : undefined;
+    const layout = useMemo(() => computeLayout(rows, aisles), [rows, aisles]);
+    const stats = useMemo(() => (focus !== null ? viewStats(layout, focus) : null), [layout, focus]);
+    // Neighbours in the same row, for "try the seat next door" in seat view.
+    const neighbour = (step: -1 | 1) => {
+        const row = rows.find((candidate) => candidate.seats.some((seat) => seat.id === focus));
+        if (!row) return undefined;
+        const index = row.seats.findIndex((seat) => seat.id === focus);
+        return row.seats[index + step];
+    };
+    const rowStep = (step: -1 | 1) => {
+        const rowIndex = rows.findIndex((candidate) => candidate.seats.some((seat) => seat.id === focus));
+        const current = focusSeat;
+        const next = rows[rowIndex + step];
+        if (!next || !current) return undefined;
+        return next.seats.reduce((best, seat) => (Math.abs(seat.number - current.number) < Math.abs(best.number - current.number) ? seat : best), next.seats[0]);
+    };
+    const trailer = movie.card.trailers?.[0];
 
-    const priceFor = (seat: Seat) => (ticketType === 'kid' && seat.kid !== null ? seat.kid : seat.adult);
-    const total = useMemo(() => selected.reduce((sum, seat) => sum + priceFor(seat), 0), [selected, ticketType]); // eslint-disable-line react-hooks/exhaustive-deps
+    const typeOf = (seat: Seat): 'adult' | 'kid' => (types[seat.id] === 'kid' && seat.kid !== null ? 'kid' : 'adult');
+    const priceFor = (seat: Seat) => (typeOf(seat) === 'kid' ? (seat.kid as number) : seat.adult);
+    const total = useMemo(() => selected.reduce((sum, seat) => sum + priceFor(seat), 0), [selected, types]); // eslint-disable-line react-hooks/exhaustive-deps
+    const kids = selected.filter((seat) => typeOf(seat) === 'kid').length;
+    const adults = selected.length - kids;
+    const setType = (seat: Seat, type: 'adult' | 'kid') => setTypes((current) => ({ ...current, [seat.id]: type }));
 
     const toggle = (seat: Seat) => {
         if (selected.some((item) => item.id === seat.id)) {
@@ -91,7 +116,12 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
 
     const hold = () => {
         if (!selected.length) return;
-        router.post(route('user.cart'), { show_id: show.id, ticket_type: ticketType, seats: selected.map((seat) => seat.id) }, {
+        if (adults === 0) {
+            setMessage('Children must be accompanied: make at least one seat an adult ticket.');
+            return;
+        }
+        const ticketTypes = Object.fromEntries(selected.map((seat) => [seat.id, typeOf(seat)]));
+        router.post(route('user.cart'), { show_id: show.id, seats: selected.map((seat) => seat.id), ticket_types: ticketTypes }, {
             preserveScroll: true,
             onStart: () => setProcessing(true),
             onFinish: () => setProcessing(false),
@@ -143,6 +173,8 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                         {serverError && <div className="mb-6"><Alert tone="error">{serverError}</Alert></div>}
                         {!onSale && <div className="mb-6"><Alert icon="clock">This show has started or is no longer on sale. Choose another time from the film page.</Alert></div>}
 
+                        {onSale && seatSummary.available === 0 && <Waitlist showId={show.id} maxSeats={maxSeats} waitlist={waitlist} signedIn={Boolean(auth.user)} />}
+
                         {onSale && seatSummary.available > 0 && (
                             <div className="panel mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-start gap-3">
@@ -176,6 +208,7 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                             {view === 'hall' && (
                                 <div className="flex flex-wrap gap-1" aria-label="Camera">
                                     <button type="button" onClick={() => setCamera('overview')} aria-pressed={camera === 'overview'} className="chip">Overview</button>
+                                    {selected.length === 0 && focus === null && <span className="text-xs text-mute">Tap a seat, then “From …” to sit in it{trailer ? ' and watch the trailer' : ''}.</span>}
                                     {selected.map((seat) => (
                                         <button key={seat.id} type="button" onClick={() => { setFocus(seat.id); setCamera('seat'); }} aria-pressed={camera === 'seat' && focus === seat.id} className="chip">
                                             <Icon name="eye" size={12} /> From {seat.label}
@@ -197,7 +230,7 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                                         selected={selected.map((seat) => seat.id)} focus={focus} mode={camera}
                                         onToggle={(hallSeat) => { const seat = seatById.get(hallSeat.id); if (seat) toggle(seat); }}
                                         onHover={(hallSeat) => setHoverSeat(hallSeat ? seatById.get(hallSeat.id) ?? null : null)}
-                                        screenImage={movie.card.hero_image_url} title={movie.title} palette={movie.card.palette} />
+                                        screenImage={movie.card.hero_image_url} trailer={trailer ? { webm: trailer.webm, mp4: trailer.src } : undefined} title={movie.title} palette={movie.card.palette} />
                                 </Suspense>
                                 <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
                                     <p className="label rounded-none bg-ink/70 px-2 py-1 backdrop-blur">
@@ -207,6 +240,32 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                                         <p className="num bg-volt px-2 py-1 text-xs font-semibold text-noir">{hoverSeat.label} · {hoverSeat.available ? hoverSeat.price_label : hoverSeat.status}</p>
                                     )}
                                 </div>
+                                {camera === 'seat' && focusSeat && stats && (
+                                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="absolute inset-x-3 bottom-3 border border-line-2 bg-ink/80 p-4 backdrop-blur-md sm:inset-x-auto sm:left-4 sm:w-80">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="label">View from {focusSeat.label}</p>
+                                            <p className="flex items-baseline gap-1.5"><span className="display text-3xl text-accent">{stats.score}</span><span className="text-xs font-semibold uppercase">{stats.verdict}</span></p>
+                                        </div>
+                                        <div className="mt-2 h-1 bg-line"><motion.div className="h-full bg-volt" initial={{ width: 0 }} animate={{ width: `${stats.score}%` }} transition={{ duration: 0.8 }} /></div>
+                                        <dl className="num mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+                                            <div><dt className="text-mute">Distance</dt><dd className="text-paper">{stats.distance.toFixed(1)} m</dd></div>
+                                            <div><dt className="text-mute">Screen fills</dt><dd className="text-paper">{Math.round(stats.fill)}°</dd></div>
+                                            <div><dt className="text-mute">Off-centre</dt><dd className="text-paper">{Math.round(stats.offAxis)}°</dd></div>
+                                        </dl>
+                                        <ul className="mt-3 space-y-1 text-xs text-paper-2">{stats.notes.map((note) => <li key={note}>· {note}</li>)}</ul>
+                                        <div className="mt-3 grid grid-cols-4 gap-1" aria-label="Try another seat">
+                                            {([['←', neighbour(-1)], ['→', neighbour(1)], ['Closer', rowStep(-1)], ['Back', rowStep(1)]] as const).map(([label, seat]) => (
+                                                <button key={label} type="button" disabled={!seat} onClick={() => seat && setFocus(seat.id)} title={seat ? `View from ${seat.label}` : undefined}
+                                                    className="border border-line-2 py-1.5 text-[10px] font-bold uppercase tracking-[.06em] text-paper transition hover:border-accent hover:text-accent disabled:opacity-30">
+                                                    {label}{seat && <span className="num block text-[9px] font-normal text-mute">{seat.label}</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {!selected.some((seat) => seat.id === focusSeat.id) && focusSeat.available && (
+                                            <button type="button" onClick={() => toggle(focusSeat)} className="btn btn-primary btn-sm mt-3 w-full">Pick {focusSeat.label} · {focusSeat.price_label}</button>
+                                        )}
+                                    </motion.div>
+                                )}
                             </div>
                         )}
 
@@ -309,32 +368,30 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                                 </div>
                             </div>
 
-                            <fieldset className="mt-6">
-                                <legend className="sr-only">Ticket type</legend>
-                                <div className="grid grid-cols-2 border border-line-2 p-1">
-                                    {(['adult', 'kid'] as const).map((type) => (
-                                        <button key={type} type="button" onClick={() => setTicketType(type)} aria-pressed={ticketType === type}
-                                            className={cn('py-2.5 text-[11px] font-bold uppercase tracking-[.08em] transition [font-stretch:115%]', ticketType === type ? 'bg-paper text-ink' : 'text-mute hover:text-paper')}>
-                                            {type === 'adult' ? 'Adult' : 'Child (3–12)'}
-                                        </button>
-                                    ))}
-                                </div>
-                                {ticketType === 'kid' && <p className="field-hint mt-2">Recliner rows have no child price and are charged as adult.</p>}
-                            </fieldset>
-
                             <div className="mt-6 min-h-[5.5rem]">
                                 {selected.length === 0 ? (
-                                    <p className="text-sm text-mute">Tap up to {maxSeats} seats on the map. They are held for {holdMinutes} minutes while you check out.</p>
+                                    <p className="text-sm text-mute">Tap up to {maxSeats} seats on the map, then choose Adult or Child for each one. Seats are held for {holdMinutes} minutes while you check out.</p>
                                 ) : (
                                     <ul className="space-y-2">
                                         <AnimatePresence initial={false}>
                                             {selected.map((seat) => (
-                                                <motion.li key={seat.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center justify-between text-sm">
-                                                    <button type="button" onClick={() => toggle(seat)} className="group flex items-center gap-2 hover:text-signal" aria-label={`Remove seat ${seat.label}`}>
-                                                        <span className="num grid h-7 w-10 place-items-center bg-volt text-[11px] font-bold text-noir group-hover:bg-signal">{seat.label}</span>
-                                                        <span>{ticketType === 'kid' && seat.kid !== null ? 'Child' : 'Adult'}</span>
+                                                <motion.li key={seat.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="flex items-center justify-between gap-3 text-sm">
+                                                    <button type="button" onClick={() => toggle(seat)} className="group shrink-0" aria-label={`Remove seat ${seat.label}`} title="Remove seat">
+                                                        <span className="num grid h-8 w-11 place-items-center bg-volt text-[11px] font-bold text-noir transition group-hover:bg-signal">{seat.label}</span>
                                                     </button>
-                                                    <span className="num text-paper-2">{money(priceFor(seat))}</span>
+                                                    <div className="grid flex-1 grid-cols-2 border border-line-2 p-0.5" role="radiogroup" aria-label={`Ticket for seat ${seat.label}`}>
+                                                        {(['adult', 'kid'] as const).map((type) => {
+                                                            const unavailable = type === 'kid' && seat.kid === null;
+                                                            return (
+                                                                <button key={type} type="button" role="radio" aria-checked={typeOf(seat) === type} disabled={unavailable} onClick={() => setType(seat, type)}
+                                                                    title={unavailable ? 'Recliner seats have no child price' : undefined}
+                                                                    className={cn('py-1.5 text-[10px] font-bold uppercase tracking-[.08em] transition [font-stretch:115%] disabled:cursor-not-allowed disabled:opacity-30', typeOf(seat) === type ? 'bg-paper text-ink' : 'text-mute hover:text-paper')}>
+                                                                    {type === 'adult' ? 'Adult' : 'Child'}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <motion.span key={priceFor(seat)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="num w-20 shrink-0 text-right text-paper-2">{money(priceFor(seat))}</motion.span>
                                                 </motion.li>
                                             ))}
                                         </AnimatePresence>
@@ -342,6 +399,12 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                                 )}
                             </div>
 
+                            {selected.length > 0 && (
+                                <p className="mt-3 text-xs text-mute">
+                                    {adults} {adults === 1 ? 'adult' : 'adults'}{kids > 0 && <> · {kids} {kids === 1 ? 'child (3–12)' : 'children (3–12)'}</>}
+                                    {kids > 0 && adults === 0 && <span className="block text-signal">Add at least one adult: children must be accompanied.</span>}
+                                </p>
+                            )}
                             {message && <p className="mt-3 text-xs text-signal" role="alert">{message}</p>}
 
                             <div className="perforation -mx-7 my-6" />
@@ -397,5 +460,42 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                 )}
             </AnimatePresence>
         </>
+    );
+}
+
+/** Sold out: join a first-come waitlist and get told when seats come back. */
+function Waitlist({ showId, maxSeats, waitlist, signedIn }: { showId: number; maxSeats: number; waitlist: Props['waitlist']; signedIn: boolean }) {
+    const [seats, setSeats] = useState(2);
+
+    return (
+        <div className="panel mb-6 border-signal/40 p-5 sm:p-6">
+            <p className="label text-signal">Sold out</p>
+            <p className="headline mt-2 text-2xl">{waitlist.joined ? 'You are on the waitlist' : 'Join the waitlist'}</p>
+            <p className="mt-2 text-sm text-paper-2">
+                Seats come back when someone cancels or a hold runs out. We alert the waitlist in the order people joined{waitlist.count > 0 ? `; ${waitlist.count} ${waitlist.count === 1 ? 'person is' : 'people are'} waiting` : ''}.
+            </p>
+            {signedIn ? (
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                    {waitlist.joined ? (
+                        <button type="button" className="btn btn-ghost" onClick={() => router.delete(route('waitlist.leave', showId), { preserveScroll: true })}>Leave waitlist</button>
+                    ) : (
+                        <>
+                            <div className="flex border border-line-2" role="radiogroup" aria-label="Seats needed">
+                                {Array.from({ length: maxSeats }, (_, index) => index + 1).map((count) => (
+                                    <button key={count} type="button" role="radio" aria-checked={seats === count} onClick={() => setSeats(count)}
+                                        className={cn('num h-11 w-11 text-sm transition', seats === count ? 'bg-paper text-ink' : 'text-mute hover:text-paper')}>{count}</button>
+                                ))}
+                            </div>
+                            <button type="button" className="btn btn-primary" onClick={() => router.post(route('waitlist.join', showId), { seats }, { preserveScroll: true })}>
+                                <Icon name="megaphone" size={16} /> Notify me
+                            </button>
+                        </>
+                    )}
+                    <PushToggle className="ms-auto" />
+                </div>
+            ) : (
+                <Link href={route('user.login')} className="btn btn-primary mt-5">Sign in to join the waitlist</Link>
+            )}
+        </div>
     );
 }

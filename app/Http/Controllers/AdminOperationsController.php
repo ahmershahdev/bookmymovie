@@ -237,6 +237,9 @@ class AdminOperationsController extends AdminController
             if ($booking->payment_status !== 'paid') {
                 $booking->forceFill(['payment_status' => 'paid'])->save();
                 Payment::query()->where('booking_id', $booking->id)->update(['status' => 'paid', 'paid_at' => now(), 'notes' => 'Paid at the box office.']);
+                // Any split shares still open were settled at the counter.
+                \App\Models\BookingSplit::query()->where('booking_id', $booking->id)->where('status', 'pending')
+                    ->update(['status' => 'paid', 'payment_method' => 'counter', 'paid_at' => now(), 'updated_at' => now()]);
                 BookingEvent::create(['booking_id' => $booking->id, 'event' => 'paid', 'from_status' => 'confirmed', 'to_status' => 'confirmed', 'note' => 'Paid at the box office.', 'actor_type' => 'admin', 'actor_id' => $admin->id]);
             }
 

@@ -81,27 +81,26 @@ class LayoutData
     }
 
     /**
-     * @return array{cart: int, wishlist: int}
+     * @return array{cart: int, wishlist: int, holdExpiresAt: ?string}
      */
     public static function counts(): array
     {
         return self::remember('counts', function () {
             if (! Auth::check()) {
-                return ['cart' => 0, 'wishlist' => 0];
+                return ['cart' => 0, 'wishlist' => 0, 'holdExpiresAt' => null];
             }
 
             try {
+                $cart = Cart::query()->where('user_id', Auth::id())->where('expires_at', '>', now())->withCount('items')->first();
+
                 return [
                     'wishlist' => Auth::user()->wishlists()->count(),
-                    'cart' => (int) (Cart::query()
-                        ->where('user_id', Auth::id())
-                        ->where('expires_at', '>', now())
-                        ->withCount('items')
-                        ->first()
-                        ?->items_count ?? 0),
+                    'cart' => (int) ($cart?->items_count ?? 0),
+                    // Drives the live seat-hold countdown in the navbar.
+                    'holdExpiresAt' => $cart && $cart->items_count ? $cart->expires_at?->toIso8601String() : null,
                 ];
             } catch (QueryException) {
-                return ['cart' => 0, 'wishlist' => 0];
+                return ['cart' => 0, 'wishlist' => 0, 'holdExpiresAt' => null];
             }
         });
     }

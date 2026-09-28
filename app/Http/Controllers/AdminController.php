@@ -443,8 +443,14 @@ class AdminController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', Rule::unique('admins', 'email')->ignore($admin->id)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'current_password' => ['nullable', 'string', 'max:72'],
+            'password' => ['nullable', 'string', 'max:72', \Illuminate\Validation\Rules\Password::min(10)->mixedCase()->numbers()->symbols()],
         ]);
+
+        // A stolen session must not be able to take over the account.
+        if ((! empty($data['password']) || strtolower($data['email']) !== $admin->email) && ! Hash::check((string) ($data['current_password'] ?? ''), $admin->password)) {
+            return back()->withErrors(['current_password' => 'Enter your current password to change your email or password.']);
+        }
 
         $admin->name = $data['name'];
         $admin->email = $data['email'];

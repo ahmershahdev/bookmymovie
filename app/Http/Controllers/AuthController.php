@@ -548,20 +548,12 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Invalid admin credentials.'])->onlyInput('email');
         }
 
-        $admin->forceFill(['last_login_at' => now()])->save();
-        $request->session()->regenerate();
-        AuditLog::record('admin.login', $admin, [], $request, 'admin', $admin->id);
-        $request->session()->put('admin_id', $admin->id);
-        $request->session()->put('admin_authenticated_at', now()->timestamp);
-        SecurityLog::record(SecurityLog::ADMIN_LOGIN, $request, ['admin_id' => $admin->id]);
-
-        // A scanned ticket QR sent the admin here first; go back to it.
-        $intended = (string) $request->session()->pull('admin_intended', '');
-        if ($intended !== '' && Str::startsWith($intended, url('/admin/'))) {
-            return redirect()->to($intended);
+        // Authenticator app turned on: the password alone is not enough.
+        if ($admin->hasTwoFactor()) {
+            return AdminStaffController::startChallenge($request, $admin);
         }
 
-        return redirect()->route('admin.dashboard');
+        return AdminStaffController::completeAdminLogin($request, $admin);
     }
 
     public function showAdminForgotCredentials(): Response

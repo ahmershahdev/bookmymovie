@@ -3,42 +3,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Palette } from '@/types';
 
-export type HallSeat = { id: number; number: number; label: string; tier: string; status: string; available: boolean };
-export type HallRow = { label: string; seats: HallSeat[] };
+import { computeLayout, EYE_HEIGHT, FIRST_ROW_Z, ROW_DEPTH, ROW_RISE, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_Y, SCREEN_Z, type HallRow, type HallSeat, type Layout } from './hallLayout';
 
-const SEAT_GAP = 0.62;
-const AISLE_GAP = 0.55;
-const ROW_DEPTH = 1.0;
-const ROW_RISE = 0.3;
-const FIRST_ROW_Z = 4.2;
-const EYE_HEIGHT = 0.78;
-const SCREEN_Z = -2.6;
-const SCREEN_WIDTH = 10;
-const SCREEN_HEIGHT = SCREEN_WIDTH / 2.2;
-const SCREEN_Y = 3.1;
+export type { HallRow, HallSeat };
 
 const TIER_COLOURS: Record<string, string> = { Gold: '#8f8b82', Platinum: '#c7e03a', Box: '#9a82e0' };
 
-type Layout = { seat: HallSeat; row: string; x: number; y: number; z: number }[];
-
-/** Positions every seat like the real room: aisles, a raked floor, row A at the front. */
 function useLayout(rows: HallRow[], aisles: number[]): Layout {
-    return useMemo(() => {
-        const layout: Layout = [];
-        rows.forEach((row, rowIndex) => {
-            let x = 0;
-            const xs = row.seats.map((seat) => {
-                const position = x;
-                x += SEAT_GAP + (aisles.includes(seat.number) ? AISLE_GAP : 0);
-                return position;
-            });
-            const width = xs.length ? xs[xs.length - 1] : 0;
-            row.seats.forEach((seat, index) => {
-                layout.push({ seat, row: row.label, x: xs[index] - width / 2, y: rowIndex * ROW_RISE, z: FIRST_ROW_Z + rowIndex * ROW_DEPTH });
-            });
-        });
-        return layout;
-    }, [rows, aisles]);
+    return useMemo(() => computeLayout(rows, aisles), [rows, aisles]);
 }
 
 /** The picture on the screen: the film's artwork, or a title card in its palette. */
@@ -83,6 +55,58 @@ function useScreenTexture(image: string | null | undefined, title: string, palet
     }, [image]);
 
     return texture;
+}
+
+/**
+ * The trailer as a texture, muted and looping, only while you sit in a seat.
+ * WebM first, MP4 fallback; if it cannot play, the still stays up.
+ */
+function useTrailerTexture(sources: { webm?: string | null; mp4?: string | null } | undefined, playing: boolean) {
+    const [texture, setTexture] = useState<THREE.VideoTexture | null>(null);
+
+    useEffect(() => {
+        if (!playing || !sources?.mp4) return;
+        const video = document.createElement('video');
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+        video.preload = 'auto';
+        const canWebm = sources.webm && video.canPlayType('video/webm; codecs="vp9"') !== '';
+        video.src = (canWebm ? sources.webm : sources.mp4) as string;
+        const videoTexture = new THREE.VideoTexture(video);
+        videoTexture.colorSpace = THREE.SRGBColorSpace;
+        let alive = true;
+        video.addEventListener('playing', () => alive && setTexture(videoTexture), { once: true });
+        video.play().catch(() => undefined);
+        return () => {
+            alive = false;
+            setTexture(null);
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            videoTexture.dispose();
+        };
+    }, [playing, sources?.webm, sources?.mp4]);
+
+    return texture;
+}
+
+/** House lights: bright in the overview, dimmed like showtime in a seat. */
+function HouseLights({ dim }: { dim: boolean }) {
+    const ambient = useRef<THREE.AmbientLight>(null);
+    const hemi = useRef<THREE.HemisphereLight>(null);
+    useFrame((_, delta) => {
+        const ease = 1 - Math.pow(0.05, delta);
+        if (ambient.current) ambient.current.intensity = THREE.MathUtils.lerp(ambient.current.intensity, dim ? 0.08 : 0.35, ease);
+        if (hemi.current) hemi.current.intensity = THREE.MathUtils.lerp(hemi.current.intensity, dim ? 0.06 : 0.35, ease);
+    });
+    return (
+        <>
+            <ambientLight ref={ambient} intensity={0.35} />
+            <hemisphereLight ref={hemi} args={['#fff6e0', '#0b0a09', 0.35]} />
+        </>
+    );
 }
 
 function Seats({ layout, selected, focus, hovered, onHover, onToggle }: {
@@ -287,7 +311,7 @@ function Director({ layout, focus, mode }: { layout: Layout; focus: number | nul
     return null;
 }
 
-export default function CinemaHall({ rows, aisles, selected, focus, mode, onToggle, onHover, screenImage, title, palette, className }: {
+export default function CinemaHall({ rows, aisles, selected, focus, mode, onToggle, onHover, screenImage, trailer, title, palette, className }: {
     rows: HallRow[];
     aisles: number[];
     selected: number[];
@@ -296,13 +320,17 @@ export default function CinemaHall({ rows, aisles, selected, focus, mode, onTogg
     onToggle: (seat: HallSeat) => void;
     onHover?: (seat: HallSeat | null) => void;
     screenImage?: string | null;
+    trailer?: { webm?: string | null; mp4?: string | null };
     title: string;
     palette: Palette;
     className?: string;
 }) {
     const layout = useLayout(rows, aisles);
     const [hovered, setHovered] = useState<number | null>(null);
-    const texture = useScreenTexture(screenImage, title, palette);
+    const still = useScreenTexture(screenImage, title, palette);
+    const seated = mode === 'seat' && focus !== null;
+    const video = useTrailerTexture(trailer, seated);
+    const texture = video ?? still;
 
     useEffect(() => () => {
         document.body.style.cursor = 'default';
@@ -313,8 +341,7 @@ export default function CinemaHall({ rows, aisles, selected, focus, mode, onTogg
             <Canvas dpr={[1, 1.75]} camera={{ position: [0, 9, 26], fov: 46 }} gl={{ antialias: true, powerPreference: 'high-performance' }}>
                 <color attach="background" args={['#070707']} />
                 <fog attach="fog" args={['#070707', 18, 42]} />
-                <ambientLight intensity={0.35} />
-                <hemisphereLight args={['#fff6e0', '#0b0a09', 0.35]} />
+                <HouseLights dim={seated} />
                 <Room layout={layout} texture={texture} accent={palette[1]} />
                 <Seats layout={layout} selected={selected} focus={focus} hovered={hovered}
                     onHover={(seat) => { setHovered(seat?.id ?? null); onHover?.(seat); }} onToggle={onToggle} />

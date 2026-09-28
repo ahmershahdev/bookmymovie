@@ -8,7 +8,7 @@ import { cn, money, plural, route, useShared } from '@/lib/utils';
 import type { MovieCard } from '@/types';
 
 export interface CartShow { id: number; movie: MovieCard; title: string; slug: string; when: string; short: string; theater: string; screen: string; format: string }
-export interface CartItem { id: number; seat: string; type: string; tier: string; price: number }
+export interface CartItem { id: number; seat: string; type: string; ticket_type?: 'adult' | 'kid'; child_allowed?: boolean; tier: string; price: number }
 
 interface Props {
     expiresAt: string | null;
@@ -63,6 +63,17 @@ export default function Cart({ expiresAt, total, show, items, maxSeats }: Props)
                                                 <span className="num grid h-10 w-12 place-items-center bg-volt text-sm font-bold text-noir">{item.seat}</span>
                                                 <span className="text-sm"><span className="block">{item.type}</span><span className="text-mute">{item.tier}</span></span>
                                             </div>
+                                            {item.child_allowed && (
+                                                <div className="hidden grid-cols-2 border border-line-2 p-0.5 sm:grid" role="radiogroup" aria-label={`Ticket for seat ${item.seat}`}>
+                                                    {(['adult', 'kid'] as const).map((type) => (
+                                                        <button key={type} type="button" role="radio" aria-checked={item.ticket_type === type}
+                                                            onClick={() => item.ticket_type !== type && router.patch(route('user.cart.item', item.id), { ticket_type: type }, { preserveScroll: true })}
+                                                            className={cn('px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.08em] transition [font-stretch:115%]', item.ticket_type === type ? 'bg-paper text-ink' : 'text-mute hover:text-paper')}>
+                                                            {type === 'adult' ? 'Adult' : 'Child'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-4">
                                                 <span className="num">{money(item.price)}</span>
                                                 <button type="button" onClick={() => router.delete(route('user.cart.remove', item.id), { preserveScroll: true })}

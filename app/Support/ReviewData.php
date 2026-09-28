@@ -35,7 +35,7 @@ class ReviewData
         };
 
         $reviews = $query
-            ->with(['user:id,name,username,profile_picture,city,created_at', 'booking:id,show_id', 'booking.show:id,screen_id,show_date', 'booking.show.screen:id,theater_id,format,screen_name', 'booking.show.screen.theater:id,name'])
+            ->with(['photos', 'user:id,name,username,profile_picture,city,created_at', 'booking:id,show_id', 'booking.show:id,screen_id,show_date', 'booking.show.screen:id,theater_id,format,screen_name', 'booking.show.screen.theater:id,name'])
             ->forPage($page, self::PAGE_SIZE)
             ->get();
 
@@ -71,6 +71,7 @@ class ReviewData
             'watched' => $show ? trim(($show->screen?->theater?->name ?? '').' · '.(\App\Models\Screen::FORMAT_LABELS[$show->screen?->format] ?? 'Standard 2D'), ' ·') : null,
             'watched_on' => $show?->show_date?->format('j M Y'),
             'helpful' => (int) $review->helpful_count,
+            'photos' => $review->relationLoaded('photos') ? ReviewPhotos::forReview($review) : [],
             'voted' => $voted,
             'ago' => $review->created_at?->diffForHumans(),
             'date' => $review->created_at?->toIso8601String(),

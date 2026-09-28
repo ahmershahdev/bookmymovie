@@ -33,6 +33,21 @@ class Review extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Rows cascade in the database; the files have to go too.
+        static::deleting(function (Review $review) {
+            foreach ($review->photos as $photo) {
+                \App\Support\ReviewPhotos::delete($photo->path);
+            }
+        });
+    }
+
+    public function photos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ReviewPhoto::class)->orderBy('position');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

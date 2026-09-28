@@ -70,6 +70,7 @@ export interface SharedProps {
         };
         admin: boolean;
         adminReadOnly?: boolean;
+        adminRole?: null | { role: string; label: string; name: string; can: { manage: boolean; own: boolean }; twoFactor: boolean };
     };
     site: {
         name: string;
@@ -89,9 +90,10 @@ export interface SharedProps {
         catalog_intro: string | null;
         max_seats: number;
         hold_minutes: number;
+        push_key?: string | null;
     };
     locale: 'en' | 'ur';
-    counts: { cart: number; wishlist: number };
+    counts: { cart: number; wishlist: number; holdExpiresAt?: string | null };
     navMovies: NavMovie[];
     footer: {
         genres: { name: string; slug: string }[];

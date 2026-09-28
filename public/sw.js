@@ -9,7 +9,7 @@
  * - Any other page offline: /offline.html, which lists the saved tickets.
  * Saved tickets are wiped when the customer signs out (see lib/offline.ts).
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `bmm-shell-${VERSION}`;
 const ASSETS = 'bmm-assets';
 const TICKETS = 'bmm-tickets';
@@ -115,4 +115,31 @@ self.addEventListener('message', (event) => {
             }
         })());
     }
+});
+
+// Web push: "a film on your watchlist is open", "seats opened on your waitlist".
+self.addEventListener('push', (event) => {
+    let data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (error) { data = { title: 'BookMyMovie', body: event.data ? event.data.text() : '' }; }
+    const url = typeof data.url === 'string' && data.url.startsWith(self.location.origin) ? data.url : self.location.origin + '/';
+    event.waitUntil(self.registration.showNotification(data.title || 'BookMyMovie', {
+        body: data.body || '',
+        icon: data.icon || '/images/favicon/android-chrome-192x192.png',
+        badge: '/images/favicon/android-chrome-192x192.png',
+        tag: data.tag || undefined,
+        renotify: Boolean(data.tag),
+        data: { url },
+    }));
+});
+
+// Focus an open tab on the target page, or open one.
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const target = (event.notification.data && event.notification.data.url) || '/';
+    event.waitUntil((async () => {
+        for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) {
+            if (client.url === target && 'focus' in client) return client.focus();
+        }
+        return self.clients.openWindow(target);
+    })());
 });

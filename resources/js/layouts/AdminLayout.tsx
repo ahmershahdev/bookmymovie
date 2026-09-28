@@ -9,13 +9,16 @@ import { Meta } from '@/layouts/SiteLayout';
 import { cn, route, useShared } from '@/lib/utils';
 
 export const ADMIN_NAV = [
-    { label: 'Overview', icon: 'grid', route: 'admin.dashboard', match: '/admin/dashboard' },
-    { label: 'Movies & shows', icon: 'film', route: 'admin.dashboard', hash: '#movies', match: '/admin/dashboard/movies' },
-    { label: 'Coupons, stock & sales', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce' },
-    { label: 'Members & bans', icon: 'user', route: 'admin.users', match: '/admin/users' },
-    { label: 'Reviews', icon: 'star', route: 'admin.reviews', match: '/admin/reviews' },
-    { label: 'Bookings & refunds', icon: 'ticket', route: 'admin.activity', match: '/admin/activity' },
-    { label: 'Site & brand', icon: 'settings', route: 'admin.settings', match: '/admin/settings' },
+    { label: 'Overview', icon: 'grid', route: 'admin.dashboard', match: '/admin/dashboard', need: 'view' },
+    { label: 'Revenue & occupancy', icon: 'chart', route: 'admin.analytics', match: '/admin/analytics', need: 'view' },
+    { label: 'Movies & shows', icon: 'film', route: 'admin.dashboard', hash: '#movies', match: '/admin/dashboard/movies', need: 'manage' },
+    { label: 'Coupons, stock & sales', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce', need: 'manage' },
+    { label: 'Members & bans', icon: 'user', route: 'admin.users', match: '/admin/users', need: 'view' },
+    { label: 'Reviews', icon: 'star', route: 'admin.reviews', match: '/admin/reviews', need: 'view' },
+    { label: 'Bookings & refunds', icon: 'ticket', route: 'admin.activity', match: '/admin/activity', need: 'view' },
+    { label: 'Staff & roles', icon: 'shield', route: 'admin.staff', match: '/admin/staff', need: 'own' },
+    { label: 'Site & brand', icon: 'settings', route: 'admin.settings', match: '/admin/settings', need: 'own' },
+    { label: 'My security', icon: 'lock', route: 'admin.security', match: '/admin/security', need: 'view' },
 ] as const;
 
 /** Read-only notice for the public demo admin. */
@@ -32,8 +35,10 @@ export function DemoBanner() {
 
 export function AdminSidebar({ children }: { children?: ReactNode }) {
     const { url } = usePage();
-    const { site } = useShared();
+    const { site, auth } = useShared();
     const path = url.split('?')[0].split('#')[0];
+    const role = auth.adminRole;
+    const visible = ADMIN_NAV.filter((item) => item.need === 'view' || (role ? role.can[item.need] : true));
 
     return (
         <aside className="z-20 flex flex-col border-b border-line bg-ink-2 p-4 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:p-5">
@@ -45,8 +50,17 @@ export function AdminSidebar({ children }: { children?: ReactNode }) {
                 <Link href={route('admin.logout')} method="post" as="button" className="btn btn-ghost btn-sm lg:hidden">Logout</Link>
             </div>
             {children}
+            {role && (
+                <div className="mt-4 hidden items-center justify-between gap-2 border border-line px-3 py-2 lg:flex">
+                    <span className="min-w-0"><span className="block truncate text-xs font-semibold">{role.name}</span><span className="label text-accent">{role.label}</span></span>
+                    <Link href={route('admin.security')} title={role.twoFactor ? 'Two-step sign-in is on' : 'Turn on two-step sign-in'}
+                        className={cn('grid h-7 w-7 place-items-center border', role.twoFactor ? 'border-mint/50 text-mint' : 'border-signal/50 text-signal')}>
+                        <Icon name={role.twoFactor ? 'shield' : 'alert'} size={13} />
+                    </Link>
+                </div>
+            )}
             <nav className="no-scrollbar mt-5 flex gap-1 overflow-x-auto lg:flex-1 lg:flex-col lg:overflow-y-auto" data-lenis-prevent aria-label="Admin">
-                {ADMIN_NAV.map((item) => {
+                {visible.map((item) => {
                     const active = item.match === '/admin/dashboard' ? path === '/admin/dashboard' : path.startsWith(item.match);
                     return (
                         <Link key={item.label} href={route(item.route) + ('hash' in item ? item.hash : '')} aria-current={active ? 'page' : undefined}

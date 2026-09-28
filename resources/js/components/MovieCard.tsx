@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
+import Tilt from '@/components/Tilt';
 import { useCompare } from '@/lib/compare';
 import { useT } from '@/lib/i18n';
 import { cn, money, pad, route } from '@/lib/utils';
@@ -16,6 +17,7 @@ export default function MovieCard({ movie, eager = false, index, className }: { 
 
     return (
         <article className={cn('group relative flex flex-col', className)}>
+            <Tilt max={8} scale={1.015}>
             <Link href={href} prefetch className="relative block overflow-hidden" aria-label={`${movie.title}: ${movie.genre}, ${movie.duration}`}>
                 <div className="transition-transform duration-[900ms] ease-[var(--ease-out-expo)] group-hover:scale-[1.04]">
                     <Poster movie={movie} eager={eager} meta={false} />
@@ -34,6 +36,7 @@ export default function MovieCard({ movie, eager = false, index, className }: { 
                     )}
                 </div>
             </Link>
+            </Tilt>
 
             <button type="button" onClick={() => compare.toggle(movie)} aria-pressed={inCompare} aria-label={`${inCompare ? 'Remove' : 'Add'} ${movie.title} ${inCompare ? 'from' : 'to'} compare`}
                 className={cn('absolute right-3 top-12 z-10 grid h-9 w-9 place-items-center border bg-ink/80 backdrop-blur transition',

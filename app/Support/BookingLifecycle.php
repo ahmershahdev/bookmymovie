@@ -76,6 +76,12 @@ class BookingLifecycle
             ? ['status' => 'refunded', 'refunded_at' => now(), 'refund_reason' => Str::limit($reason, 250, '')]
             : ['status' => 'failed', 'notes' => 'Booking cancelled before payment.']);
 
+        // Unpaid shares close; paid ones stay on record for the refund.
+        \App\Models\BookingSplit::query()->where('booking_id', $booking->id)->where('status', 'pending')->update(['status' => 'cancelled', 'updated_at' => now()]);
+
+        // Released seats go to whoever is waiting for this show.
+        \App\Jobs\ProcessShowWaitlist::dispatch((int) $booking->show_id)->afterCommit();
+
         BookingEvent::create([
             'booking_id' => $booking->id,
             'event' => $refund ? 'refunded' : 'cancelled',

@@ -2,6 +2,7 @@ import { Head, usePage } from '@inertiajs/react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { ReactNode } from 'react';
 import Assistant from '@/components/shell/Assistant';
+import ReelTransition from '@/components/shell/ReelTransition';
 import CompareTray from '@/components/shell/CompareTray';
 import Footer from '@/components/shell/Footer';
 import Navbar from '@/components/shell/Navbar';
@@ -51,6 +52,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
             </div>
             <Toaster />
             <ScrollIndicator />
+            <ReelTransition />
         </>
     );
 }

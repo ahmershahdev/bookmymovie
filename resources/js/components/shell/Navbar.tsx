@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
 import ThemeToggle from '@/components/ThemeToggle';
+import { useCountdown } from '@/components/ui';
 import { useLocale, useT } from '@/lib/i18n';
 import { lockScroll } from '@/lib/scroll';
 import { cn, pad, route, useShared } from '@/lib/utils';
@@ -165,9 +166,11 @@ export default function Navbar() {
                         <Link href={route('user.wishlist')} className="btn btn-ghost btn-icon relative hidden sm:inline-flex" aria-label={`Watchlist${counts.wishlist ? `, ${counts.wishlist} films` : ''}`}>
                             <Icon name="heart" size={18} />{badge(counts.wishlist)}
                         </Link>
-                        <Link href={route('user.cart')} className="btn btn-ghost btn-icon relative" aria-label={`Cart${counts.cart ? `, ${counts.cart} seats held` : ''}`}>
-                            <Icon name="bag" size={18} />{badge(counts.cart)}
-                        </Link>
+                        {counts.holdExpiresAt ? <HoldTimer expiresAt={counts.holdExpiresAt} seats={counts.cart} /> : (
+                            <Link href={route('user.cart')} className="btn btn-ghost btn-icon relative" aria-label={`Cart${counts.cart ? `, ${counts.cart} seats held` : ''}`}>
+                                <Icon name="bag" size={18} />{badge(counts.cart)}
+                            </Link>
+                        )}
 
                         {auth.user ? (
                             <AccountMenu open={accountOpen} setOpen={setAccountOpen} />
@@ -495,5 +498,30 @@ function CommandPalette({ open, onClose, movies }: { open: boolean; onClose: () 
                 </>
             )}
         </AnimatePresence>
+    );
+}
+
+/**
+ * While seats are held, the cart button becomes a live countdown with a
+ * draining ring. It turns red for the last two minutes and reloads the
+ * shared data when the hold runs out, so the badge never lies.
+ */
+function HoldTimer({ expiresAt, seats }: { expiresAt: string; seats: number }) {
+    const holdSeconds = useShared().site.hold_minutes * 60;
+    const { remaining, label, urgent } = useCountdown(expiresAt, () => router.reload({ only: ['counts'] }));
+    const progress = Math.max(0, Math.min(1, remaining / Math.max(1, holdSeconds)));
+
+    return (
+        <Link href={route('user.cart')} aria-label={`${seats} ${seats === 1 ? 'seat' : 'seats'} held, ${label} left. Open cart`}
+            className={cn('relative flex h-11 items-center gap-2 border px-2.5 text-xs font-semibold transition', urgent ? 'border-signal text-signal' : 'border-volt/60 text-paper hover:border-volt')}>
+            <svg viewBox="0 0 20 20" width="20" height="20" className="-rotate-90" aria-hidden="true">
+                <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeOpacity=".2" strokeWidth="2.5" />
+                <circle cx="10" cy="10" r="8" fill="none" stroke={urgent ? 'var(--color-signal)' : 'var(--color-accent)'} strokeWidth="2.5"
+                    strokeDasharray={2 * Math.PI * 8} strokeDashoffset={2 * Math.PI * 8 * (1 - progress)} style={{ transition: 'stroke-dashoffset 1s linear' }} />
+            </svg>
+            <span className="num tabular-nums">{label}</span>
+            <span className="hidden text-mute lg:inline">· {seats} {seats === 1 ? 'seat' : 'seats'}</span>
+            {urgent && <span className="absolute -right-1 -top-1 h-2 w-2 animate-ping bg-signal" aria-hidden="true" />}
+        </Link>
     );
 }

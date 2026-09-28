@@ -189,6 +189,18 @@ class AccountController extends Controller
                     'google' => WalletPass::googleEnabled() ? route('tickets.wallet.google', $booking->booking_number) : null,
                 ],
                 'cancel_until' => $startsAt?->copy()->subMinutes((int) config('bookmymovie.booking.cancellation_cutoff_minutes', 120))->format('D j M, g:i A'),
+                'admitted' => $booking->events->contains('event', 'admitted'),
+                'split' => [
+                    'allowed' => \App\Support\SplitPayments::splittable($booking),
+                    'card' => \App\Support\SplitPayments::cardEnabled(),
+                    'max' => min(\App\Support\SplitPayments::MAX_PEOPLE, max(2, (int) $booking->seat_count)),
+                    'shares' => \App\Models\BookingSplit::query()->where('booking_id', $booking->id)->orderByDesc('is_host')->orderBy('id')->get()
+                        ->map(fn ($share) => [
+                            'id' => $share->id, 'label' => $share->label, 'amount' => (float) $share->amount, 'status' => $share->status,
+                            'host' => (bool) $share->is_host, 'payer' => $share->payer_name, 'url' => route('split.show', $share->getRawOriginal('token')),
+                            'method' => $share->payment_method,
+                        ])->values(),
+                ],
             ],
         ], ['title' => 'E-ticket '.$booking->booking_number, 'description' => 'Your BookMyMovie e-ticket.'], [
             ['label' => 'Home', 'url' => route('home')],
@@ -335,6 +347,9 @@ class AccountController extends Controller
             'seats' => ['required', 'array', 'min:1', 'max:'.$maxSeats],
             'seats.*' => ['integer', 'distinct'],
             'ticket_type' => ['nullable', Rule::in(['adult', 'kid'])],
+            // Per-seat types, so one booking can mix adult and child tickets.
+            'ticket_types' => ['nullable', 'array', 'max:'.$maxSeats],
+            'ticket_types.*' => [Rule::in(['adult', 'kid'])],
         ], [
             'seats.required' => 'Select at least one seat on the map.',
             'seats.max' => 'You can hold up to '.$maxSeats.' seats per booking.',
@@ -342,11 +357,12 @@ class AccountController extends Controller
 
         $seatIds = array_values(array_unique(array_map('intval', $data['seats'])));
         $ticketType = $data['ticket_type'] ?? 'adult';
+        $types = collect($data['ticket_types'] ?? [])->mapWithKeys(fn ($type, $seat) => [(int) $seat => $type])->all();
 
         $this->clearExpiredCarts();
 
         try {
-            DB::transaction(function () use ($seatIds, $data, $ticketType, $maxSeats) {
+            DB::transaction(function () use ($seatIds, $data, $ticketType, $types, $maxSeats) {
                 // Serialises this user's cart operations (double clicks, two tabs).
                 User::query()->whereKey(Auth::id())->lockForUpdate()->firstOrFail();
 
@@ -405,9 +421,9 @@ class AccountController extends Controller
                     ->whereHas('cart', fn ($query) => $query->where('expires_at', '<=', now()))
                     ->delete();
 
-                CartItem::insert(array_map(function (int $seatId) use ($available, $cart, $show, $ticketType) {
+                CartItem::insert(array_map(function (int $seatId) use ($available, $cart, $show, $ticketType, $types) {
                     $seat = $available[$seatId];
-                    [$type, $price] = $this->seatPrice($seat, $ticketType);
+                    [$type, $price] = $this->seatPrice($seat, $types[$seatId] ?? $ticketType);
 
                     return [
                         'cart_id' => $cart->id,
@@ -437,6 +453,30 @@ class AccountController extends Controller
         }
 
         return redirect()->route('user.cart')->with('status', count($seatIds).' '.Str::plural('seat', count($seatIds)).' held for '.$this->holdMinutes().' minutes.');
+    }
+
+    /** Switches one held seat between an adult and a child ticket, repricing it. */
+    public function updateCartItem(Request $request, CartItem $item): RedirectResponse
+    {
+        $data = $request->validate(['ticket_type' => ['required', Rule::in(['adult', 'kid'])]]);
+
+        DB::transaction(function () use ($item, $data) {
+            $cart = Cart::query()->where('user_id', Auth::id())->where('expires_at', '>', now())->lockForUpdate()->first();
+            abort_unless($cart && $item->cart_id === $cart->id, 404);
+
+            $seat = DB::table('v_seat_availability')->where('show_id', $item->show_id)->where('seat_id', $item->seat_id)->first();
+            abort_unless($seat, 404);
+            [$type, $price] = $this->seatPrice($seat, $data['ticket_type']);
+            $item->forceFill(['ticket_type' => $type, 'price' => $price])->save();
+        });
+
+        return back()->with('status', 'Ticket updated.');
+    }
+
+    private function childPriceExists(CartItem $item): bool
+    {
+        return DB::table('v_seat_availability')->where('show_id', $item->show_id)->where('seat_id', $item->seat_id)
+            ->where(fn ($query) => $query->whereNotNull('kids_price')->orWhereNotNull('kids_sale_price'))->exists();
     }
 
     public function removeCartItem(CartItem $item): RedirectResponse
@@ -552,6 +592,11 @@ class AccountController extends Controller
 
                 if (! $this->isOnSale($show)) {
                     throw new \RuntimeException('show-unavailable');
+                }
+
+                // Children must be accompanied: at least one adult ticket per booking.
+                if ($items->where('ticket_type', 'adult')->isEmpty()) {
+                    throw new \RuntimeException('child-alone');
                 }
 
                 $taken = BookingSeat::query()
@@ -747,6 +792,7 @@ class AccountController extends Controller
                 'gift-card-invalid' => 'That gift card is not valid, has expired or has no balance left.',
                 'points-changed' => 'Your points balance changed while you were checking out. Please try again.',
                 'addon-sold-out' => 'One of your snacks just sold out. Please adjust your order.',
+                'child-alone' => 'Children must be accompanied: add at least one adult ticket to this booking.',
                 'sales-paused' => 'Bookings for this film are paused right now. Please try again later.',
                 'busy' => 'It is very busy right now and your seats could not be confirmed in time. Nothing was charged; please try again.',
                 default => 'One or more of your seats was just booked by someone else. Please choose again.',
@@ -938,6 +984,8 @@ class AccountController extends Controller
                 'id' => $item->id,
                 'seat' => $item->seat->row_label.$item->seat->seat_number,
                 'type' => $item->ticket_type === 'kid' ? 'Child' : 'Adult',
+                'ticket_type' => $item->ticket_type,
+                'child_allowed' => $this->childPriceExists($item),
                 'tier' => $tiers[$item->category->name] ?? $item->category->name,
                 'price' => (float) $item->price,
             ])->values(),

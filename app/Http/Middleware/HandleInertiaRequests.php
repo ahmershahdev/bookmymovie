@@ -42,6 +42,15 @@ class HandleInertiaRequests extends Middleware
                 'admin' => (bool) ($request->hasSession() && $request->session()->has('admin_id')),
                 'adminReadOnly' => fn () => $request->hasSession() && $request->session()->has('admin_id')
                     && (bool) \App\Models\Admin::query()->find($request->session()->get('admin_id'))?->isReadOnly(),
+                // Role and abilities drive which admin menu items are shown.
+                'adminRole' => fn () => ($admin = $request->hasSession() && $request->session()->has('admin_id')
+                    ? \App\Models\Admin::query()->find($request->session()->get('admin_id')) : null) ? [
+                        'role' => $admin->role,
+                        'label' => $admin->roleLabel(),
+                        'name' => $admin->name,
+                        'can' => ['manage' => $admin->allows('manage'), 'own' => $admin->allows('own')],
+                        'twoFactor' => $admin->hasTwoFactor(),
+                    ] : null,
             ],
             'locale' => app()->getLocale(),
             'site' => fn () => $this->site(),
@@ -92,6 +101,8 @@ class HandleInertiaRequests extends Middleware
             'catalog_intro' => $settings['catalog_intro'] ?? null,
             'max_seats' => (int) config('bookmymovie.booking.max_seats_per_booking', 4),
             'hold_minutes' => (int) config('bookmymovie.booking.cart_hold_minutes', 10),
+            // Public VAPID key; null when web push is not configured.
+            'push_key' => config('services.webpush.public_key') ?: null,
             'payments' => array_column(PaymentGateway::available(), 'label'),
         ];
     }

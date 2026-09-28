@@ -15,7 +15,7 @@ class ProfileController extends Controller
         $user = User::query()->where('username', strtolower($username))->where('is_blocked', false)->firstOrFail();
 
         $reviews = Review::query()
-            ->with(['movie:id,title,slug,poster_image', 'booking:id,show_id', 'booking.show:id,screen_id,show_date', 'booking.show.screen:id,theater_id,format', 'booking.show.screen.theater:id,name'])
+            ->with(['photos', 'movie:id,title,slug,poster_image', 'booking:id,show_id', 'booking.show:id,screen_id,show_date', 'booking.show.screen:id,theater_id,format', 'booking.show.screen.theater:id,name'])
             ->where('user_id', $user->id)
             ->where('is_approved', true)
             ->latest()

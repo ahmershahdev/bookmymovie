@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminCommerceController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminOperationsController;
 use App\Http\Controllers\AdminPortalController;
+use App\Http\Controllers\AdminStaffController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CinemaController;
 use App\Http\Controllers\HomeController;
@@ -102,7 +103,18 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
 | Admin
 */
 
-Route::prefix('admin')->middleware(\App\Http\Middleware\BlockDemoAdminWrites::class)->group(function () {
+Route::prefix('admin')->middleware([\App\Http\Middleware\BlockDemoAdminWrites::class, \App\Http\Middleware\AuthorizeAdminRole::class])->group(function () {
+    Route::get('/login/code', [AdminStaffController::class, 'challenge'])->name('admin.two-factor');
+    Route::post('/login/code', [AdminStaffController::class, 'verify'])->name('admin.two-factor.verify')->middleware('throttle:admin-login');
+    Route::get('/analytics', [\App\Http\Controllers\AdminAnalyticsController::class, 'index'])->name('admin.analytics');
+    Route::get('/staff', [AdminStaffController::class, 'index'])->name('admin.staff');
+    Route::post('/staff', [AdminStaffController::class, 'store'])->name('admin.staff.store')->middleware('throttle:20,1');
+    Route::put('/staff/{staff}', [AdminStaffController::class, 'update'])->whereNumber('staff')->name('admin.staff.update')->middleware('throttle:30,1');
+    Route::post('/staff/{staff}/reset-2fa', [AdminStaffController::class, 'resetTwoFactor'])->whereNumber('staff')->name('admin.staff.reset-2fa')->middleware('throttle:10,1');
+    Route::get('/security', [AdminStaffController::class, 'security'])->name('admin.security');
+    Route::post('/security/2fa', [AdminStaffController::class, 'beginSetup'])->name('admin.security.begin')->middleware('throttle:10,1');
+    Route::post('/security/2fa/confirm', [AdminStaffController::class, 'confirmSetup'])->name('admin.security.confirm')->middleware('throttle:10,1');
+    Route::delete('/security/2fa', [AdminStaffController::class, 'disable'])->name('admin.security.disable')->middleware('throttle:10,1');
     Route::get('/login', [AuthController::class, 'showAdminLogin'])->name('admin.login');
     Route::post('/login', [AuthController::class, 'adminLogin'])->middleware('throttle:admin-login');
     Route::get('/forgot-credentials', [AuthController::class, 'showAdminForgotCredentials'])->name('admin.credentials.request');
@@ -154,6 +166,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/account/bookings/{number}/track', [AccountController::class, 'tracking'])->name('user.tracking');
     Route::get('/account/bookings/{number}/wallet/apple', [TicketController::class, 'apple'])->name('tickets.wallet.apple')->middleware('throttle:profile-updates');
     Route::get('/account/bookings/{number}/wallet/google', [TicketController::class, 'google'])->name('tickets.wallet.google')->middleware('throttle:profile-updates');
+    Route::post('/account/bookings/{number}/split', [\App\Http\Controllers\SplitController::class, 'store'])->name('user.booking.split')->middleware('throttle:booking-changes');
+    Route::delete('/account/bookings/{number}/split', [\App\Http\Controllers\SplitController::class, 'destroy'])->name('user.booking.split.destroy')->middleware('throttle:booking-changes');
     Route::post('/account/bookings/{number}/cancel', [AccountController::class, 'cancelBooking'])->name('user.booking.cancel')->middleware('throttle:booking-changes');
     Route::get('/account/wishlist', [AccountController::class, 'wishlist'])->name('user.wishlist');
     Route::post('/account/wishlist', [AccountController::class, 'addWishlist'])->middleware('throttle:wishlist-actions');
@@ -164,15 +178,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/cart', [AccountController::class, 'cart'])->name('user.cart');
     Route::post('/cart', [AccountController::class, 'addToCart'])->middleware('throttle:cart-actions');
     Route::delete('/cart', [AccountController::class, 'clearCart'])->name('user.cart.clear')->middleware('throttle:cart-actions');
+    Route::patch('/cart/{item}', [AccountController::class, 'updateCartItem'])->name('user.cart.item')->middleware('throttle:cart-actions');
     Route::delete('/cart/{item}', [AccountController::class, 'removeCartItem'])->name('user.cart.remove')->middleware('throttle:cart-actions');
     Route::get('/checkout', [AccountController::class, 'checkout'])->name('user.checkout');
     Route::post('/checkout', [AccountController::class, 'placeBooking'])->middleware('throttle:checkout-actions');
 
     Route::get('/payments/{number}/pay', [PaymentController::class, 'start'])->name('payments.start')->middleware('throttle:checkout-actions');
 
+    Route::post('/push/subscribe', [\App\Http\Controllers\EngagementController::class, 'subscribe'])->name('push.subscribe')->middleware('throttle:20,1');
+    Route::delete('/push/subscribe', [\App\Http\Controllers\EngagementController::class, 'unsubscribe'])->name('push.unsubscribe')->middleware('throttle:20,1');
+    Route::post('/shows/{show}/waitlist', [\App\Http\Controllers\EngagementController::class, 'joinWaitlist'])->whereNumber('show')->name('waitlist.join')->middleware('throttle:20,1');
+    Route::delete('/shows/{show}/waitlist', [\App\Http\Controllers\EngagementController::class, 'leaveWaitlist'])->whereNumber('show')->name('waitlist.leave')->middleware('throttle:20,1');
+
     Route::post('/movies/{slug}/reviews', [MovieController::class, 'storeReview'])->name('movies.reviews.store')->middleware('throttle:profile-updates');
     Route::post('/reviews/{review}/helpful', [MovieController::class, 'voteReview'])->whereNumber('review')->name('reviews.helpful')->middleware('throttle:30,1');
 });
+
+// Split-the-bill shares: private links, no account needed to pay a share.
+Route::get('/split/{token}', [\App\Http\Controllers\SplitController::class, 'show'])->where('token', '[A-Za-z0-9]{40}')->name('split.show')->middleware('throttle:60,1');
+Route::post('/split/{token}/pay', [\App\Http\Controllers\SplitController::class, 'pay'])->where('token', '[A-Za-z0-9]{40}')->name('split.pay')->middleware('throttle:10,1');
+Route::get('/split/{token}/return', [\App\Http\Controllers\SplitController::class, 'back'])->where('token', '[A-Za-z0-9]{40}')->name('split.return')->middleware('throttle:30,1');
 
 // Reached by the payment providers; verified by signature or API lookup, not by session.
 Route::post('/payments/jazzcash/callback', [PaymentController::class, 'jazzcash'])->name('payments.jazzcash.callback')->middleware('throttle:60,1');

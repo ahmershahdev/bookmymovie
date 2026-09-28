@@ -2,6 +2,7 @@ import { Link, router } from '@inertiajs/react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useRef, useState } from 'react';
 import Icon from '@/components/Icon';
+import MarqueeSign from '@/components/MarqueeSign';
 import MovieCard from '@/components/MovieCard';
 import { Reveal, SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
@@ -143,6 +144,11 @@ export default function MovieShow(props: Props) {
                         </motion.div>
                     </div>
                 </div>
+            </section>
+
+            {/* The cinema marquee: the title in light bulbs. */}
+            <section className="shell pb-16 pt-6" aria-label="Marquee">
+                <MarqueeSign title={movie.title} eyebrow={movie.status_key === 'coming_soon' ? 'Coming soon' : movie.status_key === 'ended' ? 'Thanks for watching' : 'Now playing'} />
             </section>
 
             {/* Section nav ----------------------------------------------------------- */}

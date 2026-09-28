@@ -29,17 +29,26 @@ Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptec
 | | |
 | --- | --- |
 | **Films and trailers** | 4:3 card art on every listing, a 16:9 hero, and 10-second trailers that play silently behind the home carousel and film pages. Films with two cuts list both, labelled, side by side. |
-| **Seats** | Row-tier pricing, a live seat map, a Three.js model of the hall, and **"best 2 (or 4) together"** recommendations that favour centred seats about two thirds of the way back. Seats are held for 10 minutes. |
+| **Seats** | Row-tier pricing, a live seat map, **adult and child tickets in one booking**, and **"best 2 (or 4) together"** recommendations. Seats are held for 10 minutes, with a live countdown in the navbar. |
+| **See it from your seat** | A Three.js model of the hall: sit in any seat, watch the trailer play on the screen as the house lights dim, get a view score (distance, how much of your view the screen fills, off-centre angle, neck tilt) and hop to the seat next door, one row closer or further back. |
+| **Sold out?** | Join a first-come **waitlist**; you are told the moment seats come back (a cancellation or an expired hold). |
+| **Group bookings** | **Split the bill** into equal shares; each friend gets a private link and pays by card online or at the counter. The booking is paid when every share is. |
+| **Alerts** | In-app notifications and optional **web push**: a watchlisted film opening for booking, seats opening on your waitlist. |
 | **Checkout** | Food and drink add-ons, coupons, **gift cards** and **loyalty points** in one step. Cash at the counter, or JazzCash / Easypaisa / card once gateway keys are set. |
 | **E-tickets** | A signed **QR code** on every ticket, **Apple Wallet** and **Google Wallet** passes (when credentials are configured), and **offline access** via a service worker (installable PWA). |
-| **Account** | Bookings, tracking, watchlist, profile photo, points history, and optional **two-step sign-in** with an emailed 6-digit code. |
+| **Account** | Bookings, tracking, watchlist, profile photo, points history, **review photos** (re-encoded, location data removed), and optional **two-step sign-in** with an emailed 6-digit code. |
+| **Look and feel** | A scroll-driven intro that flies down a projector beam into a wall of posters, posters that tilt and catch the light, a WebGL film-reel page transition, a light-bulb marquee spelling each film's title, and an e-ticket whose stub tears off when you are scanned in. |
 | **Urdu** | A full English/Urdu switch with right-to-left layout and Noto Naskh Arabic. Film titles, prices and booking numbers stay in Latin script so they match the ticket. |
 
 ### For the box office
 
 | | |
 | --- | --- |
-| **Dashboard** | Movies, media, hero carousel, shows, seat pricing, coupons, users, reviews, SEO and site settings. |
+| **Dashboard** | Movies, media, hero carousel, shows, seat pricing, users, reviews, SEO and site settings. |
+| **Revenue & occupancy** | Revenue per day, tickets, average ticket and seats filled by film and cinema over 7, 30 or 90 days, with a table view. |
+| **Coupons, stock & sales** | Coupons with hard use limits, snack stock with low-stock warnings, and a per-film switch for ticket sales. |
+| **Staff & roles** | Owner, Manager and Box office roles, enforced for every admin route; **two-step sign-in with an authenticator app** and recovery codes. |
+| **Bans** | Banning a member also blocks every IP and browser they used; accounts sharing a browser are flagged. |
 | **Audit log** | Every data-changing action by admins and customers, searchable, with the before/after changes. |
 | **Refunds** | Cancel a confirmed booking in one step: seats, coupon use, gift card balance and points all return, and the customer is emailed. |
 | **Gift cards** | Issue cards with a balance, expiry and message, emailed to the recipient; switch them off at any time. |
@@ -111,6 +120,9 @@ Everything below is off until its keys are set; the site works without them.
 | Google Wallet | `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_KEY_FILE` |
 | Online payments | JazzCash, Easypaisa and card keys (see `config/payments.php`) |
 | Social sign-in | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` |
+| Web push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (generate with `php artisan push:keys`), `VAPID_SUBJECT` |
+
+The scheduler (`schedule:run` every minute) also clears expired seat holds and alerts show waitlists.
 
 ## Film artwork and trailers
 

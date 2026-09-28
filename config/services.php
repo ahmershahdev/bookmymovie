@@ -41,6 +41,16 @@ return [
     ],
 
     /*
+    | Web push (VAPID). Generate a pair with `php artisan push:keys`. Without
+    | keys, notifications still land in the account inbox; push is skipped.
+    */
+    'webpush' => [
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject' => env('VAPID_SUBJECT', 'mailto:support@ahmershah.dev'),
+    ],
+
+    /*
     | Without keys, local development falls back to Google's published test
     | pair (https://developers.google.com/recaptcha/docs/faq): the checkbox
     | renders on any host, always passes, and says it is for testing. Real

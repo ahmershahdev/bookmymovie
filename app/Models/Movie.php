@@ -70,12 +70,26 @@ class Movie extends Model
         static::saved($flush);
         static::deleted($flush);
         static::restored($flush);
+
+        // The first time a film is both "now showing" and on sale, tell its
+        // watchlist. The guarded UPDATE makes that happen exactly once.
+        static::saved(function (Movie $movie) {
+            if ($movie->status !== 'now_showing' || ! $movie->bookings_enabled || $movie->booking_opened_notified_at !== null) {
+                return;
+            }
+            $claimed = static::query()->whereKey($movie->id)->whereNull('booking_opened_notified_at')->update(['booking_opened_notified_at' => now()]);
+            if ($claimed === 1 && ($movie->wasChanged('status') || $movie->wasChanged('bookings_enabled'))) {
+                \App\Jobs\AnnounceBookingsOpen::dispatch($movie->id)->afterCommit();
+            }
+        });
     }
 
     protected function casts(): array
     {
         return [
             'trailers' => 'array',
+            'bookings_enabled' => 'boolean',
+            'booking_opened_notified_at' => 'datetime',
             'release_date' => 'date',
             'kids_discount_eligible' => 'boolean',
             'hero_carousel_enabled' => 'boolean',
