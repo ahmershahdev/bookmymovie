@@ -13,6 +13,7 @@ use App\Support\Seo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Response;
@@ -252,7 +253,7 @@ class PublicController extends Controller
         FormSecurity::validateRecaptcha($request, 'contact');
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[\pL\pM .\'-]+$/u'],
             'email' => ['required', 'email:rfc', 'max:150', FormSecurity::disposableEmailRule()],
             'topic' => ['required', Rule::in(array_keys(self::CONTACT_TOPICS))],
             'booking_number' => ['nullable', 'string', 'max:24', 'regex:/^BM-\d{4}-[A-Z0-9]{8}$/i'],
@@ -260,6 +261,13 @@ class PublicController extends Controller
         ], [
             'booking_number.regex' => 'Booking numbers look like BM-2026-8KQ2Z7TX.',
         ]);
+
+        // The same message sent twice (double submit, refresh, several tabs)
+        // is stored once. Cache::add is atomic, so racing copies cannot both pass.
+        $fingerprint = 'contact.dup.'.hash('sha256', strtolower($data['email']).'|'.preg_replace('/\s+/', ' ', trim($data['message'])));
+        if (! Cache::add($fingerprint, 1, now()->addMinutes(30))) {
+            return back()->with('status', 'Thanks, we already have that message and will reply by email.');
+        }
 
         ContactMessage::create([
             'name' => $data['name'],

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\BlockDemoAdminWrites;
+use App\Http\Middleware\EnforceBans;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\ShieldAgainstAbuse;
@@ -27,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ShieldAgainstAbuse::class,
         ], append: [
             SetLocale::class,
+            EnforceBans::class,
             HandleInertiaRequests::class,
             AddSecurityHeaders::class,
         ]);

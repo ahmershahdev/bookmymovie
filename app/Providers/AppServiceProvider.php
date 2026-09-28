@@ -76,6 +76,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('contact-form', fn (Request $request) => [
             Limit::perMinute(3)->by('contact:'.$byUserOrIp($request)),
             Limit::perDay(20)->by('contact-day:'.$request->ip()),
+            // Site-wide ceiling: a botnet on thousands of IPs still cannot
+            // bury the support inbox; real people get a "try again" page.
+            Limit::perMinute((int) env('CONTACT_GLOBAL_PER_MINUTE', 300))->by('contact-global'),
         ]);
     }
 

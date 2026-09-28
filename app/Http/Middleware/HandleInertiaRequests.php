@@ -34,11 +34,14 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'first_name' => Str::before($user->name, ' ') ?: $user->name,
+                    'username' => $user->username,
                     'email' => $user->email,
                     'avatar' => $user->profile_picture ? asset('storage/'.$user->profile_picture) : null,
                     'verified' => (bool) $user->email_verified_at,
                 ] : null,
                 'admin' => (bool) ($request->hasSession() && $request->session()->has('admin_id')),
+                'adminReadOnly' => fn () => $request->hasSession() && $request->session()->has('admin_id')
+                    && (bool) \App\Models\Admin::query()->find($request->session()->get('admin_id'))?->isReadOnly(),
             ],
             'locale' => app()->getLocale(),
             'site' => fn () => $this->site(),
@@ -64,10 +67,21 @@ class HandleInertiaRequests extends Middleware
     {
         $settings = LayoutData::settings();
 
+        $brand = fn (string $key) => filled($settings[$key] ?? null) ? $settings[$key] : \App\Models\SiteSetting::BRAND_DEFAULTS[$key];
+        $logo = $brand('logo_path');
+
         return [
-            'name' => $settings['site_name'] ?? 'BookMyMovie',
-            'support_email' => $settings['support_email'] ?? 'support@ahmershah.dev',
-            'support_phone' => $settings['support_phone'] ?? '+92 370 4831994',
+            'name' => $brand('site_name'),
+            'tagline' => $brand('site_tagline'),
+            'logo_url' => $logo ? asset(str_starts_with($logo, 'images/') ? $logo : 'storage/'.$logo) : asset('images/logo-sm.webp'),
+            'support_email' => $brand('support_email'),
+            'support_phone' => $brand('support_phone'),
+            'contact_address' => $brand('contact_address'),
+            'socials' => collect(['website' => 'Website', 'github' => 'GitHub', 'linkedin' => 'LinkedIn', 'instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X', 'youtube' => 'YouTube'])
+                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label, 'url' => $brand('social_'.$key)])
+                ->filter(fn (array $social) => filled($social['url']))
+                ->values()
+                ->all(),
             'footer_description' => $settings['footer_description'] ?? 'An independent, open-source cinema booking platform for Pakistan.',
             'copyright_note' => $settings['copyright_note'] ?? 'By Syed Ahmer Shah · MIT licence',
             'response_sla' => $settings['response_sla'] ?? 'Within one working day',

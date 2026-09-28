@@ -59,7 +59,10 @@ LimitRequestBody 8388608
     ExpiresByType font/woff2 "access plus 1 year"
     ExpiresByType image/png "access plus 1 week"
     ExpiresByType image/jpeg "access plus 1 week"
-    ExpiresByType image/webp "access plus 1 week"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType image/avif "access plus 30 days"
+    ExpiresByType video/mp4 "access plus 30 days"
+    ExpiresByType video/webm "access plus 30 days"
     ExpiresByType image/svg+xml "access plus 1 week"
     ExpiresByType image/x-icon "access plus 1 month"
     ExpiresByType application/xml "access plus 1 hour"
@@ -78,6 +81,12 @@ LimitRequestBody 8388608
     </If>
     <If "%{REQUEST_URI} =~ m#^/storage/movie-media/#">
         Header set Cache-Control "public, max-age=2592000"
+    </If>
+
+    # Bundled film art and trailers: a month in the browser, a week of
+    # stale-while-revalidate so repeat visits never wait on the network.
+    <If "%{REQUEST_URI} =~ m#^/(images/movies|videos/trailers)/#">
+        Header set Cache-Control "public, max-age=2592000, stale-while-revalidate=604800"
     </If>
 
     # Compressed responses differ by encoding; tell shared caches.
@@ -110,5 +119,9 @@ AddDefaultCharset utf-8
 
 <IfModule mod_mime.c>
     AddType font/woff2 .woff2
+    AddType video/webm .webm
+    AddType video/mp4 .mp4
+    AddType image/webp .webp
+    AddType image/avif .avif
     AddType application/manifest+json .webmanifest
 </IfModule>

@@ -1,15 +1,15 @@
 import { Link } from '@inertiajs/react';
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Accordion from '@/components/Accordion';
 import Icon from '@/components/Icon';
 import MovieCard from '@/components/MovieCard';
 import { CountUp, Reveal, SplitHeading } from '@/components/motion';
-import Poster from '@/components/Poster';
+import Poster, { responsiveSrcSet } from '@/components/Poster';
 import { BackdropVideo, TrailerModal } from '@/components/Trailer';
 import { SectionHeading, StarRating } from '@/components/ui';
 import { useT } from '@/lib/i18n';
-import { cn, pad, route } from '@/lib/utils';
+import { cn, money, pad, route } from '@/lib/utils';
 import type { MovieCard as Movie } from '@/types';
 
 const PosterRing = lazy(() => import('@/three/PosterRing'));
@@ -21,7 +21,7 @@ interface Props {
     comingSoon: Movie[];
     topRated: Movie[];
     genres: { name: string; slug: string; count: number }[];
-    cinemas: { slug: string; name: string; city: string; screens: number; seats: number }[];
+    cinemas: { slug: string; name: string; city: string; screens: number; seats: number; address: string; amenities: string[] }[];
     offers: { code: string; description: string; value: string }[];
     reviews: { id: number; text: string; rating: number; author: string; movie: { title: string; slug: string } }[];
     faqs: { id: number; question: string; answer: string }[];
@@ -214,34 +214,149 @@ function Ticker({ messages }: { messages: string[] }) {
     );
 }
 
-/* Now showing --------------------------------------------------------------- */
+/* Now showing ---------------------------------------------------------------
+ * A 16:9 spotlight (its trailer plays on hover) with the next three films as
+ * wide thumbnails, then every film as a 4:3 card in a draggable rail that the
+ * genre chips filter in place. */
 
 function NowShowing({ movies, genres, stats }: { movies: Movie[]; genres: Props['genres']; stats: Props['stats'] }) {
+    const t = useT();
     const rail = useRef<HTMLDivElement>(null);
+    const [genre, setGenre] = useState<string | null>(null);
+    const [spot, setSpot] = useState(0);
+    const [progress, setProgress] = useState(0);
+    const filtered = useMemo(() => (genre ? movies.filter((movie) => movie.genres.includes(genre)) : movies), [movies, genre]);
+    const spotlight = filtered[spot] ?? filtered[0];
+    const upNext = filtered.filter((movie) => movie !== spotlight).slice(0, 3);
     const scrollBy = (direction: number) => rail.current?.scrollBy({ left: direction * rail.current.clientWidth * 0.8, behavior: 'smooth' });
+
+    useEffect(() => setSpot(0), [genre]);
+    useEffect(() => {
+        const node = rail.current;
+        if (!node) return;
+        const update = () => setProgress(node.scrollWidth > node.clientWidth ? node.scrollLeft / (node.scrollWidth - node.clientWidth) : 1);
+        update();
+        node.addEventListener('scroll', update, { passive: true });
+        return () => node.removeEventListener('scroll', update);
+    }, [filtered.length]);
 
     return (
         <section className="pt-28 sm:pt-40" aria-labelledby="now-showing">
-            <div className="shell flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
-                <SectionHeading index="01" label="In cinemas this week" title="Now showing" id="now-showing" accent={['showing']}
+            <div className="shell flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+                <SectionHeading index="01" label={t('In cinemas this week')} title={t('Now showing')} id="now-showing" accent={['showing']}
                     description={`${movies.length} films across ${stats.cinemas} cinemas and ${stats.screens} screens, with ${stats.shows_this_week.toLocaleString('en-PK')} showtimes over the next seven days.`} />
-                <div className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => scrollBy(-1)} className="btn btn-ghost btn-icon" aria-label="Scroll films left"><Icon name="arrow-left" size={16} /></button>
-                    <button type="button" onClick={() => scrollBy(1)} className="btn btn-ghost btn-icon" aria-label="Scroll films right"><Icon name="arrow-right" size={16} /></button>
+                <Link href={route('movies.index')} className="btn btn-ghost shrink-0">{t('All films')} <Icon name="arrow-right" size={16} className="arrow" /></Link>
+            </div>
+
+            <div className="shell mt-10 flex gap-2 overflow-x-auto pb-1 no-scrollbar" role="group" aria-label="Filter by genre">
+                <button type="button" onClick={() => setGenre(null)} aria-pressed={genre === null} className={cn('chip shrink-0', genre === null && '!border-accent !bg-volt !text-noir')}>
+                    {t('Everything')} <span className="num opacity-60">{movies.length}</span>
+                </button>
+                {genres.filter((item) => movies.some((movie) => movie.genres.includes(item.name))).slice(0, 9).map((item) => (
+                    <button key={item.slug} type="button" onClick={() => setGenre(genre === item.name ? null : item.name)} aria-pressed={genre === item.name}
+                        className={cn('chip shrink-0', genre === item.name && '!border-accent !bg-volt !text-noir')}>
+                        {item.name} <span className="num opacity-60">{movies.filter((movie) => movie.genres.includes(item.name)).length}</span>
+                    </button>
+                ))}
+            </div>
+
+            {spotlight && (
+                <div className="shell mt-8 grid gap-4 lg:grid-cols-12">
+                    <AnimatePresence mode="wait">
+                        <motion.div key={spotlight.slug} className="lg:col-span-8" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.5, ease }}>
+                            <Spotlight movie={spotlight} />
+                        </motion.div>
+                    </AnimatePresence>
+                    <ol className="grid gap-4 sm:grid-cols-3 lg:col-span-4 lg:grid-cols-1" aria-label={t('Up next')}>
+                        {upNext.map((movie) => (
+                            <li key={movie.slug}>
+                                <button type="button" onClick={() => setSpot(filtered.indexOf(movie))} className="group grid w-full grid-cols-[42%_1fr] items-center gap-4 text-left lg:grid-cols-[46%_1fr]">
+                                    <span className="relative block aspect-video overflow-hidden bg-ink-3">
+                                        {movie.hero_image_url && <img src={movie.hero_image_url} srcSet={responsiveSrcSet(movie.hero_image_url)} sizes="(min-width: 1024px) 33vw, 90vw" alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-700 ease-[var(--ease-out-expo)] group-hover:scale-105" />}
+                                        {movie.trailers.length > 0 && <span className="absolute bottom-2 start-2 grid h-7 w-7 place-items-center bg-volt text-noir"><Icon name="play" size={12} /></span>}
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="label block truncate">{movie.genre}</span>
+                                        <span className="headline mt-1 block text-xl leading-tight transition-colors group-hover:text-accent" dir="auto">{movie.title}</span>
+                                        <span className="num mt-1 block text-[11px] text-mute">{movie.duration} · {movie.reviews > 0 ? `★ ${Number(movie.rating).toFixed(1)}` : movie.certificate}</span>
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            )}
+
+            <div className="shell mt-16 flex items-center justify-between gap-4">
+                <p className="label">{genre ? `${genre} · ${filtered.length}` : t('Every film this week')}</p>
+                <div className="flex items-center gap-4">
+                    <span className="hidden h-[2px] w-40 overflow-hidden bg-line sm:block" aria-hidden="true"><span className="block h-full origin-left bg-volt transition-transform duration-200" style={{ transform: `scaleX(${Math.max(0.08, progress)})` }} /></span>
+                    <div className="flex gap-1">
+                        <button type="button" onClick={() => scrollBy(-1)} className="btn btn-ghost btn-icon" aria-label="Scroll films left"><Icon name="arrow-left" size={16} /></button>
+                        <button type="button" onClick={() => scrollBy(1)} className="btn btn-ghost btn-icon" aria-label="Scroll films right"><Icon name="arrow-right" size={16} /></button>
+                    </div>
                 </div>
             </div>
-
-            <div className="shell mt-8 flex flex-wrap gap-2">
-                {genres.slice(0, 7).map((genre) => (
-                    <Link key={genre.slug} href={route('movies.genre', genre.slug)} className="chip">{genre.name} <span className="num opacity-50">{genre.count}</span></Link>
-                ))}
-                <Link href={route('movies.index')} className="chip">All films <Icon name="arrow-right" size={12} /></Link>
-            </div>
-
-            <div ref={rail} className="rail mx-auto mt-12 max-w-[1520px] pb-2" tabIndex={0} aria-label="Now showing films, scroll horizontally">
-                {movies.map((movie, index) => <MovieCard key={movie.id} movie={movie} index={index + 1} eager={index < 5} />)}
+            <div ref={rail} className="rail mx-auto mt-6 max-w-[1520px] pb-2" tabIndex={0} aria-label="Now showing films, scroll horizontally" data-lenis-prevent-wheel>
+                {filtered.map((movie, index) => <MovieCard key={movie.id} movie={movie} index={index + 1} eager={index < 5} />)}
             </div>
         </section>
+    );
+}
+
+/** The big 16:9 feature: still image, trailer on hover, and the key facts. */
+function Spotlight({ movie }: { movie: Movie }) {
+    const t = useT();
+    const video = useRef<HTMLVideoElement>(null);
+    const [playing, setPlaying] = useState(false);
+    const trailer = movie.trailers[0];
+    const onSale = Number(movie.original_price) > Number(movie.price);
+
+    const start = () => {
+        if (!trailer || !video.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        video.current.currentTime = 0;
+        video.current.play().then(() => setPlaying(true)).catch(() => undefined);
+    };
+    const stop = () => { video.current?.pause(); setPlaying(false); };
+
+    return (
+        <Link href={route('movies.show', movie.slug)} onPointerEnter={start} onPointerLeave={stop} onFocus={start} onBlur={stop}
+            className="group relative block aspect-[4/5] overflow-hidden bg-ink-3 sm:aspect-video" aria-label={`${movie.title}: ${movie.genre}`}>
+            {movie.hero_image_url
+                ? <img src={movie.hero_image_url} srcSet={responsiveSrcSet(movie.hero_image_url)} sizes="(min-width: 1024px) 60vw, 100vw" alt="" loading="lazy" decoding="async" className={cn('absolute inset-0 h-full w-full object-cover transition duration-[1.2s] ease-[var(--ease-out-expo)] group-hover:scale-[1.03]', playing && 'opacity-0')} />
+                : <div className="absolute inset-0"><Poster movie={movie} size="lg" meta={false} className="!aspect-auto h-full" /></div>}
+            {trailer && <video ref={video} src={trailer.src} muted playsInline loop preload="none" aria-hidden="true" className={cn('absolute inset-0 h-full w-full object-cover transition-opacity duration-500', playing ? 'opacity-100' : 'opacity-0')} />}
+            <span className="absolute inset-0 bg-gradient-to-t from-ink via-ink/35 to-transparent" aria-hidden="true" />
+
+            <span className="absolute inset-x-0 top-0 flex items-start justify-between p-5 sm:p-7">
+                <span className="flex flex-wrap gap-1.5">
+                    <span className="tag tag-mint">{t(movie.status)}</span>
+                    {onSale && <span className="tag tag-signal">{t('On sale')}</span>}
+                    {trailer && <span className="tag"><Icon name={playing ? 'volume' : 'play'} size={11} /> {playing ? t('Playing muted') : t('Hover for trailer')}</span>}
+                </span>
+                <span className="label hidden sm:block">{movie.certificate}</span>
+            </span>
+
+            <span className="absolute inset-x-0 bottom-0 grid gap-5 p-5 sm:p-8 md:grid-cols-[1fr_auto] md:items-end">
+                <span className="min-w-0">
+                    <span className="label block">{movie.genre} · {movie.duration} · {movie.language}</span>
+                    <span className="display mt-3 block text-[clamp(2.5rem,5vw,4.75rem)] leading-[.86]" dir="auto">{movie.title}</span>
+                    {movie.tagline && <span className="mt-3 block max-w-xl text-paper-2" dir="auto">{movie.tagline}</span>}
+                </span>
+                <span className="flex items-center gap-5">
+                    {movie.reviews > 0 && (
+                        <span className="text-right">
+                            <span className="display block text-4xl text-accent">{Number(movie.rating).toFixed(1)}</span>
+                            <span className="num block text-[10px] uppercase text-mute">{movie.reviews} {t('reviews')}</span>
+                        </span>
+                    )}
+                    <span className="btn btn-primary">
+                        {movie.first_show_id ? <>{t('Book')} · <span className="num">{money(movie.price)}</span></> : t('Details')}
+                        <Icon name="arrow-right" size={16} className="arrow" />
+                    </span>
+                </span>
+            </span>
+        </Link>
     );
 }
 
@@ -368,26 +483,34 @@ function Numbers({ stats }: { stats: Props['stats'] }) {
 }
 
 function Cinemas({ cinemas }: { cinemas: Props['cinemas'] }) {
+    const t = useT();
     return (
         <section className="pt-32 sm:pt-44" aria-labelledby="cinemas">
-            <div className="shell grid gap-14 lg:grid-cols-12">
-                <div className="lg:col-span-4">
-                    <SectionHeading index="05" label="Our cinemas" title="Screens with character" accent={['character']} id="cinemas"
-                        description="From a restored 1960s picture palace on the Clifton seafront to a boutique ScreenX room in DHA." />
-                    <Link href={route('cinemas.index')} className="btn btn-ghost mt-8">All cinemas <Icon name="arrow-right" size={16} className="arrow" /></Link>
+            <div className="shell">
+                <div className="grid items-end gap-8 border-b border-line pb-10 lg:grid-cols-12">
+                    <SectionHeading index="05" label={t('Our cinemas')} title={t('Screens with character')} accent={['character']} id="cinemas" className="lg:col-span-8" />
+                    <div className="lg:col-span-4">
+                        <p className="lede">{t('From a restored 1960s picture palace on the Clifton seafront to a boutique ScreenX room in DHA.')}</p>
+                        <Link href={route('cinemas.index')} className="btn btn-ghost mt-6">{t('All cinemas')} <Icon name="arrow-right" size={16} className="arrow" /></Link>
+                    </div>
                 </div>
-                <ol className="border-t border-line lg:col-span-8">
+
+                <ol className="grid md:grid-cols-2">
                     {cinemas.map((cinema, index) => (
-                        <li key={cinema.slug} className="border-b border-line">
-                            <Link href={route('cinemas.show', cinema.slug)} className="group relative isolate grid grid-cols-[2.5rem_1fr_auto] items-center gap-4 overflow-hidden py-6 sm:grid-cols-[3.5rem_1fr_12rem_auto] sm:px-3">
+                        <li key={cinema.slug} className="border-b border-line md:odd:border-e">
+                            <Link href={route('cinemas.show', cinema.slug)} className="group relative isolate flex h-full flex-col gap-5 overflow-hidden p-6 sm:p-8">
                                 <span className="absolute inset-0 -z-10 origin-bottom scale-y-0 bg-volt transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:scale-y-100" aria-hidden="true" />
-                                <span className="num text-xs text-dim transition-colors group-hover:text-noir">{pad(index + 1)}</span>
-                                <span>
-                                    <span className="headline block text-3xl transition-colors group-hover:text-noir sm:text-4xl">{cinema.name}</span>
-                                    <span className="mt-1 block text-sm text-mute transition-colors group-hover:text-noir/70 sm:hidden">{cinema.city} · {cinema.screens} screens</span>
+                                <span className="flex items-start justify-between gap-4">
+                                    <span className="num text-xs text-dim transition-colors group-hover:text-noir">{pad(index + 1)} · {cinema.city}</span>
+                                    <Icon name="arrow-up-right" size={22} className="shrink-0 text-dim transition duration-500 group-hover:rotate-45 group-hover:text-noir" />
                                 </span>
-                                <span className="hidden text-sm text-mute transition-colors group-hover:text-noir/70 sm:block">{cinema.city}<br /><span className="num text-xs">{cinema.screens} screens · {cinema.seats} seats</span></span>
-                                <Icon name="arrow-up-right" size={22} className="text-dim transition duration-500 group-hover:rotate-45 group-hover:text-noir" />
+                                <span className="headline block text-3xl leading-tight transition-colors group-hover:text-noir sm:text-4xl">{cinema.name}</span>
+                                <span className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-mute transition-colors group-hover:text-noir/70">
+                                    <span className="num">{cinema.screens} {t('screens')} · {cinema.seats} {t('seats')}</span>
+                                    {cinema.amenities.map((amenity) => (
+                                        <span key={amenity} className="border border-line-2 px-2 py-0.5 text-[11px] transition-colors group-hover:border-noir/30">{amenity}</span>
+                                    ))}
+                                </span>
                             </Link>
                         </li>
                     ))}

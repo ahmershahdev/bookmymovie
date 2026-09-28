@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useId, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import Dropdown from '@/components/Dropdown';
 import Icon from '@/components/Icon';
@@ -6,26 +7,53 @@ import { SplitHeading } from '@/components/motion';
 import { cn, useShared } from '@/lib/utils';
 import type { Crumb, PageLink } from '@/types';
 
+/**
+ * Breadcrumbs as a ticket stub trail: crumbs slide in one by one, links
+ * underline on hover, the current page carries a volt marker, and on small
+ * screens the middle of a long trail folds into "…" (tap to unfold).
+ */
 export function Breadcrumbs({ items, className }: { items?: Crumb[]; className?: string }) {
     const shared = useShared();
+    const reduce = useReducedMotion();
+    const [unfolded, setUnfolded] = useState(false);
     const crumbs = items ?? shared.meta?.breadcrumbs ?? [];
     if (crumbs.length < 2) return null;
+    const fold = crumbs.length > 3 && !unfolded;
 
     return (
         <nav aria-label="Breadcrumb" className={cn('no-scrollbar overflow-x-auto', className)}>
-            <ol className="label flex w-max items-center gap-2">
-                {crumbs.map((item, index) => (
-                    <li key={`${item.label}-${index}`} className="flex items-center gap-2">
-                        {index > 0 && <span aria-hidden="true" className="text-dim">/</span>}
-                        {index === crumbs.length - 1 ? (
-                            <span aria-current="page" className="text-paper">{item.label}</span>
-                        ) : item.url ? (
-                            <Link href={item.url} className="link transition hover:text-accent">{item.label}</Link>
-                        ) : (
-                            <span>{item.label}</span>
-                        )}
-                    </li>
-                ))}
+            <ol className="flex w-max items-center gap-1 text-[11px] font-semibold uppercase tracking-[.1em] text-mute [font-stretch:115%]">
+                {crumbs.map((item, index) => {
+                    const last = index === crumbs.length - 1;
+                    const hiddenOnMobile = fold && index > 0 && index < crumbs.length - 2;
+                    return (
+                        <motion.li key={`${item.label}-${index}`} className={cn('flex items-center gap-1', hiddenOnMobile && 'max-sm:hidden')}
+                            initial={reduce ? false : { opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.08 * index, ease: [0.16, 1, 0.3, 1] }}>
+                            {index > 0 && (
+                                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="text-dim rtl:rotate-180">
+                                    <motion.path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4, delay: 0.08 * index + 0.1 }} />
+                                </svg>
+                            )}
+                            {index === 1 && fold && (
+                                <button type="button" onClick={() => setUnfolded(true)} className="px-2 py-1 text-dim hover:text-paper sm:hidden" aria-label="Show the full path">…</button>
+                            )}
+                            {last ? (
+                                <span aria-current="page" className="flex items-center gap-2 bg-ink-3 px-2.5 py-1.5 text-paper">
+                                    <span className="h-1.5 w-1.5 bg-volt" aria-hidden="true" />
+                                    <span className="max-w-[14rem] truncate">{item.label}</span>
+                                </span>
+                            ) : item.url ? (
+                                <Link href={item.url} className="group relative flex items-center gap-1.5 px-2 py-1.5 transition-colors hover:text-paper">
+                                    {index === 0 && <Icon name="film" size={13} className="text-accent" />}
+                                    {item.label}
+                                    <span className="absolute inset-x-2 bottom-0.5 h-px origin-left scale-x-0 bg-volt transition-transform duration-300 group-hover:scale-x-100" aria-hidden="true" />
+                                </Link>
+                            ) : (
+                                <span className="px-2 py-1.5">{item.label}</span>
+                            )}
+                        </motion.li>
+                    );
+                })}
             </ol>
         </nav>
     );

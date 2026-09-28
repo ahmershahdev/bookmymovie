@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Booking;
 use App\Models\BookingEvent;
 use App\Models\BookingSeat;
+use App\Models\Concession;
 use App\Models\Coupon;
 use App\Models\GiftCard;
 use App\Models\LoyaltyTransaction;
@@ -49,6 +50,11 @@ class BookingLifecycle
         if ($booking->coupon_id) {
             DB::table('coupon_usages')->where('booking_id', $booking->id)->delete();
             Coupon::query()->whereKey($booking->coupon_id)->where('used_count', '>', 0)->decrement('used_count');
+        }
+
+        // Pre-ordered snacks go back on the shelf.
+        foreach (DB::table('booking_concessions')->where('booking_id', $booking->id)->get(['concession_id', 'quantity']) as $line) {
+            Concession::query()->whereKey($line->concession_id)->whereNotNull('stock')->increment('stock', (int) $line->quantity);
         }
 
         if ($booking->gift_card_id && (float) $booking->gift_card_amount > 0) {

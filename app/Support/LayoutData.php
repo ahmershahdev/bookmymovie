@@ -117,6 +117,12 @@ class LayoutData
         });
     }
 
+    /** Forgets this request's memoised values, after settings change. */
+    public static function flush(): void
+    {
+        self::$memo = [];
+    }
+
     private static function remember(string $key, \Closure $callback): mixed
     {
         if (! array_key_exists($key, self::$memo)) {

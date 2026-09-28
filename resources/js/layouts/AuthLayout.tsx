@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { motion, useReducedMotion } from 'motion/react';
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Children, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import { SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
@@ -9,7 +9,7 @@ import ProgressBar from '@/components/shell/ProgressBar';
 import ScrollIndicator from '@/components/shell/ScrollIndicator';
 import Toaster from '@/components/shell/Toaster';
 import ThemeToggle from '@/components/ThemeToggle';
-import { Alert, Breadcrumbs } from '@/components/ui';
+import { Alert } from '@/components/ui';
 import { Meta } from '@/layouts/SiteLayout';
 import { cn, route, useShared } from '@/lib/utils';
 
@@ -85,20 +85,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                         </div>
                     </div>
 
-                    <div className="flex flex-1 justify-center px-5 pb-20 pt-12 sm:px-10 lg:pt-16">
+                    <div className="flex flex-1 items-start justify-center px-5 pb-20 pt-12 sm:px-10 lg:items-center lg:pt-10">
                         <motion.div key={component} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="w-full max-w-[28rem]">
-                            <Breadcrumbs className="mb-8" />
                             {errors.oauth && <div className="mb-6"><Alert>{errors.oauth}</Alert></div>}
                             {children}
                         </motion.div>
                     </div>
 
-                    <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-line px-5 py-6 sm:px-10">
-                        <p className="label"><Icon name="shield" size={12} className="mr-1.5 inline text-accent" /> Encrypted · rate limited · bot protected</p>
-                        <p className="label">
-                            <Link href={route('terms')} className="link hover:text-paper">Terms</Link> · <Link href={route('privacy')} className="link hover:text-paper">Privacy</Link> · <Link href={route('contact')} className="link hover:text-paper">Help</Link>
-                        </p>
-                    </footer>
                 </main>
             </div>
             <Toaster />
@@ -134,6 +127,19 @@ export function AuthHeading({ label, title, step, children }: { label: string; t
             <SplitHeading as="h1" text={title} className="mt-4 text-[clamp(3.75rem,9vw,6.5rem)]" />
             {children && <p className="lede mt-5 !text-base">{children}</p>}
         </div>
+    );
+}
+
+/** Fields rise in one after another, the way a marquee lights up. */
+export function Stagger({ children, className }: { children: ReactNode; className?: string }) {
+    const reduce = useReducedMotion();
+    return (
+        <motion.div className={className} initial={reduce ? false : 'hidden'} animate="shown"
+            variants={{ hidden: {}, shown: { transition: { staggerChildren: 0.06, delayChildren: 0.25 } } }}>
+            {Children.map(children, (child) => child && (
+                <motion.div variants={{ hidden: { opacity: 0, y: 18 }, shown: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } } }}>{child}</motion.div>
+            ))}
+        </motion.div>
     );
 }
 

@@ -44,6 +44,18 @@ return [
     'admin' => [
         'invite_code' => env('BOOKMYMOVIE_ADMIN_INVITE'),
         'recovery_secret' => env('BOOKMYMOVIE_ADMIN_RECOVERY_SECRET'),
+
+        /*
+        | The owner's seeded admin account, with full access. Set
+        | BOOKMYMOVIE_DEMO_ADMIN_READ_ONLY=true to turn it into a public demo:
+        | it then refuses every change, and only then are its credentials
+        | shown on the admin sign-in page. Change the password with
+        | BOOKMYMOVIE_ADMIN_PASSWORD before going live.
+        */
+        'demo_enabled' => (bool) env('BOOKMYMOVIE_DEMO_ADMIN', true),
+        'demo_read_only' => (bool) env('BOOKMYMOVIE_DEMO_ADMIN_READ_ONLY', false),
+        'demo_email' => 'admin@bookmymovie.ahmershah.dev',
+        'demo_password' => (string) env('BOOKMYMOVIE_ADMIN_PASSWORD', 'Admin@1234'),
     ],
 
     /*

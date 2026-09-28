@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Schema;
  *
  *   public/images/movies/{slug}/card.webp   4:3 card, used on every movie card
  *   public/images/movies/{slug}/hero.webp   16:9 backdrop, home carousel and film page
- *   public/videos/trailers/{slug}-1.mp4     first trailer ({slug}-2.mp4 for a second cut)
+ *   public/images/movies/{slug}/card-sm.webp, hero-sm.webp   640 / 960 px copies for srcset
+ *   public/videos/trailers/{slug}-1.mp4     first trailer ({slug}-2.mp4 for a second cut),
+ *                                          with a VP9 {slug}-N.webm sibling and a {slug}-N.webp still
  *
  * Films without a card fall back to the hero, then to the generated
  * typographic poster, so nothing ever shows an empty box. Admin uploads
@@ -24,6 +26,8 @@ class MovieMedia
         'the-quiet-meridian',
         'whistle-of-the-night-heron',
         'a-small-hour-of-grace',
+        'the-tidewater-accord',
+        'the-cartographers-silence',
         'kestrel',
     ];
 
@@ -57,7 +61,8 @@ class MovieMedia
                 foreach ([1 => 'Trailer', 2 => 'Alternate cut'] as $index => $label) {
                     if ($src = self::existing("videos/trailers/{$movie->slug}-{$index}.mp4")) {
                         $poster = self::existing("videos/trailers/{$movie->slug}-{$index}.webp");
-                        $trailers[] = ['src' => $src, 'label' => $label, 'poster' => $poster];
+                        $webm = self::existing("videos/trailers/{$movie->slug}-{$index}.webm");
+                        $trailers[] = ['src' => $src, 'webm' => $webm, 'label' => $label, 'poster' => $poster];
                     }
                 }
                 $update['trailers'] = $trailers ? json_encode($trailers, JSON_UNESCAPED_SLASHES) : null;

@@ -90,6 +90,12 @@ class PaymentController extends Controller
     {
         $booking = Booking::query()->with('payment')->where('booking_number', $number)->firstOrFail();
 
+        // Providers post back cross-site, so the session may be missing; but
+        // a signed-in visitor must never learn about someone else's booking.
+        if (Auth::check() && $booking->user_id !== Auth::id()) {
+            abort(404);
+        }
+
         if ($booking->payment_method === 'card' && $booking->payment) {
             try {
                 $booking = PaymentGateway::refreshStripe($booking->payment) ?? $booking;

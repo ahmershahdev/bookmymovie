@@ -40,13 +40,20 @@ return [
         'redirect' => env('FACEBOOK_REDIRECT_URI'),
     ],
 
+    /*
+    | Without keys, local development falls back to Google's published test
+    | pair (https://developers.google.com/recaptcha/docs/faq): the checkbox
+    | renders on any host, always passes, and says it is for testing. Real
+    | keys (with the site's domain added in the reCAPTCHA console) are needed
+    | everywhere else.
+    */
     'recaptcha' => [
-        'v2_site_key' => env('RECAPTCHA_V2_SITE_KEY'),
-        'v2_secret_key' => env('RECAPTCHA_V2_SECRET_KEY'),
+        'v2_site_key' => env('RECAPTCHA_V2_SITE_KEY') ?: (env('APP_ENV') === 'local' ? '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' : null),
+        'v2_secret_key' => env('RECAPTCHA_V2_SECRET_KEY') ?: (env('APP_ENV') === 'local' ? '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe' : null),
         'v3_site_key' => env('RECAPTCHA_V3_SITE_KEY'),
         'v3_secret_key' => env('RECAPTCHA_V3_SECRET_KEY'),
         'v3_min_score' => env('RECAPTCHA_V3_MIN_SCORE', 0.5),
-        'skip_google_on_localhost' => env('RECAPTCHA_SKIP_GOOGLE_ON_LOCALHOST', true),
+        'skip_google_on_localhost' => (bool) env('RECAPTCHA_SKIP_GOOGLE_ON_LOCALHOST', false),
     ],
 
     /*

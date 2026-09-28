@@ -1,11 +1,13 @@
 import { Head, usePage } from '@inertiajs/react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { ReactNode } from 'react';
+import Assistant from '@/components/shell/Assistant';
 import CompareTray from '@/components/shell/CompareTray';
 import Footer from '@/components/shell/Footer';
 import Navbar from '@/components/shell/Navbar';
 import ProgressBar from '@/components/shell/ProgressBar';
 import ScrollIndicator from '@/components/shell/ScrollIndicator';
+import ScrollTop from '@/components/shell/ScrollTop';
 import Toaster from '@/components/shell/Toaster';
 import { useShared } from '@/lib/utils';
 
@@ -43,6 +45,10 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
             </main>
             <Footer />
             <CompareTray />
+            <div className="fixed bottom-4 right-4 z-[65] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6 rtl:left-4 rtl:right-auto sm:rtl:left-6">
+                <ScrollTop />
+                <Assistant />
+            </div>
             <Toaster />
             <ScrollIndicator />
         </>

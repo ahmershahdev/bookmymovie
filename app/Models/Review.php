@@ -12,7 +12,10 @@ class Review extends Model
         'movie_id',
         'booking_id',
         'rating',
+        'title',
         'review_text',
+        'contains_spoilers',
+        'helpful_count',
         'is_approved',
         'is_flagged',
         'approved_by',
@@ -24,6 +27,8 @@ class Review extends Model
         return [
             'is_approved' => 'boolean',
             'is_flagged' => 'boolean',
+            'contains_spoilers' => 'boolean',
+            'helpful_count' => 'integer',
             'approved_at' => 'datetime',
         ];
     }
@@ -36,5 +41,21 @@ class Review extends Model
     public function movie(): BelongsTo
     {
         return $this->belongsTo(Movie::class);
+    }
+
+    public function booking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * "Verified booking": the review is tied to one of the reviewer's own
+     * bookings for this film, and that show has already started. The link
+     * is only ever set by MovieController::storeReview (or the seeder, which
+     * creates the matching past booking), never from request input.
+     */
+    public function isVerified(): bool
+    {
+        return $this->booking_id !== null;
     }
 }

@@ -3,6 +3,7 @@ import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import type { ReactNode } from 'react';
 import SiteLayout from '@/layouts/SiteLayout';
+import { greetConsole } from '@/lib/console';
 import { applyDocumentLocale } from '@/lib/i18n';
 import { registerServiceWorker } from '@/lib/offline';
 import { startSmoothScroll } from '@/lib/scroll';
@@ -32,6 +33,7 @@ createInertiaApp({
         // Switching language is a POST that redirects back: 'navigate' does not fire for it.
         router.on('success', (event) => applyDocumentLocale(event.detail.page.props.locale as string | undefined));
         registerServiceWorker();
+        greetConsole(String((props.initialPage.props.site as { name?: string } | undefined)?.name ?? appName));
     },
     // The progress bar is our own component: Inertia's injects an inline
     // <style> tag, which the Content-Security-Policy blocks.

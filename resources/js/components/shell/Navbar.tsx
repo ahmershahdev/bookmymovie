@@ -11,32 +11,19 @@ import { cn, pad, route, useShared } from '@/lib/utils';
 const ease = [0.76, 0, 0.24, 1] as const;
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
-export const CONTACT = {
-    website: 'https://ahmershah.dev/',
-    github: 'https://github.com/ahmershahdev',
-    linkedin: 'https://linkedin.com/in/syedahmershah',
-    email: 'support@ahmershah.dev',
-    phone: '+92 370 4831994',
-    phoneHref: '+923704831994',
-};
-
 function useActive() {
     const { url } = usePage();
     const path = url.split('?')[0];
     return (prefixes: string[]) => prefixes.some((prefix) => (prefix === '/' ? path === '/' : path === prefix || path.startsWith(prefix + '/')));
 }
 
+/** The brand mark: the uploaded logo (Admin → Site & brand), sized for the bar it sits in. */
 export function Wordmark({ className, compact = false }: { className?: string; compact?: boolean }) {
+    const { site } = useShared();
     return (
-        <span className={cn('flex items-center gap-2.5', className)}>
-            <span className="grid h-8 w-8 shrink-0 place-items-center bg-volt text-noir" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5V9a2.5 2.5 0 0 0 0 5v2.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V14a2.5 2.5 0 0 0 0-5Z" /></svg>
-            </span>
-            {!compact && (
-                <span className="text-[1.05rem] font-extrabold uppercase leading-none tracking-[-0.01em] [font-stretch:125%]">
-                    Book<span className="text-accent">My</span>Movie
-                </span>
-            )}
+        <span className={cn('flex items-center', className)}>
+            <img src={site.logo_url} alt={site.name} width={280} height={210} decoding="async"
+                className={cn('w-auto object-contain drop-shadow-[0_4px_14px_rgba(0,0,0,.45)] transition-[height] duration-500 ease-[var(--ease-out-expo)]', compact ? 'h-9' : 'h-11 lg:h-12')} />
         </span>
     );
 }
@@ -281,12 +268,68 @@ export function LanguageToggle({ className }: { className?: string }) {
     );
 }
 
-/** Full-screen menu: condensed links, what is new, now showing and contact. */
-function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void; links: { label: string; href: string; active: boolean }[] }) {
-    const { auth, navMovies } = useShared();
+type MenuLink = { label: string; href: string; active: boolean };
+
+/** One titled group of small links in the menu. */
+function MenuGroup({ title, links, delay }: { title: string; links: { label: string; href: string; icon?: string; note?: string }[]; delay: number }) {
+    return (
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.7, ease: easeOut, delay }}>
+            <p className="label">{title}</p>
+            <ul className="mt-4 border-t border-line">
+                {links.map((link) => (
+                    <li key={link.label} className="border-b border-line">
+                        <Link href={link.href} className="group flex items-center justify-between gap-3 py-3 text-sm text-paper-2 transition-colors hover:text-accent">
+                            <span className="flex items-center gap-3">
+                                {link.icon && <Icon name={link.icon} size={16} className="text-dim transition-colors group-hover:text-accent" />}
+                                {link.label}
+                                {link.note && <span className="tag tag-volt !px-1.5 !py-0 text-[9px]">{link.note}</span>}
+                            </span>
+                            <Icon name="arrow-right" size={14} className="-translate-x-2 opacity-0 transition duration-300 group-hover:translate-x-0 group-hover:opacity-100 rtl:rotate-180" />
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </motion.div>
+    );
+}
+
+/**
+ * Full-screen menu, three columns: where to go (big type), grouped
+ * shortcuts (account, help, what's new), and what's on plus how to reach us.
+ */
+function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void; links: MenuLink[] }) {
+    const { auth, navMovies, site } = useShared();
     const [hovered, setHovered] = useState<number | null>(null);
+    const [query, setQuery] = useState('');
     const features = useFeatures();
     const t = useT();
+
+    const account = auth.user
+        ? [
+            { label: t('Overview'), href: route('user.dashboard'), icon: 'grid' },
+            { label: t('Bookings'), href: route('user.bookings'), icon: 'ticket' },
+            { label: t('Watchlist'), href: route('user.wishlist'), icon: 'heart' },
+            { label: t('Profile & security'), href: route('user.profile'), icon: 'user' },
+            { label: t('Public profile'), href: route('profile.show', auth.user.username), icon: 'star' },
+        ]
+        : [
+            { label: t('Sign in'), href: route('user.login'), icon: 'user' },
+            { label: t('Create account'), href: route('user.register'), icon: 'plus' },
+            { label: t('Find my e-ticket'), href: route('eticket.info'), icon: 'ticket' },
+        ];
+    const help = [
+        { label: t('FAQ'), href: route('faq'), icon: 'info' },
+        { label: t('Contact'), href: route('contact'), icon: 'mail' },
+        { label: t('E-tickets'), href: route('eticket.info'), icon: 'qr' },
+        { label: t('Refunds'), href: route('refund'), icon: 'refresh' },
+        { label: t('Accessibility'), href: route('accessibility'), icon: 'wheelchair' },
+    ];
+    const extras = [
+        { label: t('Gift cards'), href: route('gift-cards'), icon: 'gift', note: t('New') },
+        { label: t('Offers'), href: route('offers'), icon: 'tag' },
+        { label: t('Compare films'), href: route('movies.compare'), icon: 'compare' },
+        { label: t('Coming soon'), href: route('movies.status', 'coming-soon'), icon: 'calendar' },
+    ];
 
     return (
         <AnimatePresence>
@@ -297,7 +340,13 @@ function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void
                     className="fixed inset-0 z-[70] overflow-y-auto overflow-x-hidden overscroll-contain bg-ink text-paper">
                     <div className="sticky top-0 z-10 border-b border-line bg-ink/90 backdrop-blur-xl">
                         <div className="shell flex h-[var(--header)] items-center justify-between gap-3">
-                            <Link href={route('home')} aria-label="BookMyMovie home"><Wordmark /></Link>
+                            <Link href={route('home')} aria-label={`${site.name} home`}><Wordmark /></Link>
+                            <form onSubmit={(event) => { event.preventDefault(); if (query.trim().length > 1) router.visit(route('search', { query: query.trim() })); }}
+                                className="mx-4 hidden max-w-md flex-1 items-center gap-3 border border-line-2 px-3.5 transition-colors focus-within:border-accent md:flex" role="search">
+                                <Icon name="search" size={16} className="text-mute" />
+                                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Search films, cinemas, people…')} aria-label={t('Search')}
+                                    className="h-11 flex-1 bg-transparent text-sm placeholder:text-dim focus:outline-none" />
+                            </form>
                             <div className="flex items-center gap-2">
                                 <LanguageToggle className="hidden sm:inline-flex" />
                                 <ThemeToggle />
@@ -309,44 +358,42 @@ function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void
                     </div>
 
                     <div className="shell grid gap-12 py-10 lg:grid-cols-12 lg:gap-10 lg:py-12">
-                        <nav className="lg:col-span-6" aria-label={t('Site')} onPointerLeave={() => setHovered(null)}>
+                        <nav className="lg:col-span-5" aria-label={t('Site')} onPointerLeave={() => setHovered(null)}>
+                            <p className="label mb-4">{t('Explore')}</p>
                             <ul>
                                 {links.map((link, index) => (
                                     <li key={link.label} className="overflow-hidden border-b border-line" onPointerEnter={() => setHovered(index)}>
-                                        <motion.div initial={{ y: '110%' }} animate={{ y: 0 }} exit={{ y: '110%' }} transition={{ duration: 0.9, ease: easeOut, delay: 0.2 + index * 0.05 }}>
-                                            <Link href={link.href} className="group flex items-center justify-between gap-6 py-1.5">
-                                                <span className={cn('display text-[clamp(3rem,7vw,6.25rem)] transition-[color,opacity,transform] duration-500 ease-[var(--ease-out-expo)] group-hover:translate-x-4 rtl:group-hover:-translate-x-4',
+                                        <motion.div initial={{ y: '110%' }} animate={{ y: 0 }} exit={{ y: '110%' }} transition={{ duration: 0.9, ease: easeOut, delay: 0.15 + index * 0.05 }}>
+                                            <Link href={link.href} className="group flex items-center justify-between gap-6 py-1">
+                                                <span className={cn('display text-[clamp(2.75rem,5.6vw,5.25rem)] transition-[color,opacity,transform] duration-500 ease-[var(--ease-out-expo)] group-hover:translate-x-3 rtl:group-hover:-translate-x-3',
                                                     hovered !== null && hovered !== index ? 'opacity-25' : 'opacity-100', link.active && '!text-accent')}>
                                                     {t(link.label)}
                                                 </span>
                                                 <span className="flex items-center gap-4">
                                                     <span className="num text-sm text-mute">{pad(index + 1)}</span>
-                                                    <Icon name="arrow-up-right" size={28} className="text-dim transition duration-500 group-hover:rotate-45 group-hover:text-accent" />
+                                                    <Icon name="arrow-up-right" size={24} className="text-dim transition duration-500 group-hover:rotate-45 group-hover:text-accent" />
                                                 </span>
                                             </Link>
                                         </motion.div>
                                     </li>
                                 ))}
                             </ul>
-                            <div className="mt-8 flex flex-wrap gap-2">
-                                {auth.user ? (
-                                    <>
-                                        <Link href={route('user.dashboard')} className="btn btn-primary">{t('My account')}</Link>
-                                        <Link href={route('user.bookings')} className="btn btn-ghost">{t('Bookings')}</Link>
-                                        <Link href={route('user.logout')} method="post" as="button" className="btn btn-ghost">{t('Sign out')}</Link>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Link href={route('user.login')} className="btn btn-primary">{t('Sign in')}</Link>
-                                        <Link href={route('user.register')} className="btn btn-ghost">{t('Create account')}</Link>
-                                    </>
-                                )}
-                                <LanguageToggle className="sm:hidden" />
-                            </div>
+                            {auth.user && (
+                                <Link href={route('user.logout')} method="post" as="button" className="btn btn-ghost btn-sm mt-8"><Icon name="logout" size={14} /> {t('Sign out')}</Link>
+                            )}
+                        </nav>
 
-                            <div className="mt-12">
+                        <div className="grid gap-10 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-1 xl:grid-cols-2 lg:border-s lg:border-line lg:ps-10">
+                            <MenuGroup title={auth.user ? t('Your account') : t('Account')} links={account} delay={0.3} />
+                            <MenuGroup title={t('More to do')} links={extras} delay={0.38} />
+                            <MenuGroup title={t('Help')} links={help} delay={0.46} />
+                            <MenuGroup title={t('New on BookMyMovie')} links={features.map((feature) => ({ label: feature.title, href: feature.href ?? route('about'), icon: feature.icon }))} delay={0.54} />
+                        </div>
+
+                        <motion.aside className="space-y-10 lg:col-span-3" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: easeOut, delay: 0.5 }}>
+                            <div>
                                 <p className="label">{t('Now showing')}</p>
-                                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <div className="mt-4 grid grid-cols-2 gap-2">
                                     {navMovies.slice(0, 4).map((movie) => (
                                         <Link key={movie.slug} href={route('movies.show', movie.slug)} className="group block overflow-hidden" aria-label={movie.title}>
                                             <div className="transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-105"><Poster movie={movie} size="sm" meta={false} /></div>
@@ -354,51 +401,14 @@ function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void
                                     ))}
                                 </div>
                             </div>
-                        </nav>
-
-                        <motion.aside className="space-y-10 lg:col-span-6 lg:border-s lg:border-line lg:ps-10" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: easeOut, delay: 0.4 }}>
                             <div>
-                                <p className="label label-accent">{t('New on BookMyMovie')}</p>
-                                <ul className="mt-4 grid gap-px border border-line bg-line sm:grid-cols-2">
-                                    {features.map((feature) => {
-                                        const body = (
-                                            <>
-                                                <span className="grid h-9 w-9 shrink-0 place-items-center border border-line-2 text-accent transition-colors group-hover:border-accent"><Icon name={feature.icon} size={17} /></span>
-                                                <span className="min-w-0">
-                                                    <span className="block text-sm font-semibold leading-snug">{feature.title}</span>
-                                                    <span className="mt-1 block text-xs leading-relaxed text-mute">{feature.text}</span>
-                                                </span>
-                                            </>
-                                        );
-                                        return (
-                                            <li key={feature.icon} className="bg-ink">
-                                                {feature.href ? (
-                                                    <Link href={feature.href} className="group flex h-full gap-3 p-4 transition-colors hover:bg-ink-2">{body}</Link>
-                                                ) : (
-                                                    <div className="group flex h-full gap-3 p-4">{body}</div>
-                                                )}
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-                            <div className="grid gap-10 sm:grid-cols-2">
-                                <div>
-                                    <p className="label">{t('Get in touch')}</p>
-                                    <a href={`mailto:${CONTACT.email}`} className="link headline mt-4 block break-all text-2xl">{CONTACT.email}</a>
-                                    <a href={`tel:${CONTACT.phoneHref}`} dir="ltr" className="link num mt-2 block text-lg text-paper-2">{CONTACT.phone}</a>
-                                </div>
-                                <div>
-                                    <p className="label">{t('Elsewhere')}</p>
-                                    <ul className="mt-3 grid">
-                                        {[['Portfolio', CONTACT.website], ['GitHub', CONTACT.github], ['LinkedIn', CONTACT.linkedin]].map(([label, href]) => (
-                                            <li key={label}>
-                                                <a href={href} target="_blank" rel="noopener" className="group flex items-center justify-between border-b border-line py-2.5 text-sm transition-colors hover:text-accent">
-                                                    {label} <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
-                                                </a>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                <p className="label">{t('Get in touch')}</p>
+                                <a href={`mailto:${site.support_email}`} className="link mt-4 block break-all text-lg font-semibold">{site.support_email}</a>
+                                <a href={`tel:${site.support_phone.replace(/[^\d+]/g, '')}`} dir="ltr" className="link num mt-1 block text-paper-2">{site.support_phone}</a>
+                                <div className="mt-5 flex flex-wrap gap-1.5">
+                                    {site.socials.map((social) => (
+                                        <a key={social.key} href={social.url} target="_blank" rel="noopener" className="chip">{social.label} <Icon name="arrow-up-right" size={11} /></a>
+                                    ))}
                                 </div>
                             </div>
                         </motion.aside>

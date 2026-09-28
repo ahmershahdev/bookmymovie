@@ -21,6 +21,7 @@ use App\Models\LoyaltyTransaction;
 use App\Payments\PaymentGateway;
 use App\Support\BookingLifecycle;
 use App\Support\AuditLog;
+use App\Support\CleanText;
 use App\Support\FormSecurity;
 use App\Support\TransactionalMailer;
 use App\Support\WalletPass;
@@ -29,6 +30,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -479,8 +481,8 @@ class AccountController extends Controller
             'idempotencyKey' => (string) Str::uuid(),
             'captcha' => FormSecurity::forPage('checkout'),
             'paymentMethods' => PaymentGateway::available(),
-            'concessions' => Concession::query()->where('is_active', true)->orderBy('sort_order')->get()
-                ->map(fn (Concession $item) => ['id' => $item->id, 'name' => $item->name, 'name_ur' => $item->name_ur, 'description' => $item->description, 'category' => $item->category, 'price' => (float) $item->price, 'icon' => $item->icon])->values(),
+            'concessions' => Concession::query()->where('is_active', true)->where(fn ($query) => $query->whereNull('stock')->orWhere('stock', '>', 0))->orderBy('sort_order')->get()
+                ->map(fn (Concession $item) => ['id' => $item->id, 'name' => $item->name, 'name_ur' => $item->name_ur, 'description' => $item->description, 'category' => $item->category, 'price' => (float) $item->price, 'icon' => $item->icon, 'left' => $item->stock !== null && $item->stock <= $item->low_stock_at ? $item->stock : null])->values(),
             'points' => (int) $user->loyalty_points,
             'customer' => ['name' => $user->name, 'email' => $user->email, 'phone' => (string) $user->phone, 'address' => (string) $user->address],
         ], ['title' => 'Checkout | BookMyMovie', 'description' => 'Confirm your booking.']);
@@ -642,6 +644,14 @@ class AccountController extends Controller
                 ]);
 
                 foreach ($concessions as $item) {
+                    // Tracked stock is taken with a guarded UPDATE: the last
+                    // units can only go to one buyer, however many check out at once.
+                    if ($item->stock !== null) {
+                        $taken = Concession::query()->whereKey($item->id)->where('stock', '>=', $addons[$item->id])->decrement('stock', $addons[$item->id]);
+                        if ($taken !== 1) {
+                            throw new \RuntimeException('addon-sold-out');
+                        }
+                    }
                     $booking->concessions()->attach($item->id, ['quantity' => $addons[$item->id], 'unit_price' => $item->price]);
                 }
 
@@ -671,6 +681,7 @@ class AccountController extends Controller
                         ->increment('used_count');
 
                     if ($claimed !== 1) {
+                        Cache::put('coupon.exhausted.'.$coupon->code, true, now()->addMinutes(2));
                         throw new \RuntimeException('coupon-invalid');
                     }
 
@@ -716,6 +727,12 @@ class AccountController extends Controller
                 return redirect()->route('user.booking.show', $existing->booking_number);
             }
 
+            // 1205 lock wait timeout / 1213 deadlock: a rush on the same show
+            // or coupon, not a lost seat. The whole transaction rolled back.
+            if (in_array($exception->errorInfo[1] ?? null, [1205, 1213], true)) {
+                return redirect()->route('user.checkout')->withErrors(['cart' => 'It is very busy right now and your booking could not be confirmed in time. Nothing was charged and your seats are still held; please try again.'])->withInput($request->except('custom_captcha_answer'));
+            }
+
             report($exception);
 
             return redirect()->route('user.cart')->withErrors(['cart' => 'One or more of your seats was just booked by someone else. Please choose again.']);
@@ -729,6 +746,9 @@ class AccountController extends Controller
                 'coupon-user-limit' => 'You have already used this coupon the maximum number of times.',
                 'gift-card-invalid' => 'That gift card is not valid, has expired or has no balance left.',
                 'points-changed' => 'Your points balance changed while you were checking out. Please try again.',
+                'addon-sold-out' => 'One of your snacks just sold out. Please adjust your order.',
+                'sales-paused' => 'Bookings for this film are paused right now. Please try again later.',
+                'busy' => 'It is very busy right now and your seats could not be confirmed in time. Nothing was charged; please try again.',
                 default => 'One or more of your seats was just booked by someone else. Please choose again.',
             };
 
@@ -736,6 +756,7 @@ class AccountController extends Controller
                 'coupon-invalid', 'coupon-user-limit' => 'coupon_code',
                 'gift-card-invalid' => 'gift_card_code',
                 'points-changed' => 'use_points',
+                'addon-sold-out' => 'addons',
                 default => 'cart',
             };
             $target = $field === 'cart' ? 'user.cart' : 'user.checkout';
@@ -763,6 +784,9 @@ class AccountController extends Controller
         return $this->page('Account/Profile', [
             'profile' => [
                 'name' => $user->name,
+                'username' => (string) $user->username,
+                'bio' => (string) $user->bio,
+                'city' => (string) $user->city,
                 'email' => $user->email,
                 'phone' => (string) $user->phone,
                 'address' => (string) $user->address,
@@ -785,7 +809,10 @@ class AccountController extends Controller
         $user = Auth::user();
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:100'],
+            'name' => CleanText::nameRules(),
+            'username' => CleanText::usernameRules($user->id),
+            'bio' => ['nullable', 'string', 'max:160', CleanText::noProfanity('Your bio')],
+            'city' => ['nullable', 'string', 'max:60', 'regex:/^[\pL\pM .\'-]+$/u'],
             'email' => ['required', 'email:rfc', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', Rule::unique('users', 'phone')->ignore($user->id)],
             'address' => ['nullable', 'string', 'max:500'],
@@ -795,7 +822,7 @@ class AccountController extends Controller
             'password' => ['nullable', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()],
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=96,min_height=96,max_width=4000,max_height=4000'],
             'two_factor_enabled' => ['nullable', 'boolean'],
-        ]);
+        ], [...CleanText::nameMessages(), ...CleanText::usernameMessages(), 'city.regex' => 'Please use letters only for your city.']);
 
         $emailChanged = strtolower($data['email']) !== $user->email;
 
@@ -815,7 +842,10 @@ class AccountController extends Controller
         }
 
         $user->fill([
-            'name' => $data['name'],
+            'name' => CleanText::normaliseName($data['name']),
+            'username' => $data['username'],
+            'bio' => filled($data['bio'] ?? null) ? strip_tags($data['bio']) : null,
+            'city' => filled($data['city'] ?? null) ? strip_tags($data['city']) : null,
             'email' => strtolower($data['email']),
             'phone' => $data['phone'] ?? null,
             'address' => $data['address'] ?? null,
@@ -949,7 +979,8 @@ class AccountController extends Controller
     {
         $startsAt = Carbon::parse($show->show_date->toDateString().' '.$show->show_time);
 
-        return $show->status === 'scheduled' && $startsAt->isFuture();
+        return $show->status === 'scheduled' && $startsAt->isFuture()
+            && (bool) Movie::query()->whereKey($show->movie_id)->value('bookings_enabled');
     }
 
     private function bookingNumber(): string
@@ -984,7 +1015,19 @@ class AccountController extends Controller
             return null;
         }
 
-        $coupon = Coupon::query()->where('code', $code)->lockForUpdate()->first();
+        // Thousands claiming one code: once it is used up, later requests fail
+        // here from the cache instead of queueing on the coupon row's lock.
+        if (Cache::has('coupon.exhausted.'.$code)) {
+            throw new \RuntimeException('coupon-invalid');
+        }
+
+        // A plain read: the final say is the guarded UPDATE on used_count at
+        // the end of the transaction, so the hot row is locked only briefly.
+        $coupon = Coupon::query()->where('code', $code)->first();
+
+        if ($coupon && $coupon->max_uses !== null && $coupon->used_count >= $coupon->max_uses) {
+            Cache::put('coupon.exhausted.'.$code, true, now()->addMinutes(2));
+        }
 
         if (
             ! $coupon

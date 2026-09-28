@@ -8,7 +8,7 @@ import { cn, route } from '@/lib/utils';
 
 interface Props {
     profile: {
-        name: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
+        name: string; username: string; bio: string; city: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
         avatar: string | null; verified: boolean; member_since: string | null; last_film: string | null; max_birth_date: string;
         two_factor_enabled: boolean;
     };
@@ -16,10 +16,10 @@ interface Props {
 
 export default function Profile({ profile }: Props) {
     const form = useForm<{
-        name: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
+        name: string; username: string; bio: string; city: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
         current_password: string; password: string; password_confirmation: string; profile_picture: File | null; two_factor_enabled: boolean;
     }>({
-        name: profile.name, email: profile.email, phone: profile.phone, address: profile.address, date_of_birth: profile.date_of_birth, gender: profile.gender,
+        name: profile.name, username: profile.username, bio: profile.bio, city: profile.city, email: profile.email, phone: profile.phone, address: profile.address, date_of_birth: profile.date_of_birth, gender: profile.gender,
         current_password: '', password: '', password_confirmation: '', profile_picture: null, two_factor_enabled: profile.two_factor_enabled,
     });
     const [preview, setPreview] = useState<string | null>(profile.avatar);
@@ -68,6 +68,7 @@ export default function Profile({ profile }: Props) {
                         </div>
                         <p className="headline mt-6 text-3xl">{profile.name}</p>
                         <p className="text-sm text-mute">{profile.email}</p>
+                        <Link href={route('profile.show', profile.username)} className="btn btn-ghost btn-sm mt-4">View public profile <Icon name="arrow-up-right" size={14} /></Link>
                         <p className="mt-4 text-xs text-mute">JPG, PNG or WebP, up to 2 MB, at least 96 × 96 px.</p>
                         {form.errors.profile_picture && <p className="field-error mt-3 justify-center">{form.errors.profile_picture}</p>}
                         <span className={cn('tag mt-6', profile.verified ? 'tag-mint' : 'tag-volt')}>{profile.verified ? 'Email verified' : 'Unverified'}</span>
@@ -75,6 +76,17 @@ export default function Profile({ profile }: Props) {
                 </aside>
 
                 <div className="space-y-6 lg:col-span-8">
+                    <fieldset className="panel grid gap-6 p-6 sm:grid-cols-2 sm:p-9">
+                        <legend className="sr-only">Public profile</legend>
+                        <p className="headline text-4xl sm:col-span-2">Public profile</p>
+                        <p className="-mt-3 text-sm text-mute sm:col-span-2">Shown next to your reviews and on your profile page. Your email, phone and address never are.</p>
+                        <Field label="Username" value={form.data.username} onChange={(event) => form.setData('username', event.target.value.toLowerCase())} error={form.errors.username} required minLength={3} maxLength={30}
+                            hint="Lowercase letters, numbers and _ only." inputClassName="num" />
+                        <Field label="City" value={form.data.city} onChange={(event) => form.setData('city', event.target.value)} error={form.errors.city} maxLength={60} placeholder="Lahore" autoComplete="address-level2" />
+                        <TextArea className="sm:col-span-2" label="Bio" rows={2} value={form.data.bio} onChange={(event) => form.setData('bio', event.target.value)} error={form.errors.bio} maxLength={160}
+                            hint={`${form.data.bio.length}/160 · a line about what you like to watch`} />
+                    </fieldset>
+
                     <fieldset className="panel grid gap-6 p-6 sm:grid-cols-2 sm:p-9">
                         <legend className="sr-only">Personal details</legend>
                         <p className="headline text-4xl sm:col-span-2">Personal details</p>

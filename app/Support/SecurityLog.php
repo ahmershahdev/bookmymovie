@@ -32,6 +32,8 @@ class SecurityLog
 
     public const ADMIN_LOGIN = 'admin_login';
 
+    public const BANNED_VISIT = 'banned_visit';
+
     /**
      * @param  array<string, mixed>  $meta
      */

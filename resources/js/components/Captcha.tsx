@@ -6,6 +6,7 @@ type Grecaptcha = {
     ready: (callback: () => void) => void;
     execute: (key: string, options: { action: string }) => Promise<string>;
     render: (element: HTMLElement, options: Record<string, unknown>) => number;
+    reset: (widget?: number) => void;
 };
 
 declare global {
@@ -63,11 +64,18 @@ export default function Captcha({ captcha, answer, honeypot, error, onAnswer, on
 }) {
     const id = useId();
     const v2Ref = useRef<HTMLDivElement>(null);
+    const widget = useRef<number | null>(null);
     const googleEnabled = Boolean(captcha.v2_site_key || captcha.v3_site_key);
 
-    // A new challenge image means the old answer is useless.
+    // A new challenge image means the last attempt failed: the old answer is
+    // useless and Google's token was spent, so tick the box again.
+    const firstImage = useRef(captcha.image);
     useEffect(() => {
         onAnswer('');
+        if (captcha.image !== firstImage.current && widget.current !== null) {
+            window.grecaptcha?.reset(widget.current);
+            onV2Token?.('');
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [captcha.image]);
 
@@ -77,7 +85,14 @@ export default function Captcha({ captcha, answer, honeypot, error, onAnswer, on
             if (!captcha.v2_site_key || !v2Ref.current || v2Ref.current.dataset.rendered) return;
             const attempt = (tries = 0) => {
                 if (window.grecaptcha?.render && v2Ref.current) {
-                    window.grecaptcha.render(v2Ref.current, { sitekey: captcha.v2_site_key, theme: 'dark', callback: (token: string) => onV2Token?.(token) });
+                    const light = document.documentElement.dataset.theme === 'light';
+                    widget.current = window.grecaptcha.render(v2Ref.current, {
+                        sitekey: captcha.v2_site_key,
+                        theme: light ? 'light' : 'dark',
+                        callback: (token: string) => onV2Token?.(token),
+                        'expired-callback': () => onV2Token?.(''),
+                        'error-callback': () => onV2Token?.(''),
+                    });
                     v2Ref.current.dataset.rendered = 'true';
                 } else if (tries < 20) {
                     window.setTimeout(() => attempt(tries + 1), 250);
@@ -111,7 +126,14 @@ export default function Captcha({ captcha, answer, honeypot, error, onAnswer, on
                 <p id={`${id}-hint`} className="field-hint">Letters and numbers, not case-sensitive. A new code appears after each attempt.</p>
             </div>
 
-            {captcha.v2_site_key && <div ref={v2Ref} />}
+            {captcha.v2_site_key && (
+                <div className="field">
+                    <span className="field-label">Human check</span>
+                    <div className="min-h-[78px] max-w-full overflow-x-auto">
+                        <div ref={v2Ref} />
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <p className="field-error" role="alert"><Icon name="alert" size={16} className="mt-0.5" /> {error}</p>

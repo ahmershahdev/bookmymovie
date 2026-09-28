@@ -97,6 +97,7 @@ class DatabaseSeeder extends Seeder
         $this->seedContentPages();
         $this->seedFaqs();
         $this->seedInboxAndNotifications();
+        $this->call([DemoAdminSeeder::class, CommunitySeeder::class]);
     }
 
     private function truncateDomainTables(): void

@@ -22,12 +22,25 @@ function hash(text: string): number {
  * generated from the film's palette: condensed billing type over one of four
  * graphic compositions, so the catalogue never shows an empty box.
  */
-export default function Poster({ movie, eager = false, size = 'md', meta = true, className }: {
+/**
+ * Bundled artwork ships a 640px copy next to each full-size file
+ * (card.webp + card-sm.webp, hero.webp + hero-sm.webp), so grids and phones
+ * download about a quarter of the bytes.
+ */
+export function responsiveSrcSet(url: string | null | undefined): string | undefined {
+    const match = url?.match(/^(.*\/(card|hero))\.webp(\?.*)?$/);
+    if (!match) return undefined;
+    const [, base, kind] = match;
+    return kind === 'card' ? `${base}-sm.webp 640w, ${base}.webp 1200w` : `${base}-sm.webp 960w, ${base}.webp 1600w`;
+}
+
+export default function Poster({ movie, eager = false, size = 'md', meta = true, className, sizes }: {
     movie: PosterMovie;
     eager?: boolean;
     size?: 'sm' | 'md' | 'lg';
     meta?: boolean;
     className?: string;
+    sizes?: string;
 }) {
     const [ground, accent, paper] = movie.palette ?? ['#1b1b1b', '#e3ff3b', '#f2f0ea'];
     const variant = hash(movie.slug ?? movie.title) % 4;
@@ -42,7 +55,9 @@ export default function Poster({ movie, eager = false, size = 'md', meta = true,
     if (movie.poster_url) {
         return (
             <div className={cn('poster', className)}>
-                <img src={movie.poster_url} alt={`Poster for ${movie.title}`} width={1200} height={900}
+                <img src={movie.poster_url} srcSet={responsiveSrcSet(movie.poster_url)}
+                    sizes={sizes ?? (size === 'lg' ? '(min-width: 1024px) 40vw, 90vw' : size === 'sm' ? '(min-width: 768px) 12rem, 40vw' : '(min-width: 1280px) 22vw, (min-width: 768px) 32vw, 48vw')}
+                    alt={`Poster for ${movie.title}`} width={1200} height={900}
                     loading={eager ? 'eager' : 'lazy'} decoding="async" {...(eager ? { fetchPriority: 'high' as const } : {})}
                     className="absolute inset-0 h-full w-full object-cover" />
             </div>

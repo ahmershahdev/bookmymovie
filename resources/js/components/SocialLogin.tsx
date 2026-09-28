@@ -7,7 +7,6 @@ export default function SocialLogin({ providers }: { providers: { key: string; l
                 {/* Plain links: OAuth leaves the app, so this must be a full page navigation. */}
                 {providers.map((provider) => <a key={provider.key} href={provider.url} className="btn btn-ghost w-full">Continue with {provider.label}</a>)}
             </div>
-            <div className="label my-8 flex items-center gap-4"><span className="h-px flex-1 bg-line" />or with email<span className="h-px flex-1 bg-line" /></div>
         </>
     );
 }

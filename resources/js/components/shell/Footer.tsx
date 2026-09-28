@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import Icon from '@/components/Icon';
-import { CONTACT, LanguageToggle } from '@/components/shell/Navbar';
+import { LanguageToggle } from '@/components/shell/Navbar';
 import { useT } from '@/lib/i18n';
 import { route, useShared } from '@/lib/utils';
 
@@ -49,12 +49,12 @@ export default function Footer() {
             <div className="shell pt-20">
                 <div className="grid gap-16 lg:grid-cols-12">
                     <div className="lg:col-span-5">
-                        <img src="/images/logo-sm.webp" alt="BookMyMovie" width={280} height={210} loading="lazy" decoding="async" className="mb-8 h-24 w-auto" />
+                        <img src={site.logo_url} alt={site.name} width={280} height={210} loading="lazy" decoding="async" className="mb-8 h-24 w-auto" />
                         <p className="display text-[clamp(3.5rem,7vw,6.5rem)]">{t('See it on the')} <span className="text-accent">{t('big')}</span> {t('screen.')}</p>
                         <p className="lede mt-6 max-w-md">{site.footer_description}</p>
                         <div className="mt-8 flex flex-wrap gap-2">
                             <Link href={route('movies.index')} className="btn btn-primary">{t('Browse showtimes')} <Icon name="arrow-right" size={16} className="arrow" /></Link>
-                            <a href={CONTACT.github} rel="noopener" target="_blank" className="btn btn-ghost"><Icon name="github" size={16} /> GitHub</a>
+                            <Link href={route('about')} className="btn btn-ghost">{t('About the project')}</Link>
                         </div>
                     </div>
 
@@ -86,25 +86,25 @@ export default function Footer() {
                     </div>
                 </div>
 
-                <div className="grid-lines mt-20 sm:grid-cols-2 lg:grid-cols-5" aria-label="Contact">
-                    <a href={`mailto:${CONTACT.email}`} className="group p-6 transition-colors hover:!bg-volt hover:text-noir sm:col-span-2">
+                <div className="grid-lines mt-20 sm:grid-cols-2 lg:grid-cols-4" aria-label="Contact">
+                    <a href={`mailto:${site.support_email}`} className="group p-6 transition-colors hover:!bg-volt hover:text-noir sm:col-span-2">
                         <span className="label group-hover:text-noir/60">{t('Email support')}</span>
-                        <span className="headline mt-3 block break-all text-3xl sm:text-4xl">{CONTACT.email}</span>
+                        <span className="headline mt-3 block break-all text-3xl sm:text-4xl">{site.support_email}</span>
                     </a>
-                    <a href={`tel:${CONTACT.phoneHref}`} className="group p-6 transition-colors hover:!bg-volt hover:text-noir">
+                    <a href={`tel:${site.support_phone.replace(/[^\d+]/g, '')}`} className="group p-6 transition-colors hover:!bg-volt hover:text-noir">
                         <span className="label group-hover:text-noir/60">{t('Call')}</span>
-                        <span className="num mt-3 block text-xl" dir="ltr">{CONTACT.phone}</span>
+                        <span className="num mt-3 block text-xl" dir="ltr">{site.support_phone}</span>
                     </a>
-                    {[['Portfolio', 'ahmershah.dev', CONTACT.website, 'globe'], ['GitHub', 'ahmershahdev', CONTACT.github, 'github']].map(([label, handle, href, icon]) => (
-                        <a key={label} href={href} target="_blank" rel="noopener" className="group flex flex-col justify-between p-6 transition-colors hover:!bg-volt hover:text-noir">
-                            <span className="label flex items-center justify-between group-hover:text-noir/60">{label} <Icon name="arrow-up-right" size={14} className="transition group-hover:rotate-45" /></span>
-                            <span className="mt-3 flex items-center gap-2 text-lg font-semibold"><Icon name={icon} size={18} /> {handle}</span>
+                    <div className="p-6">
+                        <span className="label">{t('Based in')}</span>
+                        <span className="mt-3 block text-lg font-semibold">{site.contact_address}</span>
+                    </div>
+                    {site.socials.map((social) => (
+                        <a key={social.key} href={social.url} target="_blank" rel="noopener me" className="group flex items-center justify-between gap-3 p-6 transition-colors hover:!bg-volt hover:text-noir">
+                            <span className="flex items-center gap-3 text-lg font-semibold">{['github', 'linkedin'].includes(social.key) ? <Icon name={social.key} size={18} /> : <Icon name="globe" size={18} />} {social.label}</span>
+                            <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
                         </a>
                     ))}
-                    <a href={CONTACT.linkedin} target="_blank" rel="noopener" className="group flex flex-col justify-between p-6 transition-colors hover:!bg-volt hover:text-noir sm:col-span-2 lg:col-span-5">
-                        <span className="label flex items-center justify-between group-hover:text-noir/60">LinkedIn <Icon name="arrow-up-right" size={14} className="transition group-hover:rotate-45" /></span>
-                        <span className="mt-3 flex items-center gap-2 text-lg font-semibold"><Icon name="linkedin" size={18} /> Syed Ahmer Shah · linkedin.com/in/syedahmershah</span>
-                    </a>
                 </div>
 
                 <p className="pointer-events-none mt-24 select-none whitespace-nowrap text-center text-[15.5vw] font-black uppercase leading-[.78] tracking-[-0.03em] text-paper/[.06] [font-stretch:62%]" aria-hidden="true">

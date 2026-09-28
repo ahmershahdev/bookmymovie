@@ -6,6 +6,7 @@ import ProgressBar from '@/components/shell/ProgressBar';
 import ScrollIndicator from '@/components/shell/ScrollIndicator';
 import Toaster from '@/components/shell/Toaster';
 import { Alert, Checkbox, Field, Select, TextArea } from '@/components/ui';
+import { DemoBanner } from '@/layouts/AdminLayout';
 import { Meta } from '@/layouts/SiteLayout';
 import { scrollToTarget } from '@/lib/scroll';
 import { cn, route, useShared } from '@/lib/utils';
@@ -96,9 +97,13 @@ export default function AdminDashboard(props: Props) {
                             </button>
                         ))}
                     </nav>
-                    <Link href={route('admin.activity')} className="mt-3 flex shrink-0 items-center justify-between gap-3 border border-line px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[.08em] text-paper transition hover:border-accent hover:text-accent [font-stretch:115%]">
-                        <span className="flex items-center gap-3"><Icon name="shield" size={16} /> Audit log & refunds</span> <Icon name="arrow-right" size={14} />
-                    </Link>
+                    <div className="mt-3 grid gap-1 border-t border-line pt-3">
+                        {([['Members', 'admin.users', 'user'], ['Reviews', 'admin.reviews', 'star'], ['Bookings & refunds', 'admin.activity', 'ticket'], ['Site & brand', 'admin.settings', 'settings']] as const).map(([label, name, icon]) => (
+                            <Link key={name} href={route(name)} className="flex items-center justify-between gap-3 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[.08em] text-paper transition hover:bg-ink-3 hover:text-accent [font-stretch:115%]">
+                                <span className="flex items-center gap-3"><Icon name={icon} size={16} /> {label}</span> <Icon name="arrow-right" size={14} />
+                            </Link>
+                        ))}
+                    </div>
                     <div className="mt-4 hidden gap-2 border-t border-line pt-4 lg:grid">
                         <Link href={route('home')} className="btn btn-ghost btn-sm">Public site <Icon name="arrow-up-right" size={14} /></Link>
                         <Link href={route('admin.logout')} method="post" as="button" className="btn btn-primary btn-sm"><Icon name="logout" size={14} /> Logout</Link>
@@ -115,6 +120,7 @@ export default function AdminDashboard(props: Props) {
                         <Link href={route('home')} className="btn btn-ghost">View live site <Icon name="arrow-up-right" size={14} /></Link>
                     </header>
 
+                    <DemoBanner />
                     {firstError && <Alert tone="error">{firstError}</Alert>}
 
                     <div className="grid-lines sm:grid-cols-2 xl:grid-cols-3">

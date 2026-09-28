@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminCommerceController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminOperationsController;
+use App\Http\Controllers\AdminPortalController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CinemaController;
 use App\Http\Controllers\HomeController;
@@ -33,6 +35,8 @@ Route::get('/movies', [MovieController::class, 'index'])->name('movies.index');
 Route::get('/movies/{status}', [MovieController::class, 'status'])->whereIn('status', ['now-showing', 'coming-soon', 'ended'])->name('movies.status');
 Route::get('/genres/{slug}', [MovieController::class, 'genre'])->where('slug', '[a-z0-9-]+')->name('movies.genre');
 Route::get('/movies/{slug}', [MovieController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('movies.show');
+Route::get('/u/{username}', [\App\Http\Controllers\ProfileController::class, 'show'])->where('username', '[a-z0-9_]{3,30}')->name('profile.show');
+Route::get('/movies/{slug}/reviews', [MovieController::class, 'reviews'])->where('slug', '[a-z0-9-]+')->name('movies.reviews')->middleware('throttle:60,1');
 Route::get('/movies/{slug}/book/{show}', [MovieController::class, 'seats'])->whereNumber('show')->name('movies.seats');
 Route::get('/compare', [PublicController::class, 'compare'])->name('movies.compare');
 Route::get('/search/{query?}', [PublicController::class, 'search'])->where('query', '[^/]{1,120}')->middleware('throttle:search')->name('search');
@@ -57,6 +61,7 @@ Route::get('/accessibility', [PublicController::class, 'accessibility'])->name('
 Route::get('/e-ticket-info', [PublicController::class, 'eticket'])->name('eticket.info');
 Route::get('/gift-cards', [PublicController::class, 'giftCards'])->name('gift-cards');
 Route::post('/gift-cards/balance', [PublicController::class, 'giftCardBalance'])->name('gift-cards.balance')->middleware('throttle:10,1');
+Route::get('/assistant/context', [\App\Http\Controllers\AssistantController::class, 'context'])->name('assistant.context')->middleware('throttle:30,1');
 Route::post('/language', [LocaleController::class, 'update'])->name('locale.update')->middleware('throttle:30,1');
 
 /*
@@ -73,6 +78,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:password-reset');
     Route::get('/reset-password', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
+    Route::get('/username-check', [AuthController::class, 'usernameAvailable'])->name('username.check')->middleware('throttle:40,1');
     Route::get('/login/code', [AuthController::class, 'showTwoFactor'])->name('user.two-factor');
     Route::post('/login/code', [AuthController::class, 'verifyTwoFactor'])->middleware('throttle:login');
     Route::post('/login/code/resend', [AuthController::class, 'resendTwoFactor'])->name('user.two-factor.resend')->middleware('throttle:password-reset');
@@ -96,7 +102,7 @@ Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderC
 | Admin
 */
 
-Route::prefix('admin')->group(function () {
+Route::prefix('admin')->middleware(\App\Http\Middleware\BlockDemoAdminWrites::class)->group(function () {
     Route::get('/login', [AuthController::class, 'showAdminLogin'])->name('admin.login');
     Route::post('/login', [AuthController::class, 'adminLogin'])->middleware('throttle:admin-login');
     Route::get('/forgot-credentials', [AuthController::class, 'showAdminForgotCredentials'])->name('admin.credentials.request');
@@ -111,6 +117,24 @@ Route::prefix('admin')->group(function () {
     Route::post('/dashboard', [AdminController::class, 'handleDashboard'])->middleware('throttle:30,1');
 
     Route::get('/activity', [AdminOperationsController::class, 'activity'])->name('admin.activity');
+    Route::get('/users', [AdminPortalController::class, 'users'])->name('admin.users');
+    Route::get('/users/{user}', [AdminPortalController::class, 'userShow'])->whereNumber('user')->name('admin.users.show');
+    Route::post('/users/{user}/ban', [AdminPortalController::class, 'banUser'])->whereNumber('user')->name('admin.users.ban')->middleware('throttle:30,1');
+    Route::post('/users/{user}/unban', [AdminPortalController::class, 'unbanUser'])->whereNumber('user')->name('admin.users.unban')->middleware('throttle:30,1');
+    Route::post('/banned-ips', [AdminPortalController::class, 'banIp'])->name('admin.ips.store')->middleware('throttle:30,1');
+    Route::delete('/banned-ips/{ban}', [AdminPortalController::class, 'unbanIp'])->whereNumber('ban')->name('admin.ips.destroy')->middleware('throttle:30,1');
+    Route::delete('/banned-devices/{device}', [AdminPortalController::class, 'unbanDevice'])->whereNumber('device')->name('admin.devices.destroy')->middleware('throttle:30,1');
+    Route::get('/commerce', [AdminCommerceController::class, 'index'])->name('admin.commerce');
+    Route::post('/coupons', [AdminCommerceController::class, 'storeCoupon'])->name('admin.coupons.store')->middleware('throttle:30,1');
+    Route::put('/coupons/{coupon}', [AdminCommerceController::class, 'updateCoupon'])->whereNumber('coupon')->name('admin.coupons.update')->middleware('throttle:60,1');
+    Route::post('/coupons/{coupon}/toggle', [AdminCommerceController::class, 'toggleCoupon'])->whereNumber('coupon')->name('admin.coupons.toggle')->middleware('throttle:60,1');
+    Route::delete('/coupons/{coupon}', [AdminCommerceController::class, 'destroyCoupon'])->whereNumber('coupon')->name('admin.coupons.destroy')->middleware('throttle:30,1');
+    Route::put('/snacks/{concession}', [AdminCommerceController::class, 'updateSnack'])->whereNumber('concession')->name('admin.snacks.update')->middleware('throttle:60,1');
+    Route::put('/films/{movie}/access', [AdminCommerceController::class, 'updateFilm'])->whereNumber('movie')->name('admin.films.access')->middleware('throttle:60,1');
+    Route::get('/reviews', [AdminPortalController::class, 'reviews'])->name('admin.reviews');
+    Route::post('/reviews/{review}', [AdminPortalController::class, 'moderateReview'])->whereNumber('review')->name('admin.reviews.moderate')->middleware('throttle:60,1');
+    Route::get('/settings', [AdminPortalController::class, 'settings'])->name('admin.settings');
+    Route::post('/settings', [AdminPortalController::class, 'updateSettings'])->name('admin.settings.update')->middleware('throttle:20,1');
     Route::post('/bookings/{number}/refund', [AdminOperationsController::class, 'refund'])->name('admin.bookings.refund')->middleware('throttle:30,1');
     Route::post('/gift-cards', [AdminOperationsController::class, 'issueGiftCard'])->name('admin.gift-cards.store')->middleware('throttle:30,1');
     Route::delete('/gift-cards/{card}', [AdminOperationsController::class, 'deactivateGiftCard'])->name('admin.gift-cards.destroy')->middleware('throttle:30,1');
@@ -147,6 +171,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{number}/pay', [PaymentController::class, 'start'])->name('payments.start')->middleware('throttle:checkout-actions');
 
     Route::post('/movies/{slug}/reviews', [MovieController::class, 'storeReview'])->name('movies.reviews.store')->middleware('throttle:profile-updates');
+    Route::post('/reviews/{review}/helpful', [MovieController::class, 'voteReview'])->whereNumber('review')->name('reviews.helpful')->middleware('throttle:30,1');
 });
 
 // Reached by the payment providers; verified by signature or API lookup, not by session.

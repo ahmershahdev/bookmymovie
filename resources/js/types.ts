@@ -2,6 +2,7 @@ export type Palette = [string, string, string];
 
 export interface Trailer {
     src: string;
+    webm?: string | null;
     label: string;
     poster: string | null;
 }
@@ -62,16 +63,22 @@ export interface SharedProps {
             id: number;
             name: string;
             first_name: string;
+            username: string;
             email: string;
             avatar: string | null;
             verified: boolean;
         };
         admin: boolean;
+        adminReadOnly?: boolean;
     };
     site: {
         name: string;
+        tagline: string;
+        logo_url: string;
         support_email: string;
         support_phone: string;
+        contact_address: string;
+        socials: { key: string; label: string; url: string }[];
         footer_description: string;
         copyright_note: string;
         response_sla: string;

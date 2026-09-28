@@ -19,20 +19,12 @@ class HomeController extends Controller
     {
         $cards = fn ($query) => $query->withCardMetrics()->with('genres')->get()->map(fn (Movie $movie) => $movie->toCardArray());
 
-        $slides = $cards(Movie::query()
-            ->where('hero_carousel_enabled', true)
-            ->publiclyListed()
-            ->orderBy('hero_sort_order')
-            ->limit(5));
-
-        $nowShowing = $cards(Movie::query()
-            ->where('status', 'now_showing')
-            ->orderByDesc('total_reviews')
-            ->orderByDesc('average_rating'));
-
-        $comingSoon = $cards(Movie::query()
-            ->where('status', 'coming_soon')
-            ->orderBy('release_date'));
+        // The catalogue rails are the same for everyone; build them once every few minutes.
+        [$slides, $nowShowing, $comingSoon] = Cache::remember('home.rails', now()->addMinutes(5), fn () => [
+            $cards(Movie::query()->where('hero_carousel_enabled', true)->publiclyListed()->orderBy('hero_sort_order')->limit(5)),
+            $cards(Movie::query()->where('status', 'now_showing')->orderByDesc('total_reviews')->orderByDesc('average_rating')),
+            $cards(Movie::query()->where('status', 'coming_soon')->orderBy('release_date')),
+        ]);
 
         $topRated = $nowShowing->sortByDesc('rating')->take(3)->values();
 
@@ -66,6 +58,8 @@ class HomeController extends Controller
                     'city' => $cinema->city,
                     'screens' => (int) $cinema->screen_count,
                     'seats' => (int) $cinema->seat_capacity,
+                    'address' => Str::limit((string) $cinema->address, 60),
+                    'amenities' => array_slice(array_filter(array_map('trim', explode(',', (string) $cinema->amenity_list))), 0, 3),
                 ]),
             'offers' => Coupon::query()
                 ->where('is_active', true)

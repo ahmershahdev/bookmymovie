@@ -28,6 +28,7 @@ class Movie extends Model
         'content_advisory',
         'release_date',
         'status',
+        'bookings_enabled',
         'poster_image',
         'banner_image',
         'hero_carousel_enabled',
@@ -59,6 +60,17 @@ class Movie extends Model
         'A' => 'Adults only',
         'S' => 'Specialised audiences',
     ];
+
+    /** Cached rails and menus that list films; cleared whenever a film changes. */
+    public const LISTING_CACHE_KEYS = ['home.rails', 'home.stats', 'nav.movies.cards.v2', 'assistant.context'];
+
+    protected static function booted(): void
+    {
+        $flush = fn () => array_map(fn (string $key) => \Illuminate\Support\Facades\Cache::forget($key), self::LISTING_CACHE_KEYS);
+        static::saved($flush);
+        static::deleted($flush);
+        static::restored($flush);
+    }
 
     protected function casts(): array
     {
@@ -123,6 +135,8 @@ class Movie extends Model
                     ->whereColumn('shows.movie_id', 'movies.id')
                     ->where('shows.status', 'scheduled')
                     ->whereDate('shows.show_date', '>=', $today)
+                    // A show that already started today is no longer bookable.
+                    ->whereRaw('TIMESTAMP(shows.show_date, shows.show_time) > ?', [now()->toDateTimeString()])
                     ->orderBy('shows.show_date')
                     ->orderBy('shows.show_time')
                     ->limit(1),
@@ -291,7 +305,7 @@ class Movie extends Model
     }
 
     /**
-     * @return list<array{src: string, label: string, poster: ?string}>
+     * @return list<array{src: string, webm: ?string, label: string, poster: ?string}>
      */
     public function trailerList(): array
     {
@@ -299,6 +313,7 @@ class Movie extends Model
             ->filter(fn ($trailer) => is_array($trailer) && filled($trailer['src'] ?? null))
             ->map(fn (array $trailer) => [
                 'src' => (string) $this->publicMediaUrl($trailer['src']),
+                'webm' => $this->publicMediaUrl($trailer['webm'] ?? null),
                 'label' => (string) ($trailer['label'] ?? 'Trailer'),
                 'poster' => $this->publicMediaUrl($trailer['poster'] ?? null),
             ])

@@ -1,13 +1,9 @@
-import { Link, router, useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
-import { Wordmark } from '@/components/shell/Navbar';
-import ProgressBar from '@/components/shell/ProgressBar';
-import ScrollIndicator from '@/components/shell/ScrollIndicator';
-import Toaster from '@/components/shell/Toaster';
-import { Alert, Field, TextArea } from '@/components/ui';
-import { Meta } from '@/layouts/SiteLayout';
-import { cn, money, route, useShared } from '@/lib/utils';
+import { Field, TextArea } from '@/components/ui';
+import AdminLayout from '@/layouts/AdminLayout';
+import { cn, money, route } from '@/lib/utils';
 
 type Log = { id: number; at: string; actor: string; actor_name: string; action: string; subject: string | null; changes: Record<string, unknown> | null; ip: string | null };
 type Booking = { number: string; customer: string | null; film: string | null; starts: string | null; total: number; gift_card: number; points: number; method: string; payment: string; status: string; refundable: boolean };
@@ -24,51 +20,25 @@ type Tab = (typeof tabs)[number][0];
 
 /** Back office: who changed what, cancellations with refunds, and gift cards. */
 export default function AdminActivity({ logs, bookings, giftCards }: Props) {
-    const { errors } = useShared();
     const [tab, setTab] = useState<Tab>('log');
-    const firstError = Object.values(errors)[0];
 
     return (
-        <>
-            <Meta />
-            <ProgressBar />
-            <header className="border-b border-line bg-ink-2">
-                <div className="shell flex h-[var(--header)] items-center justify-between gap-4">
-                    <Link href={route('home')} aria-label="BookMyMovie home"><Wordmark /></Link>
-                    <div className="flex items-center gap-2">
-                        <Link href={route('admin.dashboard')} className="btn btn-ghost btn-sm"><Icon name="arrow-left" size={14} /> Dashboard</Link>
-                        <Link href={route('admin.logout')} method="post" as="button" className="btn btn-primary btn-sm"><Icon name="logout" size={14} /> Logout</Link>
-                    </div>
-                </div>
-            </header>
+        <AdminLayout label="Back office" title="Bookings & refunds" lede="Every admin and customer action that changes data, cancellations with refunds, and gift cards.">
+            <div className="flex flex-wrap gap-1 border-b border-line" role="tablist" aria-label="Sections">
+                {tabs.map(([id, label, icon]) => (
+                    <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+                        className={cn('-mb-px flex items-center gap-2 border-b-2 px-4 py-3 text-[11px] font-semibold uppercase tracking-[.08em] transition [font-stretch:115%]',
+                            tab === id ? 'border-volt text-paper' : 'border-transparent text-mute hover:text-paper')}>
+                        <Icon name={icon} size={15} /> {label}
+                        <span className="num text-[10px] text-dim">{id === 'log' ? logs.length : id === 'refunds' ? bookings.length : giftCards.length}</span>
+                    </button>
+                ))}
+            </div>
 
-            <main id="main" className="shell space-y-8 py-10">
-                <div>
-                    <p className="label label-accent">Back office</p>
-                    <h1 className="display mt-3 text-[clamp(3.25rem,7vw,6rem)]">Activity</h1>
-                    <p className="mt-3 max-w-2xl text-sm text-mute">Every admin and customer action that changes data, cancellations with refunds, and gift cards.</p>
-                </div>
-
-                {firstError && <Alert tone="error">{firstError}</Alert>}
-
-                <div className="flex flex-wrap gap-1 border-b border-line" role="tablist" aria-label="Sections">
-                    {tabs.map(([id, label, icon]) => (
-                        <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-                            className={cn('-mb-px flex items-center gap-2 border-b-2 px-4 py-3 text-[11px] font-semibold uppercase tracking-[.08em] transition [font-stretch:115%]',
-                                tab === id ? 'border-volt text-paper' : 'border-transparent text-mute hover:text-paper')}>
-                            <Icon name={icon} size={15} /> {label}
-                            <span className="num text-[10px] text-dim">{id === 'log' ? logs.length : id === 'refunds' ? bookings.length : giftCards.length}</span>
-                        </button>
-                    ))}
-                </div>
-
-                {tab === 'log' && <AuditLog logs={logs} />}
-                {tab === 'refunds' && <Refunds bookings={bookings} />}
-                {tab === 'gift' && <GiftCards cards={giftCards} />}
-            </main>
-            <Toaster />
-            <ScrollIndicator />
-        </>
+            {tab === 'log' && <AuditLog logs={logs} />}
+            {tab === 'refunds' && <Refunds bookings={bookings} />}
+            {tab === 'gift' && <GiftCards cards={giftCards} />}
+        </AdminLayout>
     );
 }
 

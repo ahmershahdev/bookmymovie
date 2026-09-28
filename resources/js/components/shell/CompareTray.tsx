@@ -13,7 +13,7 @@ export default function CompareTray() {
         <AnimatePresence>
             {list.length > 0 && component !== 'Public/Compare' && (
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    className="fixed bottom-4 right-4 z-[60] sm:bottom-6 sm:right-6" data-print-hide>
+                    className="fixed bottom-4 left-4 z-[60] sm:bottom-6 sm:left-6" data-print-hide>
                     <div className="glass flex items-center gap-3 p-1.5 shadow-2xl shadow-black/60">
                         <div className="flex -space-x-2 pl-1">
                             {list.map((movie) => (

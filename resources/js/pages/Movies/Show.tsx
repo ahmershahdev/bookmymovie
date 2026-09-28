@@ -1,4 +1,4 @@
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useRef, useState } from 'react';
 import Icon from '@/components/Icon';
@@ -6,7 +6,8 @@ import MovieCard from '@/components/MovieCard';
 import { Reveal, SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
 import { BackdropVideo, TrailerModal } from '@/components/Trailer';
-import { Breadcrumbs, SectionHeading, StarRating } from '@/components/ui';
+import ReviewsSection, { type ReviewPage, type ReviewSummary } from '@/components/Reviews';
+import { Breadcrumbs, SectionHeading } from '@/components/ui';
 import { useT } from '@/lib/i18n';
 import { useCompare } from '@/lib/compare';
 import { scrollToTarget } from '@/lib/scroll';
@@ -33,9 +34,11 @@ interface Props {
     cities: string[];
     showCount: number;
     venueCount: number;
-    reviews: { id: number; author: string; initial: string; rating: number; text: string; ago: string }[];
+    reviews: ReviewPage;
+    reviewSummary: ReviewSummary;
     totalReviews: number;
     distribution: { stars: number; count: number }[];
+    pricing: { tier: string; rows: string; from: number; to: number; was: number | null; kids: number | null; benefits: string | null }[];
     similar: Movie[];
     primaryGenre: { name: string; slug: string } | null;
     directors: Credit[];
@@ -44,7 +47,7 @@ interface Props {
     cast: Credit[];
     inWishlist: boolean;
     canReview: boolean;
-    userReview: { rating: number; text: string } | null;
+    userReview: { rating: number; title: string; text: string; spoilers: boolean } | null;
 }
 
 export default function MovieShow(props: Props) {
@@ -67,7 +70,7 @@ export default function MovieShow(props: Props) {
         }
     };
 
-    const sections: [string, string][] = [['showtimes', t('Showtimes')], ...(movie.trailers.length ? [['trailers', movie.trailers.length > 1 ? t('Trailers') : t('Trailer')] as [string, string]] : []), ['story', 'Story'], ['cast', 'Cast & crew'], ['details', 'Details'], ['reviews', `Reviews (${totalReviews})`]];
+    const sections: [string, string][] = [['showtimes', t('Showtimes')], ...(props.pricing.length ? [['prices', t('Prices')] as [string, string]] : []), ...(movie.trailers.length ? [['trailers', movie.trailers.length > 1 ? t('Trailers') : t('Trailer')] as [string, string]] : []), ['story', 'Story'], ['cast', 'Cast & crew'], ['details', 'Details'], ['reviews', `Reviews (${totalReviews})`]];
     if (props.similar.length) sections.push(['similar', 'More like this']);
 
     return (
@@ -156,6 +159,7 @@ export default function MovieShow(props: Props) {
             </nav>
 
             <Showtimes {...props} />
+            {props.pricing.length > 0 && <Pricing pricing={props.pricing} kidsNote={props.pricing.some((tier) => tier.kids !== null)} />}
 
             {movie.trailers.length > 0 && (
                 <section id="trailers" className="scroll-mt-24 pt-28" aria-labelledby="trailers-title">
@@ -233,7 +237,7 @@ export default function MovieShow(props: Props) {
                 </div>
             </section>
 
-            <ReviewsSection {...props} />
+            <ReviewsSection movie={movie} initial={props.reviews} summary={props.reviewSummary} canReview={props.canReview} userReview={props.userReview} />
 
             {props.similar.length > 0 && (
                 <section id="similar" className="scroll-mt-24 pt-28" aria-labelledby="similar-title">
@@ -377,92 +381,38 @@ function Cast({ cast, directors, writers, crew, movie }: Props) {
     );
 }
 
-function ReviewsSection({ movie, reviews, totalReviews, distribution, canReview, userReview }: Props) {
-    const form = useForm({ rating: userReview?.rating ?? 0, review_text: userReview?.text ?? '' });
-    const [hover, setHover] = useState(0);
-
-    const submit = (event: React.FormEvent) => {
-        event.preventDefault();
-        form.post(route('movies.reviews.store', movie.slug), { preserveScroll: true });
-    };
-
+/** What a seat costs for this film, per tier, across the coming week. */
+function Pricing({ pricing, kidsNote }: { pricing: Props['pricing']; kidsNote: boolean }) {
+    const t = useT();
     return (
-        <section id="reviews" className="scroll-mt-24 pt-28" aria-labelledby="reviews-title">
-            <div className="shell grid gap-12 lg:grid-cols-12">
-                <div className="lg:col-span-4">
-                    <SectionHeading label="Verified audience" title="Reviews" id="reviews-title" />
-                    {totalReviews > 0 && (
-                        <div className="panel mt-10 p-7">
-                            <div className="flex items-end gap-4">
-                                <span className="display text-8xl tabular">{movie.average_rating.toFixed(1)}</span>
-                                <div className="pb-2">
-                                    <StarRating rating={movie.average_rating} size={16} />
-                                    <p className="mt-1 text-sm text-mute">{plural(totalReviews, 'review')}</p>
-                                </div>
-                            </div>
-                            <ul className="mt-6 space-y-2">
-                                {distribution.map(({ stars, count }) => (
-                                    <li key={stars} className="flex items-center gap-3 text-xs text-mute">
-                                        <span className="num w-3">{stars}</span>
-                                        <span className="h-1.5 flex-1 overflow-hidden bg-line"><motion.span className="block h-full bg-volt" initial={{ width: 0 }} whileInView={{ width: `${totalReviews ? (count / totalReviews) * 100 : 0}%` }} viewport={{ once: true }} transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} /></span>
-                                        <span className="num w-5 text-right">{count}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                    <p className="mt-6 text-sm text-mute">Only guests who booked this film on BookMyMovie can review it.</p>
-                </div>
-
-                <div className="lg:col-span-8">
-                    {canReview && (
-                        <form onSubmit={submit} className="panel mb-10 p-7">
-                            <p className="headline text-3xl">{userReview ? 'Update your review' : 'You saw it. What did you think?'}</p>
-                            <fieldset className="mt-5">
-                                <legend className="field-label">Your rating</legend>
-                                <div className="mt-2 flex gap-1" onMouseLeave={() => setHover(0)}>
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <label key={star} className="cursor-pointer" onMouseEnter={() => setHover(star)}>
-                                            <input type="radio" name="rating" value={star} className="sr-only" checked={form.data.rating === star} onChange={() => form.setData('rating', star)} />
-                                            <Icon name="star" size={30} className={cn('transition', (hover || form.data.rating) >= star ? 'fill-accent text-accent' : 'text-dim')} />
-                                            <span className="sr-only">{plural(star, 'star')}</span>
-                                        </label>
+        <section id="prices" className="scroll-mt-40 pt-28" aria-labelledby="prices-title">
+            <div className="shell">
+                <SectionHeading label={t('No booking fee on any seat')} title={t('Tickets & prices')} id="prices-title"
+                    description={t('Prices change with the screen and the time of day. This is the full range for the next seven days; the seat map shows the exact price before you tap.')} />
+                <div className="mt-12 grid border-s border-t border-line sm:grid-cols-2 xl:grid-cols-4">
+                    {pricing.map((tier, index) => (
+                        <motion.article key={tier.tier} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-10%' }}
+                            transition={{ duration: 0.7, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }} className="group relative flex flex-col border-b border-e border-line bg-ink p-7 transition-colors hover:bg-ink-2">
+                            <p className="label">{t('Rows')} <span className="num text-paper">{tier.rows}</span></p>
+                            <h3 className="headline mt-3 text-3xl">{tier.tier}</h3>
+                            <p className="mt-6 flex items-baseline gap-2">
+                                <span className="display text-5xl text-accent">{money(tier.from)}</span>
+                                {tier.to > tier.from && <span className="num text-sm text-mute">– {money(tier.to)}</span>}
+                            </p>
+                            {tier.was && <p className="num mt-1 text-xs text-signal line-through">{money(tier.was)}</p>}
+                            {tier.kids !== null && <p className="mt-2 text-sm text-paper-2">{t('Children (3–12)')}: <span className="num">{money(tier.kids)}</span></p>}
+                            {tier.benefits && (
+                                <ul className="mt-6 space-y-2 border-t border-line pt-5 text-sm text-mute">
+                                    {tier.benefits.split(/[,;·]/).map((item) => item.trim()).filter(Boolean).map((item) => (
+                                        <li key={item} className="flex gap-2"><Icon name="check" size={14} className="mt-0.5 shrink-0 text-mint" />{item}</li>
                                     ))}
-                                </div>
-                                {form.errors.rating && <p className="field-error mt-2">{form.errors.rating}</p>}
-                            </fieldset>
-                            <div className="field mt-5">
-                                <label htmlFor="review_text" className="field-label">Your review</label>
-                                <textarea id="review_text" className="input" minLength={20} maxLength={1200} required placeholder="What stayed with you? No spoilers, please."
-                                    value={form.data.review_text} onChange={(event) => form.setData('review_text', event.target.value)} />
-                                {form.errors.review_text && <p className="field-error">{form.errors.review_text}</p>}
-                            </div>
-                            <button type="submit" disabled={form.processing} className="btn btn-primary mt-5">Publish review</button>
-                        </form>
-                    )}
-
-                    {reviews.length ? reviews.map((review) => (
-                        <article key={review.id} className="border-t border-line py-8 first:border-t-0 first:pt-0">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <span className="grid h-10 w-10 place-items-center bg-ink-4 text-lg font-black uppercase [font-stretch:75%]">{review.initial}</span>
-                                    <div>
-                                        <p className="text-sm font-semibold">{review.author}</p>
-                                        <p className="text-xs text-mute">Verified booking · {review.ago}</p>
-                                    </div>
-                                </div>
-                                <StarRating rating={review.rating} />
-                            </div>
-                            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-paper-2">{review.text}</p>
-                        </article>
-                    )) : (
-                        <div className="panel p-10 text-center">
-                            <Icon name="quote" size={32} className="mx-auto text-dim" />
-                            <p className="headline mt-4 text-3xl">No reviews yet</p>
-                            <p className="mt-2 text-sm text-mute">{movie.status_key === 'coming_soon' ? 'Reviews open after the first screenings.' : 'Book a seat and be the first to tell everyone what you thought.'}</p>
-                        </div>
-                    )}
+                                </ul>
+                            )}
+                            <span className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 bg-volt transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-x-100" aria-hidden="true" />
+                        </motion.article>
+                    ))}
                 </div>
+                <p className="mt-4 text-xs text-mute">{kidsNote ? t('Child prices apply to ages 3–12 with an adult.') : t('This film has no child discount.')} {t('Coupons, gift cards and loyalty points come off at checkout.')}</p>
             </div>
         </section>
     );

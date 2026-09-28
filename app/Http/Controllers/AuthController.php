@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Admin;
 use App\Models\User;
 use App\Support\AuditLog;
+use App\Support\CleanText;
+use App\Support\DeviceIdentity;
 use App\Support\FormSecurity;
 use App\Support\SecurityLog;
 use App\Support\TransactionalMailer;
@@ -159,6 +161,9 @@ class AuthController extends Controller
     {
         Auth::login($user, $remember);
         $request->session()->regenerate();
+        // Kept so an admin can see (and, if needed, ban) the address an account signs in from.
+        $user->forceFill(['last_login_ip' => $request->ip(), 'last_login_at' => now()])->saveQuietly();
+        DeviceIdentity::remember($request, $user, true);
         AuditLog::record('auth.login', $user, ['method' => $method], $request, 'user', $user->id);
         TransactionalMailer::userLogin($user, $request, ucfirst($method));
 
@@ -178,13 +183,15 @@ class AuthController extends Controller
         FormSecurity::validateRecaptcha($request, 'user_register');
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[\pL\s.\'-]+$/u'],
+            'name' => CleanText::nameRules(),
+            'username' => CleanText::usernameRules(),
             'email' => ['required', 'email:rfc', 'max:150', 'unique:users,email', FormSecurity::disposableEmailRule()],
             'phone' => ['nullable', 'string', 'min:10', 'max:20', 'regex:/^[0-9+\-\s()]+$/', 'unique:users,phone'],
             'password' => ['required', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()],
             'terms' => ['accepted'],
         ], [
-            'name.regex' => 'Please use letters, spaces, apostrophes and hyphens only.',
+            ...CleanText::nameMessages(),
+            ...CleanText::usernameMessages(),
             'terms.accepted' => 'Please accept the terms of service to create an account.',
         ]);
 
@@ -192,7 +199,8 @@ class AuthController extends Controller
 
         try {
             $user = User::create([
-                'name' => trim($data['name']),
+                'name' => CleanText::normaliseName($data['name']),
+                'username' => $data['username'],
                 'email' => strtolower($data['email']),
                 'phone' => $data['phone'] ?? null,
                 'password' => $data['password'],
@@ -211,6 +219,22 @@ class AuthController extends Controller
         return redirect()
             ->route('user.verify.notice')
             ->with('status', 'Account created. We have emailed you an 8-character verification code.');
+    }
+
+    /** Live check for the sign-up form. Says only "free or not", never who owns a name. */
+    public function usernameAvailable(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $name = strtolower(trim(mb_substr((string) $request->query('u', ''), 0, 40)));
+        $problem = CleanText::usernameProblem($name);
+        $valid = $problem === null;
+        $available = $valid && ! User::withTrashed()->where('username', $name)->exists();
+
+        return response()->json([
+            'valid' => $valid,
+            'reason' => $problem,
+            'available' => $available,
+            'suggestion' => $valid && ! $available ? User::uniqueUsername($name) : null,
+        ]);
     }
 
     public function showEmailVerification(Request $request): Response
@@ -340,6 +364,7 @@ class AuthController extends Controller
 
         Auth::login($user, true);
         $request->session()->regenerate();
+        DeviceIdentity::remember($request, $user, true);
         AuditLog::record('auth.login', $user, ['method' => $provider], $request, 'user', $user->id);
         TransactionalMailer::userLogin($user, $request, ucfirst($provider));
 
@@ -491,6 +516,13 @@ class AuthController extends Controller
             'captcha' => FormSecurity::forPage('admin_login'),
             'sessionMinutes' => (int) config('session.admin_lifetime', 60),
             'recoveryEnabled' => $this->adminRecoveryEnabled(),
+            // Credentials are only ever shown while the account is a read-only
+            // demo; with full access they would hand the site to anyone.
+            'demo' => config('bookmymovie.admin.demo_enabled') && config('bookmymovie.admin.demo_read_only') ? [
+                'email' => config('bookmymovie.admin.demo_email'),
+                'password' => config('bookmymovie.admin.demo_password'),
+                'readOnly' => (bool) config('bookmymovie.admin.demo_read_only'),
+            ] : null,
         ], ['title' => 'Admin sign in | BookMyMovie', 'description' => 'Restricted area for BookMyMovie staff.', 'robots' => 'noindex, nofollow']);
     }
 
@@ -556,7 +588,7 @@ class AuthController extends Controller
 
         $email = strtolower($data['email']);
 
-        if (Admin::query()->where('email', $email)->exists()) {
+        if (Admin::query()->where('email', $email)->where('is_demo', false)->exists()) {
             $token = Str::random(64);
 
             DB::table('admin_password_resets')->updateOrInsert(

@@ -24,6 +24,7 @@ const rows: [string, Field, string | null][] = [
 export default function Compare({ catalogue }: { catalogue: MovieCard[] }) {
     const compare = useCompare();
     const list = compare.list as MovieCard[];
+    const slots: (MovieCard | null)[] = [...list, ...Array.from({ length: Math.max(0, 4 - list.length) }, () => null)].slice(0, 4);
 
     const best = (rule: string) => {
         const [mode, field] = rule.split(':') as ['min' | 'max', Field];
@@ -47,12 +48,12 @@ export default function Compare({ catalogue }: { catalogue: MovieCard[] }) {
             <section className="pt-14">
                 <div className="shell">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <Dropdown className="flex-1 sm:max-w-md" label="Add a film" value="" placeholder={`Choose from ${catalogue.length} films…`}
+                        <div data-compare-add className="flex-1 sm:max-w-md"><Dropdown label="Add a film" value="" placeholder={`Choose from ${catalogue.length} films…`}
                             options={catalogue.filter((movie) => !compare.has(movie.id)).map((movie) => ({ value: String(movie.id), label: movie.title, hint: movie.status }))}
                             onChange={(value) => {
                                 const movie = catalogue.find((item) => String(item.id) === value);
                                 if (movie) compare.toggle(movie);
-                            }} />
+                            }} /></div>
                         {list.length > 0 && <button type="button" className="btn btn-ghost" onClick={compare.clear}>Clear all</button>}
                     </div>
 
@@ -63,21 +64,35 @@ export default function Compare({ catalogue }: { catalogue: MovieCard[] }) {
                             </EmptyState>
                         </div>
                     ) : (
-                        <div className="mt-12 overflow-x-auto" data-lenis-prevent>
-                            <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
+                        <div className="mt-12 overflow-x-auto border border-line" data-lenis-prevent>
+                            {/* Always four equal slots: one film never stretches to fill the page, and empty slots invite the next pick. */}
+                            <table className="w-full min-w-[46rem] table-fixed border-collapse text-left">
                                 <caption className="sr-only">Film comparison</caption>
+                                <colgroup>
+                                    <col className="w-32 sm:w-44" />
+                                    {slots.map((_, index) => <col key={index} />)}
+                                </colgroup>
                                 <thead>
                                     <tr>
-                                        <th scope="col" className="w-44 align-bottom"><span className="sr-only">Attribute</span></th>
-                                        {list.map((movie) => (
-                                            <th key={movie.id} scope="col" className="px-2 pb-6 align-bottom font-normal">
-                                                <div className="relative">
-                                                    <Link href={route('movies.show', movie.slug)} className="block"><Poster movie={movie} size="sm" /></Link>
-                                                    <button type="button" onClick={() => compare.toggle(movie)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center bg-ink/80 text-paper hover:bg-signal hover:text-noir" aria-label={`Remove ${movie.title}`}>
-                                                        <Icon name="close" size={14} />
+                                        <th scope="col" className="sticky left-0 z-10 bg-ink align-bottom"><span className="sr-only">Attribute</span></th>
+                                        {slots.map((movie, index) => (
+                                            <th key={movie?.id ?? `empty-${index}`} scope="col" className="border-s border-line p-3 align-top font-normal">
+                                                {movie ? (
+                                                    <div className="group relative">
+                                                        <Link href={route('movies.show', movie.slug)} className="block overflow-hidden">
+                                                            <div className="transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-105"><Poster movie={movie} size="sm" meta={false} /></div>
+                                                        </Link>
+                                                        <button type="button" onClick={() => compare.toggle(movie)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center bg-ink/80 text-paper backdrop-blur transition hover:bg-signal hover:text-noir" aria-label={`Remove ${movie.title}`}>
+                                                            <Icon name="close" size={14} />
+                                                        </button>
+                                                        <p className="headline mt-3 line-clamp-2 text-lg leading-tight">{movie.title}</p>
+                                                    </div>
+                                                ) : (
+                                                    <button type="button" onClick={() => document.querySelector<HTMLElement>('[data-compare-add] button')?.click()}
+                                                        className="grid aspect-[4/3] w-full place-items-center border border-dashed border-line-2 text-mute transition hover:border-accent hover:text-accent">
+                                                        <span className="flex flex-col items-center gap-2 text-xs"><Icon name="plus" size={20} /> Add a film</span>
                                                     </button>
-                                                </div>
-                                                <p className="headline mt-3 text-xl">{movie.title}</p>
+                                                )}
                                             </th>
                                         ))}
                                     </tr>
@@ -87,19 +102,24 @@ export default function Compare({ catalogue }: { catalogue: MovieCard[] }) {
                                         const winner = rule ? best(rule) : null;
                                         return (
                                             <tr key={label} className="border-t border-line">
-                                                <th scope="row" className="label py-4 pr-4 font-semibold">{label}</th>
-                                                {list.map((movie) => (
-                                                    <td key={movie.id} className={cn('num px-2 py-4', winner && Number(movie[winner.field]) === winner.value && 'font-semibold text-accent')}>
-                                                        {format(movie, field)}
-                                                    </td>
-                                                ))}
+                                                <th scope="row" className="label sticky left-0 z-10 bg-ink px-3 py-4 font-semibold">{label}</th>
+                                                {slots.map((movie, index) => {
+                                                    const wins = movie && winner && Number(movie[winner.field]) === winner.value;
+                                                    return (
+                                                        <td key={movie?.id ?? `empty-${index}`} className={cn('num border-s border-line px-3 py-4', wins && 'bg-volt/[.07] font-semibold text-accent')}>
+                                                            {movie ? <>{format(movie, field)}{wins && <span className="ms-2 text-[10px] uppercase">Best</span>}</> : <span className="text-dim">—</span>}
+                                                        </td>
+                                                    );
+                                                })}
                                             </tr>
                                         );
                                     })}
                                     <tr className="border-t border-line">
-                                        <th scope="row" className="py-6"><span className="sr-only">Book</span></th>
-                                        {list.map((movie) => (
-                                            <td key={movie.id} className="px-2 py-6"><Link href={`${route('movies.show', movie.slug)}#showtimes`} className="btn btn-primary btn-sm w-full">Showtimes</Link></td>
+                                        <th scope="row" className="sticky left-0 z-10 bg-ink py-6"><span className="sr-only">Book</span></th>
+                                        {slots.map((movie, index) => (
+                                            <td key={movie?.id ?? `empty-${index}`} className="border-s border-line px-3 py-6">
+                                                {movie && <Link href={`${route('movies.show', movie.slug)}#showtimes`} className="btn btn-primary btn-sm w-full">Showtimes</Link>}
+                                            </td>
                                         ))}
                                     </tr>
                                 </tbody>

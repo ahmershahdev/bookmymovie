@@ -8,8 +8,11 @@ use App\Models\Movie;
 use App\Models\Review;
 use App\Models\Screen;
 use App\Models\Wishlist;
+use App\Support\CleanText;
+use App\Support\ReviewData;
 use App\Support\Seo;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -179,20 +182,7 @@ class MovieController extends Controller
                 })->values(),
             ])->values());
 
-        $reviews = Review::query()
-            ->with('user:id,name')
-            ->where('movie_id', $movie->id)
-            ->where('is_approved', true)
-            ->latest()
-            ->limit(8)
-            ->get();
-
-        $distribution = Review::query()
-            ->where('movie_id', $movie->id)
-            ->where('is_approved', true)
-            ->selectRaw('rating, COUNT(*) AS total')
-            ->groupBy('rating')
-            ->pluck('total', 'rating');
+        $reviewSummary = ReviewData::summary($movie);
 
         $similar = Movie::query()
             ->withCardMetrics()
@@ -206,16 +196,12 @@ class MovieController extends Controller
             ->map(fn (Movie $item) => $item->toCardArray());
 
         $user = Auth::user();
-        $canReview = $user && Booking::query()
-            ->where('user_id', $user->id)
-            ->where('booking_status', '<>', 'cancelled')
-            ->whereHas('show', fn (Builder $query) => $query->where('movie_id', $movie->id))
-            ->exists();
+        $canReview = $user && $this->watchedBooking($user->id, $movie->id) !== null;
 
         $card = $movie->toCardArray();
         $primaryGenre = $movie->genres->first();
-        $totalReviews = (int) $distribution->sum();
-        $userReview = $user ? ($reviews->firstWhere('user_id', $user->id) ?? Review::query()->where('user_id', $user->id)->where('movie_id', $movie->id)->first()) : null;
+        $totalReviews = $reviewSummary['total'];
+        $userReview = $user ? Review::query()->where('user_id', $user->id)->where('movie_id', $movie->id)->first() : null;
         $person = fn ($credit) => [
             'name' => $credit->person->name,
             'initials' => $credit->person->initials(),
@@ -265,16 +251,11 @@ class MovieController extends Controller
             'cities' => $cities,
             'showCount' => $shows->count(),
             'venueCount' => $shows->pluck('theater_id')->unique()->count(),
-            'reviews' => $reviews->map(fn (Review $review) => [
-                'id' => $review->id,
-                'author' => Str::before($review->user->name, ' ').' '.mb_substr(Str::after($review->user->name, ' '), 0, 1).'.',
-                'initial' => mb_substr($review->user->name, 0, 1),
-                'rating' => (int) $review->rating,
-                'text' => $review->review_text,
-                'ago' => $review->created_at?->diffForHumans(),
-            ])->values(),
+            'reviews' => ReviewData::page($movie, viewerId: $user?->id),
+            'reviewSummary' => $reviewSummary,
             'totalReviews' => $totalReviews,
-            'distribution' => collect(range(5, 1))->map(fn (int $stars) => ['stars' => $stars, 'count' => (int) ($distribution[$stars] ?? 0)])->values(),
+            'distribution' => $reviewSummary['distribution'],
+            'pricing' => $this->pricing($movie),
             'similar' => $similar->values(),
             'primaryGenre' => $primaryGenre ? ['name' => $primaryGenre->name, 'slug' => $primaryGenre->slug] : null,
             'directors' => $movie->creditsFor('director')->map($person)->values(),
@@ -283,7 +264,7 @@ class MovieController extends Controller
             'cast' => $movie->creditsFor('cast')->map($person)->values(),
             'inWishlist' => $user ? Wishlist::query()->where('user_id', $user->id)->where('movie_id', $movie->id)->exists() : false,
             'canReview' => $canReview,
-            'userReview' => $userReview ? ['rating' => (int) $userReview->rating, 'text' => $userReview->review_text] : null,
+            'userReview' => $userReview ? ['rating' => (int) $userReview->rating, 'title' => (string) $userReview->title, 'text' => $userReview->review_text, 'spoilers' => (bool) $userReview->contains_spoilers] : null,
         ], [
             'title' => $movie->meta_title ?: $movie->title.' | Showtimes & Tickets',
             'description' => $movie->meta_description ?: $movie->tagline.' '.$movie->durationLabel().', '.$movie->certificate_rating.'. Book seats at BookMyMovie.',
@@ -300,8 +281,10 @@ class MovieController extends Controller
     }
 
     /**
-     * Verified-audience reviews: only customers holding a booking for this
-     * film can post, and they can edit their single review later.
+     * Verified-booking reviews. A member can review a film only after one of
+     * their own bookings for it has actually started (not cancelled, not a
+     * no-show); that booking is stored on the review and is what earns the
+     * "Verified booking" badge. One review per member per film, editable.
      */
     public function storeReview(Request $request, string $slug): RedirectResponse
     {
@@ -309,23 +292,22 @@ class MovieController extends Controller
 
         $data = $request->validate([
             'rating' => ['required', 'integer', 'between:1,5'],
-            'review_text' => ['required', 'string', 'min:20', 'max:1200'],
+            'title' => ['nullable', 'string', 'max:90', CleanText::noProfanity('Your headline')],
+            'review_text' => ['required', 'string', 'min:20', 'max:1200', CleanText::noProfanity('Your review')],
+            'contains_spoilers' => ['nullable', 'boolean'],
         ]);
 
-        $booking = Booking::query()
-            ->where('user_id', Auth::id())
-            ->where('booking_status', '<>', 'cancelled')
-            ->whereHas('show', fn (Builder $query) => $query->where('movie_id', $movie->id))
-            ->latest('booked_at')
-            ->first();
+        $booking = $this->watchedBooking((int) Auth::id(), $movie->id);
 
-        abort_unless($booking, 403, 'Reviews are open to guests who booked this film.');
+        abort_unless($booking, 403, 'Reviews open once you have watched this film with a BookMyMovie booking.');
 
         Review::query()->updateOrCreate(
             ['user_id' => Auth::id(), 'movie_id' => $movie->id],
             [
                 'booking_id' => $booking->id,
                 'rating' => $data['rating'],
+                'title' => filled($data['title'] ?? null) ? strip_tags($data['title']) : null,
+                'contains_spoilers' => (bool) ($data['contains_spoilers'] ?? false),
                 'review_text' => strip_tags($data['review_text']),
                 'is_approved' => true,
                 'is_flagged' => false,
@@ -355,7 +337,7 @@ class MovieController extends Controller
         }
 
         $startsAt = Carbon::parse($showDetails->show_date.' '.$showDetails->show_time);
-        $onSale = $showDetails->show_status === 'scheduled' && $startsAt->isFuture();
+        $onSale = $showDetails->show_status === 'scheduled' && $startsAt->isFuture() && (bool) ($movie->bookings_enabled ?? true);
 
         $seats = DB::table('v_seat_availability')
             ->where('show_id', $show)
@@ -472,5 +454,99 @@ class MovieController extends Controller
             ['label' => $movie->title, 'url' => route('movies.show', $movie->slug)],
             ['label' => 'Seats', 'url' => null],
         ]);
+    }
+
+    /** "Load more", sorting and filters for the film page's reviews. */
+    public function reviews(Request $request, string $slug): JsonResponse
+    {
+        $movie = Movie::query()->where('slug', $slug)->firstOrFail();
+        $data = $request->validate([
+            'sort' => ['nullable', 'in:'.implode(',', ReviewData::SORTS)],
+            'stars' => ['nullable', 'integer', 'between:1,5'],
+            'verified' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1', 'max:200'],
+        ]);
+
+        return response()->json(ReviewData::page(
+            $movie,
+            $data['sort'] ?? 'recent',
+            isset($data['stars']) ? (int) $data['stars'] : null,
+            (bool) ($data['verified'] ?? false),
+            (int) ($data['page'] ?? 1),
+            Auth::id(),
+        ));
+    }
+
+    /** Toggles the signed-in member's "Helpful" vote on a review. */
+    public function voteReview(Review $review): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        abort_if($review->user_id === $userId, 422, 'You cannot vote on your own review.');
+        abort_unless($review->is_approved, 404);
+
+        $voted = DB::transaction(function () use ($review, $userId) {
+            $removed = DB::table('review_votes')->where('review_id', $review->id)->where('user_id', $userId)->delete();
+            if ($removed) {
+                Review::query()->whereKey($review->id)->where('helpful_count', '>', 0)->decrement('helpful_count');
+
+                return false;
+            }
+            // INSERT IGNORE on the (review_id, user_id) key: a double click
+            // counts once instead of failing with a duplicate-key error.
+            if (DB::table('review_votes')->insertOrIgnore(['review_id' => $review->id, 'user_id' => $userId, 'created_at' => now()]) === 1) {
+                Review::query()->whereKey($review->id)->increment('helpful_count');
+            }
+
+            return true;
+        }, 3);
+
+        return response()->json(['voted' => $voted, 'helpful' => (int) Review::query()->whereKey($review->id)->value('helpful_count')]);
+    }
+
+    /** The member's latest booking for this film whose show has already started. */
+    private function watchedBooking(int $userId, int $movieId): ?Booking
+    {
+        return Booking::query()
+            ->where('user_id', $userId)
+            ->whereIn('booking_status', ['confirmed', 'completed'])
+            ->whereHas('show', fn (Builder $query) => $query
+                ->where('movie_id', $movieId)
+                ->whereRaw('TIMESTAMP(show_date, show_time) <= ?', [now()->toDateTimeString()]))
+            ->latest('booked_at')
+            ->first();
+    }
+
+    /**
+     * Ticket prices across this film's upcoming shows, per seating tier:
+     * the lowest and highest adult price, the child price and what the tier
+     * includes. Sale prices are used where set.
+     *
+     * @return list<array{tier: string, rows: string, from: float, to: float, was: ?float, kids: ?float, benefits: ?string}>
+     */
+    private function pricing(Movie $movie): array
+    {
+        return DB::table('show_seat_row_prices as p')
+            ->join('shows as s', 's.id', '=', 'p.show_id')
+            ->where('s.movie_id', $movie->id)
+            ->where('s.status', 'scheduled')
+            ->where('s.show_date', '>=', now()->toDateString())
+            ->groupBy('p.tier_name')
+            ->selectRaw("p.tier_name AS tier, GROUP_CONCAT(DISTINCT p.row_label ORDER BY p.row_label SEPARATOR '') AS `rows`,
+                MIN(COALESCE(p.sale_price, p.price)) AS low, MAX(COALESCE(p.sale_price, p.price)) AS high,
+                MAX(CASE WHEN p.sale_price IS NOT NULL AND p.sale_price < p.price THEN p.price END) AS was,
+                MIN(COALESCE(p.kids_sale_price, p.kids_price)) AS kids, MAX(p.benefits) AS benefits")
+            ->orderByDesc('low')
+            ->get()
+            ->map(fn ($tier) => [
+                'tier' => $tier->tier,
+                'rows' => implode(', ', str_split((string) $tier->rows)),
+                'from' => (float) $tier->low,
+                'to' => (float) $tier->high,
+                'was' => $tier->was !== null ? (float) $tier->was : null,
+                'kids' => $movie->kids_discount_eligible && $tier->kids !== null ? (float) $tier->kids : null,
+                'benefits' => $tier->benefits,
+            ])
+            ->values()
+            ->all();
     }
 }

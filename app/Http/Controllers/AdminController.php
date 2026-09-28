@@ -107,7 +107,7 @@ class AdminController extends Controller
             'genres' => Genre::query()->orderBy('name')->get(['id', 'name']),
             'recentMovies' => Movie::query()->latest()->limit(8)->get()->map(fn (Movie $movie) => ['label' => $movie->title, 'value' => 'PKR '.number_format((float) ($movie->sale_price ?: $movie->base_price))])->all(),
             'trashedMovies' => Movie::onlyTrashed()->latest('deleted_at')->limit(12)->get(['id', 'title'])->map(fn (Movie $movie) => ['id' => $movie->id, 'title' => $movie->title])->values(),
-            'schedule' => DB::table('v_show_details')->orderBy('show_date')->orderBy('show_time')->limit(8)->get()
+            'schedule' => DB::table('v_show_details')->where('show_status', 'scheduled')->whereRaw('TIMESTAMP(show_date, show_time) > ?', [now()->toDateTimeString()])->orderBy('show_date')->orderBy('show_time')->limit(8)->get()
                 ->map(fn ($show) => ['label' => "{$show->movie_title}", 'value' => "{$show->theater_name} · {$show->screen_name} · {$show->show_date} {$show->show_time}"])
                 ->all(),
             'selectedMovieShows' => $selectedMovie
@@ -422,17 +422,17 @@ class AdminController extends Controller
     {
         $data = $request->validate(['message' => ['required', 'string', 'max:1000']]);
 
-        User::query()->select('id')->chunkById(100, function ($users) use ($data) {
-            foreach ($users as $user) {
-                Notification::create([
-                    'user_id' => $user->id,
-                    'type' => 'admin_message',
-                    'title' => 'BookMyMovie update',
-                    'message' => $data['message'],
-                    'is_read' => false,
-                    'created_at' => now(),
-                ]);
-            }
+        // One multi-row INSERT per 500 members instead of a query per member.
+        $at = now();
+        User::query()->where('is_blocked', false)->select('id')->chunkById(500, function ($users) use ($data, $at) {
+            Notification::query()->insert($users->map(fn ($user) => [
+                'user_id' => $user->id,
+                'type' => 'admin_message',
+                'title' => 'BookMyMovie update',
+                'message' => strip_tags($data['message']),
+                'is_read' => false,
+                'created_at' => $at,
+            ])->all());
         });
 
         return back()->with('status', 'Notification sent.');
