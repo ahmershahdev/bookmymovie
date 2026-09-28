@@ -35,7 +35,8 @@ export function SplitHeading({ text, as = 'h2', className, delay = 0, accent, id
 
     return createElement(
         as,
-        { ref, id, className: cn('display', className), 'aria-label': text },
+        // dir=auto: English film titles keep their word order on the Urdu (RTL) site.
+        { ref, id, dir: 'auto', className: cn('display', className), 'aria-label': text },
         words.map((word, index) => (
             <span key={`${word}-${index}`} className="inline-block overflow-hidden pb-[0.06em] align-bottom" aria-hidden="true">
                 <motion.span

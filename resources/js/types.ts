@@ -1,5 +1,11 @@
 export type Palette = [string, string, string];
 
+export interface Trailer {
+    src: string;
+    label: string;
+    poster: string | null;
+}
+
 /** Movie::toCardArray() */
 export interface MovieCard {
     id: number;
@@ -10,6 +16,7 @@ export interface MovieCard {
     banner_url: string | null;
     hero_image_url: string | null;
     hero_eyebrow: string;
+    trailers: Trailer[];
     genre: string;
     genres: string[];
     language: string;
@@ -76,6 +83,7 @@ export interface SharedProps {
         max_seats: number;
         hold_minutes: number;
     };
+    locale: 'en' | 'ur';
     counts: { cart: number; wishlist: number };
     navMovies: NavMovie[];
     footer: {

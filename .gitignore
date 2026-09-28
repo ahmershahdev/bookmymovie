@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Raw artwork and trailer uploads; the optimised copies live in public/images/movies and public/videos
+/*.png
+/*.mp4
+/*.ico

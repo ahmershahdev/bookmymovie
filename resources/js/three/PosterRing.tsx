@@ -6,8 +6,8 @@ import type { Palette } from '@/types';
 
 export type RingMovie = { title: string; slug: string; genre?: string; palette?: Palette; poster_url?: string | null; certificate?: string; release_year?: string | null };
 
-const PANEL_HEIGHT = 3.3;
-const PANEL_WIDTH = PANEL_HEIGHT * (2 / 3);
+const PANEL_HEIGHT = 2.25;
+const PANEL_WIDTH = PANEL_HEIGHT * (4 / 3);
 const RADIUS = 5.4;
 const MIN_PANELS = 10;
 
@@ -16,7 +16,7 @@ const MIN_PANELS = 10;
  * so films without artwork still get a proper face in 3D.
  */
 function drawPoster(movie: RingMovie): THREE.CanvasTexture {
-    const width = 512;
+    const width = 1024;
     const height = 768;
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -34,7 +34,7 @@ function drawPoster(movie: RingMovie): THREE.CanvasTexture {
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.arc(width * 0.78, height * 0.3, width * 0.42, 0, Math.PI * 2);
+    ctx.arc(width * 0.8, height * 0.3, height * 0.42, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
 
@@ -96,8 +96,10 @@ function Panel({ movie, index, step }: { movie: RingMovie; index: number; step: 
     const { gl } = useThree();
     const material = useRef<THREE.MeshBasicMaterial>(null);
     const geometry = useMemo(() => {
-        const theta = PANEL_WIDTH / RADIUS;
-        return new THREE.CylinderGeometry(RADIUS, RADIUS, PANEL_HEIGHT, 24, 1, true, index * step - theta / 2, theta);
+        // Never wider than its slot (with a gap), so neighbours cannot overlap and z-fight.
+        const theta = Math.min(PANEL_WIDTH / RADIUS, step * 0.9);
+        const height = theta * RADIUS * (3 / 4);
+        return new THREE.CylinderGeometry(RADIUS, RADIUS, height, 24, 1, true, index * step - theta / 2, theta);
     }, [index, step]);
     const fallback = useMemo(() => drawPoster(movie), [movie]);
 
@@ -234,8 +236,8 @@ export default function PosterRing({ movies, active, className, offset = 0 }: { 
     useEffect(() => {
         let cancelled = false;
         Promise.all([
-            document.fonts.load('850 62% 100px "Archivo Variable"'),
-            document.fonts.load('700 125% 18px "Archivo Variable"'),
+            document.fonts.load('850 extra-condensed 100px "Archivo Variable"'),
+            document.fonts.load('700 expanded 18px "Archivo Variable"'),
         ]).finally(() => !cancelled && setFontsReady(true));
         return () => {
             cancelled = true;

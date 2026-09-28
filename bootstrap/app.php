@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\ShieldAgainstAbuse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(prepend: [
             ShieldAgainstAbuse::class,
         ], append: [
+            SetLocale::class,
             HandleInertiaRequests::class,
             AddSecurityHeaders::class,
         ]);

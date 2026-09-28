@@ -316,15 +316,15 @@ class AdminController extends Controller
             'delete_poster_image' => ['nullable', 'boolean'],
             'delete_hero_image' => ['nullable', 'boolean'],
         ], [
-            'poster_upload.required' => 'Upload a 9:16 poster image for this movie.',
-            'poster_upload.max' => 'Poster image must be 3 MB or smaller.',
+            'poster_upload.required' => 'Upload a 4:3 card image for this movie.',
+            'poster_upload.max' => 'Card image must be 3 MB or smaller.',
             'hero_upload.required' => 'Upload a 16:9 carousel image for this movie.',
             'hero_upload.max' => 'Carousel image must be 3 MB or smaller.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
-            if (! $this->imageHasAspect($request, 'poster_upload', 9 / 16)) {
-                $validator->errors()->add('poster_upload', 'Poster image must use a 9:16 vertical aspect ratio.');
+            if (! $this->imageHasAspect($request, 'poster_upload', 4 / 3)) {
+                $validator->errors()->add('poster_upload', 'Card image must use a 4:3 landscape aspect ratio.');
             }
 
             if (! $this->imageHasAspect($request, 'hero_upload', 16 / 9)) {
@@ -508,7 +508,7 @@ class AdminController extends Controller
         return back()->with('status', 'Page SEO updated.');
     }
 
-    private function admin(Request $request): ?Admin
+    protected function admin(Request $request): ?Admin
     {
         $id = $request->session()->get('admin_id');
 

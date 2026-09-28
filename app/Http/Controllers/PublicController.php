@@ -219,6 +219,34 @@ class PublicController extends Controller
         return $this->contentPage('accessibility');
     }
 
+    public function giftCards(): Response
+    {
+        return $this->page('Public/GiftCards', [
+            'pointValue' => \App\Support\BookingLifecycle::POINT_VALUE,
+            'pointsPer100' => (int) round(100 * \App\Support\BookingLifecycle::POINTS_PER_RUPEE),
+        ], [
+            'title' => 'Gift cards and loyalty points | BookMyMovie',
+            'description' => 'Check a BookMyMovie gift card balance and see how loyalty points work. Both come off your ticket total at checkout.',
+        ]);
+    }
+
+    public function giftCardBalance(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:24', 'regex:/^[A-Za-z0-9-]+$/']]);
+        $card = \App\Models\GiftCard::query()->where('code', strtoupper(trim($data['code'])))->first();
+
+        if (! $card) {
+            return back()->withErrors(['code' => 'We could not find a gift card with that code.']);
+        }
+
+        return back()->with('giftCard', [
+            'code' => $card->code,
+            'balance' => (float) $card->balance,
+            'expires' => $card->expires_at?->format('j F Y'),
+            'usable' => $card->usable(),
+        ]);
+    }
+
     public function submitContact(Request $request): RedirectResponse
     {
         FormSecurity::validateRecaptcha($request, 'contact');

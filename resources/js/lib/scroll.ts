@@ -47,6 +47,8 @@ export function onLenisScroll(listener: (lenis: Lenis) => void): () => void {
 /** Stops page scrolling while an overlay is open. */
 export function lockScroll(locked: boolean): void {
     document.documentElement.style.overflow = locked ? 'hidden' : '';
+    // The drawn page scrollbar steps aside so the overlay's own is the only one.
+    document.documentElement.toggleAttribute('data-scroll-locked', locked);
     if (!lenis) return;
     if (locked) {
         lenis.stop();

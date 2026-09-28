@@ -28,6 +28,11 @@ class Booking extends Model
         'subtotal',
         'discount_amount',
         'total_amount',
+        'addons_total',
+        'gift_card_id',
+        'gift_card_amount',
+        'points_redeemed',
+        'points_earned',
         'payment_method',
         'payment_status',
         'booking_status',
@@ -57,6 +62,16 @@ class Booking extends Model
     public function seats(): HasMany
     {
         return $this->hasMany(BookingSeat::class);
+    }
+
+    public function concessions(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Concession::class, 'booking_concessions')->withPivot(['quantity', 'unit_price'])->withTimestamps();
+    }
+
+    public function giftCard(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(GiftCard::class);
     }
 
     public function payment(): HasOne

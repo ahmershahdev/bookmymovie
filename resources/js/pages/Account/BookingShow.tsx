@@ -3,7 +3,9 @@ import { useState } from 'react';
 import Icon from '@/components/Icon';
 import { SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
+import QrCode from '@/components/QrCode';
 import { Alert, Breadcrumbs, Select } from '@/components/ui';
+import { useLocale, useT } from '@/lib/i18n';
 import { cn, money, route, useShared } from '@/lib/utils';
 import type { BookingSummary } from '@/types';
 
@@ -17,7 +19,6 @@ interface Props {
         time: string;
         doors: string;
         tickets: { seat: string; type: string; price: number; code: string }[];
-        pattern: boolean[];
         adults: number;
         kids: number;
         subtotal: number;
@@ -30,11 +31,20 @@ interface Props {
         map_url: string;
         cancellable: boolean;
         cancel_until: string | null;
+        addons: { name: string; name_ur: string | null; quantity: number; total: number }[];
+        addons_total: number;
+        gift_card_amount: number;
+        points_redeemed: number;
+        points_earned: number;
+        qr: string;
+        wallet: { apple: string | null; google: string | null };
     };
 }
 
 export default function BookingShow({ booking }: Props) {
     const { errors } = useShared();
+    const t = useT();
+    const locale = useLocale();
     const [confirm, setConfirm] = useState(false);
     const cancel = useForm({ reason: '' });
 
@@ -83,10 +93,13 @@ export default function BookingShow({ booking }: Props) {
                                 </ul>
                             </div>
                             <div className="flex flex-col items-center justify-center gap-3 sm:border-l sm:border-line sm:pl-8">
-                                <div className="grid grid-cols-8 gap-[3px] bg-paper p-3" aria-hidden="true">
-                                    {booking.pattern.map((on, index) => <span key={index} className={cn('h-3 w-3', on ? 'bg-ink' : 'bg-transparent')} />)}
-                                </div>
+                                {booking.cancelled ? (
+                                    <div className="grid h-[184px] w-[184px] place-items-center border border-dashed border-signal p-4 text-center text-sm text-signal">{t('Cancelled: this ticket no longer admits')}</div>
+                                ) : (
+                                    <QrCode value={booking.qr} label={t('Ticket QR code for :number', { number: booking.number })} />
+                                )}
                                 <p className="num text-sm font-semibold tracking-[.14em]">{booking.number}</p>
+                                <p className="label text-[9px]">{t('Scan at the door')}</p>
                             </div>
                         </div>
                     </article>
@@ -96,8 +109,13 @@ export default function BookingShow({ booking }: Props) {
                             <p className="label">Payment</p>
                             <dl className="mt-5 space-y-3 text-sm">
                                 <div className="flex justify-between"><dt className="text-mute">{booking.adults} adult{booking.kids ? `, ${booking.kids} child` : ''}</dt><dd className="num">{money(booking.subtotal)}</dd></div>
-                                {booking.discount > 0 && <div className="flex justify-between"><dt className="text-mute">Coupon {booking.coupon}</dt><dd className="num text-mint">− {money(booking.discount)}</dd></div>}
-                                <div className="flex justify-between"><dt className="text-mute">Booking fee</dt><dd>None</dd></div>
+                                {booking.discount > 0 && <div className="flex justify-between"><dt className="text-mute">{t('Coupon')} {booking.coupon}</dt><dd className="num text-mint">− {money(booking.discount)}</dd></div>}
+                                {booking.addons.map((addon) => (
+                                    <div key={addon.name} className="flex justify-between"><dt className="text-mute"><span className="num">{addon.quantity}×</span> {locale === 'ur' && addon.name_ur ? addon.name_ur : addon.name}</dt><dd className="num">{money(addon.total)}</dd></div>
+                                ))}
+                                {booking.gift_card_amount > 0 && <div className="flex justify-between"><dt className="text-mute">{t('Gift card')}</dt><dd className="num text-mint">− {money(booking.gift_card_amount)}</dd></div>}
+                                {booking.points_redeemed > 0 && <div className="flex justify-between"><dt className="text-mute">{t('Loyalty points')}</dt><dd className="num text-mint">− {money(booking.points_redeemed)}</dd></div>}
+                                <div className="flex justify-between"><dt className="text-mute">{t('Booking fee')}</dt><dd>{t('None')}</dd></div>
                                 <div className="flex items-baseline justify-between border-t border-line pt-4"><dt>Total</dt><dd className="display text-5xl tabular">{money(booking.total)}</dd></div>
                             </dl>
                             <p className="mt-5 text-xs text-mute">
@@ -106,7 +124,27 @@ export default function BookingShow({ booking }: Props) {
                             {booking.can_pay_online && (
                                 <a href={route('payments.start', booking.number)} className="btn btn-primary mt-5 w-full">Pay {money(booking.total)} with {booking.method_label} <Icon name="arrow-right" size={16} className="arrow" /></a>
                             )}
+                            {booking.points_earned > 0 && !booking.cancelled && (
+                                <p className="mt-4 flex items-center gap-2 border-t border-line pt-4 text-xs text-paper-2"><Icon name="star" size={14} className="text-accent" /> {t('You earned :points loyalty points with this booking.', { points: booking.points_earned })}</p>
+                            )}
                         </div>
+
+                        {!booking.cancelled && (
+                            <div className="panel p-7">
+                                <p className="label">{t('Keep it handy')}</p>
+                                <p className="mt-3 text-sm text-mute">{t('This ticket is saved on this device and opens even without internet.')}</p>
+                                {(booking.wallet.apple || booking.wallet.google) && (
+                                    <div className="mt-5 grid gap-2">
+                                        {booking.wallet.apple && (
+                                            <a href={booking.wallet.apple} className="btn btn-light w-full"><Icon name="wallet" size={16} /> {t('Add to Apple Wallet')}</a>
+                                        )}
+                                        {booking.wallet.google && (
+                                            <a href={booking.wallet.google} className="btn btn-light w-full"><Icon name="wallet" size={16} /> {t('Save to Google Wallet')}</a>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="panel p-7">
                             <p className="label">Booked by</p>

@@ -15,10 +15,15 @@ use App\Models\Seat;
 use App\Models\Show;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Models\Concession;
+use App\Models\GiftCard;
+use App\Models\LoyaltyTransaction;
 use App\Payments\PaymentGateway;
+use App\Support\BookingLifecycle;
 use App\Support\AuditLog;
 use App\Support\FormSecurity;
 use App\Support\TransactionalMailer;
+use App\Support\WalletPass;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -86,6 +91,11 @@ class AccountController extends Controller
                 'cart' => $cart?->items()->count() ?? 0,
                 'reviews' => $user->reviews()->count(),
             ],
+            'loyalty' => [
+                'points' => (int) $user->loyalty_points,
+                'history' => LoyaltyTransaction::query()->where('user_id', $user->id)->latest('created_at')->limit(6)->get()
+                    ->map(fn (LoyaltyTransaction $entry) => ['id' => $entry->id, 'points' => (int) $entry->points, 'reason' => $entry->reason, 'ago' => $entry->created_at?->diffForHumans()])->values(),
+            ],
             'next' => ($next = $upcoming->first()) ? $this->bookingSummary($next) : null,
             'upcoming' => $upcoming->skip(1)->take(3)->map(fn (Booking $booking) => $this->bookingSummary($booking))->values(),
             'cartExpiresAt' => $cart?->expires_at?->toIso8601String(),
@@ -151,8 +161,6 @@ class AccountController extends Controller
                         'price' => (float) $seat->price_paid,
                         'code' => $seat->ticket_number,
                     ])->values(),
-                // Visual booking code block; the counter reads the booking number.
-                'pattern' => array_map(fn ($nibble) => hexdec($nibble) % 2 === 1, str_split(substr(hash('sha256', $booking->booking_number), 0, 64))),
                 'adults' => (int) $booking->adult_count,
                 'kids' => (int) $booking->kids_count,
                 'subtotal' => (float) $booking->subtotal,
@@ -168,6 +176,16 @@ class AccountController extends Controller
                 'booked_at' => $booking->booked_at?->format('j M Y, g:i A'),
                 'map_url' => 'https://www.google.com/maps/search/?api=1&query='.urlencode($theater->name.', '.$theater->address),
                 'cancellable' => $booking->isCancellableByCustomer(),
+                'addons' => $booking->concessions->map(fn ($item) => ['name' => $item->name, 'name_ur' => $item->name_ur, 'quantity' => (int) $item->pivot->quantity, 'total' => (float) $item->pivot->unit_price * $item->pivot->quantity])->values(),
+                'addons_total' => (float) $booking->addons_total,
+                'gift_card_amount' => (float) $booking->gift_card_amount,
+                'points_redeemed' => (int) $booking->points_redeemed,
+                'points_earned' => (int) $booking->points_earned,
+                'qr' => BookingLifecycle::ticketPayload($booking->booking_number),
+                'wallet' => [
+                    'apple' => WalletPass::appleEnabled() ? route('tickets.wallet.apple', $booking->booking_number) : null,
+                    'google' => WalletPass::googleEnabled() ? route('tickets.wallet.google', $booking->booking_number) : null,
+                ],
                 'cancel_until' => $startsAt?->copy()->subMinutes((int) config('bookmymovie.booking.cancellation_cutoff_minutes', 120))->format('D j M, g:i A'),
             ],
         ], ['title' => 'E-ticket '.$booking->booking_number, 'description' => 'Your BookMyMovie e-ticket.'], [
@@ -240,39 +258,7 @@ class AccountController extends Controller
                 return 'not-cancellable';
             }
 
-            Show::query()->whereKey($booking->show_id)->lockForUpdate()->first();
-
-            $released = BookingSeat::query()->where('booking_id', $booking->id)->update(['seat_lock' => null]);
-
-            Show::query()
-                ->whereKey($booking->show_id)
-                ->where('booked_seats', '>=', $released)
-                ->decrement('booked_seats', $released);
-
-            if ($booking->coupon_id) {
-                DB::table('coupon_usages')->where('booking_id', $booking->id)->delete();
-                Coupon::query()->whereKey($booking->coupon_id)->where('used_count', '>', 0)->decrement('used_count');
-            }
-
-            $booking->forceFill([
-                'booking_status' => 'cancelled',
-                'payment_status' => 'failed',
-                'cancelled_at' => now(),
-                'cancelled_by' => 'user',
-                'cancellation_reason' => $data['reason'] ?: 'Cancelled by customer',
-            ])->save();
-
-            Payment::query()->where('booking_id', $booking->id)->update(['status' => 'failed', 'notes' => 'Booking cancelled by customer before payment.']);
-
-            BookingEvent::create([
-                'booking_id' => $booking->id,
-                'event' => 'cancelled',
-                'from_status' => 'confirmed',
-                'to_status' => 'cancelled',
-                'note' => Str::limit('Cancelled by customer. '.($data['reason'] ?? ''), 250, ''),
-                'actor_type' => 'user',
-                'actor_id' => Auth::id(),
-            ]);
+            BookingLifecycle::unwind($booking, 'user', Auth::id(), $data['reason'] ?: 'Cancelled by customer');
 
             return $booking;
         }, 3);
@@ -493,6 +479,9 @@ class AccountController extends Controller
             'idempotencyKey' => (string) Str::uuid(),
             'captcha' => FormSecurity::forPage('checkout'),
             'paymentMethods' => PaymentGateway::available(),
+            'concessions' => Concession::query()->where('is_active', true)->orderBy('sort_order')->get()
+                ->map(fn (Concession $item) => ['id' => $item->id, 'name' => $item->name, 'name_ur' => $item->name_ur, 'description' => $item->description, 'category' => $item->category, 'price' => (float) $item->price, 'icon' => $item->icon])->values(),
+            'points' => (int) $user->loyalty_points,
             'customer' => ['name' => $user->name, 'email' => $user->email, 'phone' => (string) $user->phone, 'address' => (string) $user->address],
         ], ['title' => 'Checkout | BookMyMovie', 'description' => 'Confirm your booking.']);
     }
@@ -510,6 +499,10 @@ class AccountController extends Controller
             'coupon_code' => ['nullable', 'string', 'max:30', 'regex:/^[A-Za-z0-9_-]*$/'],
             'terms' => ['accepted'],
             'payment_method' => ['nullable', Rule::in(array_column(PaymentGateway::available(), 'key'))],
+            'addons' => ['nullable', 'array', 'max:20'],
+            'addons.*' => ['integer', 'min:0', 'max:10'],
+            'gift_card_code' => ['nullable', 'string', 'max:24', 'regex:/^[A-Za-z0-9-]*$/'],
+            'use_points' => ['nullable', 'boolean'],
         ], [
             'terms.accepted' => 'Please confirm you have read the cancellation policy.',
             'payment_method.in' => 'Choose one of the payment options shown.',
@@ -572,7 +565,35 @@ class AccountController extends Controller
                 $subtotal = round((float) $items->sum('price'), 2);
                 $coupon = $this->lockedCoupon($data['coupon_code'] ?? null, $subtotal, $user->id);
                 $discount = $coupon ? $this->discountAmount($coupon, $subtotal) : 0.0;
-                $total = round($subtotal - $discount, 2);
+
+                // Food and drink: prices come from the database, never the form.
+                $addons = collect($data['addons'] ?? [])->map(fn ($quantity) => (int) $quantity)->filter(fn ($quantity) => $quantity > 0);
+                $concessions = $addons->isEmpty() ? collect() : Concession::query()->where('is_active', true)->whereIn('id', $addons->keys())->get()->keyBy('id');
+                $addonsTotal = round($concessions->sum(fn (Concession $item) => (float) $item->price * $addons[$item->id]), 2);
+
+                $due = round($subtotal - $discount + $addonsTotal, 2);
+
+                // Gift card balance, locked so two checkouts cannot spend it twice.
+                $giftCard = null;
+                $giftAmount = 0.0;
+                if (filled($data['gift_card_code'] ?? null)) {
+                    $giftCard = GiftCard::query()->where('code', strtoupper(trim($data['gift_card_code'])))->lockForUpdate()->first();
+                    if (! $giftCard || ! $giftCard->usable()) {
+                        throw new \RuntimeException('gift-card-invalid');
+                    }
+                    $giftAmount = round(min((float) $giftCard->balance, $due), 2);
+                    $due = round($due - $giftAmount, 2);
+                }
+
+                // Loyalty points: 1 point = PKR 1, up to what is still due.
+                $pointsUsed = 0;
+                if (! empty($data['use_points'])) {
+                    $pointsUsed = (int) min((int) User::query()->whereKey($user->id)->value('loyalty_points'), floor($due / BookingLifecycle::POINT_VALUE));
+                    $due = round($due - $pointsUsed * BookingLifecycle::POINT_VALUE, 2);
+                }
+
+                $total = max(0, $due);
+                $method = $total <= 0 ? 'cod' : $data['payment_method'];
 
                 $booking = Booking::create([
                     'booking_number' => $this->bookingNumber(),
@@ -589,9 +610,13 @@ class AccountController extends Controller
                     'kids_count' => $items->where('ticket_type', 'kid')->count(),
                     'subtotal' => $subtotal,
                     'discount_amount' => $discount,
+                    'addons_total' => $addonsTotal,
+                    'gift_card_id' => $giftCard?->id,
+                    'gift_card_amount' => $giftAmount,
+                    'points_redeemed' => $pointsUsed,
                     'total_amount' => $total,
-                    'payment_method' => $data['payment_method'],
-                    'payment_status' => 'pending',
+                    'payment_method' => $method,
+                    'payment_status' => $total <= 0 ? 'paid' : 'pending',
                     'booking_status' => 'confirmed',
                 ]);
 
@@ -609,11 +634,34 @@ class AccountController extends Controller
 
                 Payment::create([
                     'booking_id' => $booking->id,
-                    'payment_method' => $data['payment_method'],
+                    'payment_method' => $method,
                     'amount' => $total,
-                    'status' => 'pending',
-                    'notes' => $data['payment_method'] === 'cod' ? 'Pay at the cinema box office before the show.' : 'Awaiting online payment.',
+                    'status' => $total <= 0 ? 'paid' : 'pending',
+                    'paid_at' => $total <= 0 ? now() : null,
+                    'notes' => $total <= 0 ? 'Covered in full by gift card and points.' : ($method === 'cod' ? 'Pay at the cinema box office before the show.' : 'Awaiting online payment.'),
                 ]);
+
+                foreach ($concessions as $item) {
+                    $booking->concessions()->attach($item->id, ['quantity' => $addons[$item->id], 'unit_price' => $item->price]);
+                }
+
+                if ($giftCard && $giftAmount > 0) {
+                    // Guarded decrement: never below zero.
+                    $spent = GiftCard::query()->whereKey($giftCard->id)->where('balance', '>=', $giftAmount)->decrement('balance', $giftAmount);
+                    if ($spent !== 1) {
+                        throw new \RuntimeException('gift-card-invalid');
+                    }
+                }
+
+                if ($pointsUsed > 0) {
+                    $spent = User::query()->whereKey($user->id)->where('loyalty_points', '>=', $pointsUsed)->decrement('loyalty_points', $pointsUsed);
+                    if ($spent !== 1) {
+                        throw new \RuntimeException('points-changed');
+                    }
+                    LoyaltyTransaction::create(['user_id' => $user->id, 'booking_id' => $booking->id, 'points' => -$pointsUsed, 'reason' => 'Spent on '.$booking->booking_number]);
+                }
+
+                BookingLifecycle::awardPoints($booking);
 
                 if ($coupon) {
                     // Guarded increment: fails instead of overshooting max_uses.
@@ -679,19 +727,27 @@ class AccountController extends Controller
                 'mixed-show' => 'Please check out one show at a time.',
                 'coupon-invalid' => 'That coupon is not valid for this booking (expired, used up, or below the minimum spend).',
                 'coupon-user-limit' => 'You have already used this coupon the maximum number of times.',
+                'gift-card-invalid' => 'That gift card is not valid, has expired or has no balance left.',
+                'points-changed' => 'Your points balance changed while you were checking out. Please try again.',
                 default => 'One or more of your seats was just booked by someone else. Please choose again.',
             };
 
-            $target = in_array($exception->getMessage(), ['coupon-invalid', 'coupon-user-limit'], true) ? 'user.checkout' : 'user.cart';
+            $field = match ($exception->getMessage()) {
+                'coupon-invalid', 'coupon-user-limit' => 'coupon_code',
+                'gift-card-invalid' => 'gift_card_code',
+                'points-changed' => 'use_points',
+                default => 'cart',
+            };
+            $target = $field === 'cart' ? 'user.cart' : 'user.checkout';
 
-            return redirect()->route($target)->withErrors([$target === 'user.checkout' ? 'coupon_code' : 'cart' => $message])->withInput($request->except('custom_captcha_answer'));
+            return redirect()->route($target)->withErrors([$field => $message])->withInput($request->except('custom_captcha_answer'));
         }
 
         $booking->load('user');
         AuditLog::record('booking.created', $booking, ['seats' => $booking->seat_count, 'total' => (float) $booking->total_amount, 'method' => $booking->payment_method]);
         TransactionalMailer::bookingConfirmed($booking->user, $booking);
 
-        if ($booking->payment_method !== 'cod') {
+        if ($booking->payment_method !== 'cod' && $booking->payment_status !== 'paid') {
             return redirect()->route('payments.start', $booking->booking_number);
         }
 
@@ -717,6 +773,8 @@ class AccountController extends Controller
                 'member_since' => $user->created_at?->format('j F Y'),
                 'last_film' => $lastBooking?->show?->movie?->title,
                 'max_birth_date' => now()->subYears(10)->toDateString(),
+                'two_factor_enabled' => (bool) $user->two_factor_enabled,
+                'locale' => $user->locale ?: 'en',
             ],
         ], ['title' => 'Profile & security | BookMyMovie', 'description' => 'Manage your details, photo and password.']);
     }
@@ -736,6 +794,7 @@ class AccountController extends Controller
             'current_password' => ['nullable', 'required_with:password', 'string', 'max:72'],
             'password' => ['nullable', 'string', 'max:72', 'confirmed', Password::min(8)->mixedCase()->numbers()],
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=96,min_height=96,max_width=4000,max_height=4000'],
+            'two_factor_enabled' => ['nullable', 'boolean'],
         ]);
 
         $emailChanged = strtolower($data['email']) !== $user->email;
@@ -763,6 +822,7 @@ class AccountController extends Controller
             'date_of_birth' => $data['date_of_birth'] ?? null,
             'gender' => $data['gender'] ?? $user->gender,
         ]);
+        $user->two_factor_enabled = $request->boolean('two_factor_enabled');
 
         if (! empty($data['password'])) {
             $user->password = Hash::make($data['password']);
@@ -879,7 +939,7 @@ class AccountController extends Controller
     private function userBooking(string $number): Booking
     {
         return Booking::query()
-            ->with(['user', 'show.movie.genres', 'show.screen.theater.city', 'seats.seat', 'seats.category', 'payment', 'coupon', 'events'])
+            ->with(['user', 'show.movie.genres', 'show.screen.theater.city', 'seats.seat', 'seats.category', 'payment', 'coupon', 'events', 'concessions'])
             ->where('user_id', Auth::id())
             ->where('booking_number', $number)
             ->firstOrFail();

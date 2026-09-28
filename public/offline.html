@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offline | BookMyMovie</title>
+    <meta name="robots" content="noindex">
+    <link rel="icon" href="/images/favicon/favicon.ico" sizes="any">
+    <meta name="theme-color" content="#0a0a0a">
+    <style>
+        :root { color-scheme: dark; --ink: #0a0a0a; --paper: #f2f0ea; --mute: #8f8c85; --line: #262626; --volt: #e3ff3b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--paper); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: grid; place-items: center; padding: 24px 16px; }
+        main { width: 100%; max-width: 560px; }
+        img { width: 56px; height: 56px; }
+        h1 { font-size: clamp(2.5rem, 9vw, 4rem); line-height: .9; text-transform: uppercase; letter-spacing: -.02em; margin: 24px 0 12px; font-stretch: 75%; }
+        p { color: var(--mute); margin: 0 0 24px; }
+        ul { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+        li a { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); color: var(--paper); text-decoration: none; font-family: ui-monospace, monospace; }
+        li a:hover { color: var(--volt); }
+        .label { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--mute); margin-bottom: 8px; }
+        button { margin-top: 24px; background: var(--volt); color: #0a0a0a; border: 0; padding: 12px 20px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<main>
+    <img src="/images/favicon/android-chrome-192x192.png" alt="BookMyMovie">
+    <h1>You are offline</h1>
+    <p>No connection right now. E-tickets you opened before are saved on this device and still work at the door.</p>
+    <div id="saved" hidden>
+        <p class="label">Saved tickets</p>
+        <ul id="tickets"></ul>
+    </div>
+    <p id="none" hidden>No tickets are saved on this device yet. Open a booking once while online to keep it for later.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+</main>
+<script>
+    (async function () {
+        try {
+            const cache = await caches.open('bmm-tickets');
+            const numbers = new Set();
+            for (const request of await cache.keys()) {
+                const match = new URL(request.url).pathname.match(/^\/account\/bookings\/([A-Za-z0-9-]+)$/);
+                if (match) numbers.add(match[1]);
+            }
+            const list = document.getElementById('tickets');
+            numbers.forEach(function (number) {
+                const item = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '/account/bookings/' + number;
+                link.textContent = number;
+                const arrow = document.createElement('span');
+                arrow.textContent = '→';
+                link.appendChild(arrow);
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+            document.getElementById(numbers.size ? 'saved' : 'none').hidden = false;
+        } catch (error) {
+            document.getElementById('none').hidden = false;
+        }
+    })();
+</script>
+</body>
+</html>

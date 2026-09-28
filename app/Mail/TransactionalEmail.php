@@ -12,6 +12,12 @@ class TransactionalEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    /** Queued sends retry a few times if the mail provider is briefly down. */
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [30, 120];
+
     /**
      * @param array<string, mixed> $data
      */

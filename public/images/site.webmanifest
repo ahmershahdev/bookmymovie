@@ -1,1 +1,24 @@
-{"name":"BookMyMovie","short_name":"BookMyMovie","icons":[{"src":"/images/favicon/android-chrome-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/images/favicon/android-chrome-512x512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#05070d","background_color":"#05070d","display":"standalone"}
+{
+    "id": "/",
+    "name": "BookMyMovie",
+    "short_name": "BookMyMovie",
+    "description": "Cinema tickets, live seat maps and e-tickets that work offline.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "lang": "en",
+    "dir": "auto",
+    "theme_color": "#0a0a0a",
+    "background_color": "#0a0a0a",
+    "categories": ["entertainment", "lifestyle"],
+    "icons": [
+        { "src": "/images/favicon/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "/images/favicon/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" },
+        { "src": "/images/favicon/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ],
+    "shortcuts": [
+        { "name": "My tickets", "short_name": "Tickets", "url": "/account/bookings", "icons": [{ "src": "/images/favicon/android-chrome-192x192.png", "sizes": "192x192" }] },
+        { "name": "Now showing", "short_name": "Films", "url": "/movies/now-showing", "icons": [{ "src": "/images/favicon/android-chrome-192x192.png", "sizes": "192x192" }] }
+    ]
+}

@@ -56,6 +56,20 @@ const paths: Record<string, string> = {
     settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6 6 18M18 18l-1.4-1.4M7.4 7.4 6 6"/>',
     chart: '<path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/>',
     megaphone: '<path d="M4 10v4h3l7 4V6L7 10Z"/><path d="M17.5 9a3.5 3.5 0 0 1 0 6"/>',
+    popcorn: '<path d="M6 9.5h12l-1.6 10.5H7.6Z"/><path d="M9.5 9.5 10 20M14.5 9.5 14 20"/><path d="M6.5 9.5a2.2 2.2 0 0 1 1.8-3.4 2.6 2.6 0 0 1 4.8-1.2 2.4 2.4 0 0 1 3.9 1.9 2 2 0 0 1 .5 2.7"/>',
+    nachos: '<path d="M4 18h16l-8-13Z"/><path d="M9 13.5h.01M13 11h.01M12.5 15h.01"/>',
+    drink: '<path d="M7 7.5h10l-1.3 12.5H8.3Z"/><path d="M6 7.5h12M12.5 7.5 14 3.5h2.5"/>',
+    water: '<path d="M10 3.5h4v2.5l1.5 2V20a.5.5 0 0 1-.5.5H9a.5.5 0 0 1-.5-.5V8L10 6Z"/><path d="M8.5 12h7"/>',
+    combo: '<path d="M3.5 10h9l-1 10h-7Z"/><path d="M4 10a2 2 0 0 1 2.5-3 2.4 2.4 0 0 1 4 0 2 2 0 0 1 2 3"/><path d="M14 11h6.5l-1 9h-4.5ZM17.5 11l1-4h1.5"/>',
+    gift: '<rect x="4" y="9" width="16" height="11"/><path d="M3.5 9h17V6h-17ZM12 6v14"/><path d="M12 6c-1.5-3-5-3-5-1s3.5 1 5 1c1.5 0 5 1 5-1s-3.5-2-5 1Z"/>',
+    play: '<path d="M8 5.5v13l10.5-6.5Z"/>',
+    pause: '<path d="M8.5 5.5v13M15.5 5.5v13"/>',
+    volume: '<path d="M5 9.5h3l4-3.5v12l-4-3.5H5Z"/><path d="M15.5 9a4 4 0 0 1 0 6"/>',
+    mute: '<path d="M5 9.5h3l4-3.5v12l-4-3.5H5Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
+    wallet: '<path d="M4 7.5A1.5 1.5 0 0 1 5.5 6H18v3"/><path d="M4 7.5v10A1.5 1.5 0 0 0 5.5 19h14a.5.5 0 0 0 .5-.5V9.5a.5.5 0 0 0-.5-.5H5.5A1.5 1.5 0 0 1 4 7.5Z"/><path d="M16.5 14h.01"/>',
+    qr: '<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h2v2h-2ZM18 18h2v2h-2ZM14 18h2M18 14h2"/>',
+    language: '<path d="M4 5.5h9M8.5 3.5v2M6 5.5c.8 3.5 3 6 6 7.5M11 5.5c-.8 3.8-3.2 6.7-6.5 8.5"/><path d="M12.5 20.5l4-9.5 4 9.5M14 17h5"/>',
+    wifi: '<path d="M3.5 9a12.5 12.5 0 0 1 17 0M6.5 12.3a8 8 0 0 1 11 0M9.5 15.6a3.6 3.6 0 0 1 5 0"/><path d="M12 19h.01"/>',
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name' | 'stroke'> {

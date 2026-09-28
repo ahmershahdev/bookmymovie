@@ -1,8 +1,10 @@
 import './bootstrap';
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import type { ReactNode } from 'react';
 import SiteLayout from '@/layouts/SiteLayout';
+import { applyDocumentLocale } from '@/lib/i18n';
+import { registerServiceWorker } from '@/lib/offline';
 import { startSmoothScroll } from '@/lib/scroll';
 
 type PageModule = { default: { layout?: ((page: ReactNode) => ReactNode) | null } };
@@ -25,6 +27,11 @@ createInertiaApp({
     setup({ el, App, props }) {
         createRoot(el).render(<App {...props} />);
         startSmoothScroll();
+        applyDocumentLocale(props.initialPage.props.locale as string | undefined);
+        router.on('navigate', (event) => applyDocumentLocale(event.detail.page.props.locale as string | undefined));
+        // Switching language is a POST that redirects back: 'navigate' does not fire for it.
+        router.on('success', (event) => applyDocumentLocale(event.detail.page.props.locale as string | undefined));
+        registerServiceWorker();
     },
     // The progress bar is our own component: Inertia's injects an inline
     // <style> tag, which the Content-Security-Policy blocks.

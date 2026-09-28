@@ -5,7 +5,9 @@ import Icon from '@/components/Icon';
 import MovieCard from '@/components/MovieCard';
 import { Reveal, SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
+import { BackdropVideo, TrailerModal } from '@/components/Trailer';
 import { Breadcrumbs, SectionHeading, StarRating } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { useCompare } from '@/lib/compare';
 import { scrollToTarget } from '@/lib/scroll';
 import { cn, money, plural, route, useShared } from '@/lib/utils';
@@ -54,6 +56,8 @@ export default function MovieShow(props: Props) {
     const posterY = useTransform(scrollYProgress, [0, 1], ['0%', '18%']);
     const titleY = useTransform(scrollYProgress, [0, 1], ['0%', '-30%']);
     const [ground, accent] = movie.palette;
+    const [trailer, setTrailer] = useState<number | null>(null);
+    const t = useT();
 
     const toggleWishlist = () => {
         if (props.inWishlist) {
@@ -63,7 +67,7 @@ export default function MovieShow(props: Props) {
         }
     };
 
-    const sections: [string, string][] = [['showtimes', 'Showtimes'], ['story', 'Story'], ['cast', 'Cast & crew'], ['details', 'Details'], ['reviews', `Reviews (${totalReviews})`]];
+    const sections: [string, string][] = [['showtimes', t('Showtimes')], ...(movie.trailers.length ? [['trailers', movie.trailers.length > 1 ? t('Trailers') : t('Trailer')] as [string, string]] : []), ['story', 'Story'], ['cast', 'Cast & crew'], ['details', 'Details'], ['reviews', `Reviews (${totalReviews})`]];
     if (props.similar.length) sections.push(['similar', 'More like this']);
 
     return (
@@ -72,8 +76,11 @@ export default function MovieShow(props: Props) {
             <section ref={hero} className="relative isolate overflow-hidden pb-16 pt-[calc(var(--header)+2.5rem)]">
                 <div className="absolute inset-0 -z-10" aria-hidden="true"
                     style={{ background: `radial-gradient(55% 70% at 22% 35%, color-mix(in oklab, ${accent} 20%, transparent), transparent 70%), radial-gradient(60% 60% at 90% 0%, color-mix(in oklab, ${ground} 80%, transparent), transparent 70%), var(--color-ink)` }} />
-                {movie.hero_image_url && movie.hero_image_url !== movie.poster_url && (
-                    <img src={movie.hero_image_url} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-20 mix-blend-luminosity" aria-hidden="true" />
+                {(movie.trailers.length > 0 || (movie.hero_image_url && movie.hero_image_url !== movie.poster_url)) && (
+                    <div className="absolute inset-0 -z-10 opacity-45" aria-hidden="true">
+                        <BackdropVideo trailer={movie.trailers[0]} image={movie.hero_image_url} />
+                        <div className="absolute inset-0 rtl:-scale-x-100 bg-[linear-gradient(90deg,var(--color-ink)_0%,color-mix(in_oklab,var(--color-ink)_60%,transparent)_45%,transparent_100%)]" />
+                    </div>
                 )}
                 <div className="absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-b from-transparent to-ink" aria-hidden="true" />
 
@@ -94,7 +101,7 @@ export default function MovieShow(props: Props) {
                             </div>
 
                             <SplitHeading as="h1" text={movie.title} className="mt-6 text-[clamp(4rem,12vw,11.5rem)] leading-[.8]" />
-                            {movie.tagline && <p className="lede mt-6 max-w-2xl text-xl sm:text-2xl">{movie.tagline}</p>}
+                            {movie.tagline && <p className="lede mt-6 max-w-2xl text-xl sm:text-2xl" dir="auto">{movie.tagline}</p>}
 
                             <dl className="grid-lines mt-10 max-w-3xl grid-cols-2 sm:grid-cols-4">
                                 {[
@@ -123,6 +130,9 @@ export default function MovieShow(props: Props) {
                                 ) : (
                                     <Link href={route('user.login')} className="btn btn-ghost btn-lg"><Icon name="heart" size={18} /> Add to watchlist</Link>
                                 )}
+                                {movie.trailers.length > 0 && (
+                                    <button type="button" onClick={() => setTrailer(0)} className="btn btn-ghost btn-lg"><Icon name="play" size={18} /> {t('Watch trailer')}</button>
+                                )}
                                 <button type="button" onClick={() => compare.toggle(movie)} aria-pressed={compare.has(movie.id)} className={cn('btn btn-ghost btn-lg', compare.has(movie.id) && '!border-accent !text-accent')}>
                                     <Icon name="compare" size={18} /> {compare.has(movie.id) ? 'In compare' : 'Compare'}
                                 </button>
@@ -133,11 +143,11 @@ export default function MovieShow(props: Props) {
             </section>
 
             {/* Section nav ----------------------------------------------------------- */}
-            <nav className="sticky top-0 z-40 border-y border-line bg-ink/90 backdrop-blur-xl" aria-label="On this page">
+            <nav className="sticky top-[4.75rem] z-40 border-y border-line bg-ink/90 backdrop-blur-xl" aria-label="On this page">
                 <ul className="shell no-scrollbar flex overflow-x-auto">
                     {sections.map(([anchor, label]) => (
                         <li key={anchor}>
-                            <button type="button" onClick={() => scrollToTarget(`#${anchor}`, -64)} className="block whitespace-nowrap px-4 py-4 text-[11px] font-semibold uppercase tracking-[.08em] text-mute transition hover:text-accent [font-stretch:115%]">
+                            <button type="button" onClick={() => scrollToTarget(`#${anchor}`, -140)} className="block whitespace-nowrap px-4 py-4 text-[11px] font-semibold uppercase tracking-[.08em] text-mute transition hover:text-accent [font-stretch:115%]">
                                 {label}
                             </button>
                         </li>
@@ -146,6 +156,33 @@ export default function MovieShow(props: Props) {
             </nav>
 
             <Showtimes {...props} />
+
+            {movie.trailers.length > 0 && (
+                <section id="trailers" className="scroll-mt-24 pt-28" aria-labelledby="trailers-title">
+                    <div className="shell">
+                        <SectionHeading label={movie.trailers.length > 1 ? t(':count cuts, slightly different', { count: movie.trailers.length }) : t('Watch before you book')}
+                            title={movie.trailers.length > 1 ? t('Trailers') : t('Trailer')} id="trailers-title" />
+                        <div className={cn('mt-12 grid gap-4', movie.trailers.length > 1 && 'md:grid-cols-2')}>
+                            {movie.trailers.map((item, index) => (
+                                <button key={item.src} type="button" onClick={() => setTrailer(index)} className="group relative block aspect-video overflow-hidden bg-ink-3 text-left"
+                                    aria-label={`${t('Play')} ${item.label}: ${movie.title}`}>
+                                    {item.poster || movie.hero_image_url ? (
+                                        <img src={item.poster ?? movie.hero_image_url ?? ''} alt="" loading="lazy" decoding="async"
+                                            className="h-full w-full object-cover transition-transform duration-[900ms] ease-[var(--ease-out-expo)] group-hover:scale-[1.04]" />
+                                    ) : null}
+                                    <span className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
+                                    <span className="absolute left-5 top-5 num text-[11px] text-paper-2">{String(index + 1).padStart(2, '0')} · 0:10</span>
+                                    <span className="absolute inset-x-5 bottom-5 flex items-end justify-between gap-4">
+                                        <span className="headline text-3xl sm:text-4xl">{item.label}</span>
+                                        <span className="grid h-14 w-14 shrink-0 place-items-center bg-volt text-noir transition-transform duration-500 group-hover:scale-110"><Icon name="play" size={22} /></span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
+            <TrailerModal title={movie.title} trailers={movie.trailers} open={trailer !== null} initial={trailer ?? 0} onClose={() => setTrailer(null)} />
 
             {/* Story ------------------------------------------------------------------ */}
             <section id="story" className="scroll-mt-24 pt-28" aria-labelledby="story-title">

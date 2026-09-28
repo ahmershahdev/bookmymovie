@@ -16,9 +16,10 @@ interface Props {
     cartExpiresAt: string | null;
     recommended: Movie[];
     notifications: { id: number; title: string; message: string; read: boolean; ago: string }[];
+    loyalty: { points: number; history: { id: number; points: number; reason: string; ago: string | null }[] };
 }
 
-export default function Dashboard({ greeting, memberSince, stats, next, upcoming, cartExpiresAt, recommended, notifications }: Props) {
+export default function Dashboard({ greeting, memberSince, stats, next, upcoming, cartExpiresAt, recommended, notifications, loyalty }: Props) {
     const { auth } = useShared();
     const hold = useCountdown(stats.cart > 0 ? cartExpiresAt : null, () => router.reload());
 
@@ -36,6 +37,33 @@ export default function Dashboard({ greeting, memberSince, stats, next, upcoming
                         <Link href={route('user.checkout')} className="btn btn-primary btn-sm">Finish checkout</Link>
                     </div>
                 )}
+
+                <section className="grid gap-px border border-line bg-line md:grid-cols-12" aria-labelledby="loyalty-title">
+                    <div className="bg-ink p-7 md:col-span-5">
+                        <p className="label label-accent" id="loyalty-title">Loyalty points</p>
+                        <p className="display mt-3 text-7xl"><span className="num">{loyalty.points.toLocaleString('en-PK')}</span></p>
+                        <p className="mt-2 text-sm text-mute">Worth {money(loyalty.points)} off your next booking. Use them, or a gift card, at checkout.</p>
+                        <div className="mt-6 flex flex-wrap gap-2">
+                            <Link href={route('movies.index')} className="btn btn-primary btn-sm">Spend points</Link>
+                            <Link href={route('gift-cards')} className="btn btn-ghost btn-sm"><Icon name="gift" size={14} /> Gift cards</Link>
+                        </div>
+                    </div>
+                    <div className="bg-ink p-7 md:col-span-7">
+                        <p className="label">Recent points</p>
+                        {loyalty.history.length ? (
+                            <ul className="mt-4 divide-y divide-line">
+                                {loyalty.history.map((entry) => (
+                                    <li key={entry.id} className="flex items-center justify-between gap-4 py-3 text-sm">
+                                        <span className="min-w-0 truncate text-paper-2">{entry.reason}<span className="ms-2 text-xs text-dim">{entry.ago}</span></span>
+                                        <span className={cn('num shrink-0 font-semibold', entry.points >= 0 ? 'text-mint' : 'text-signal')}>{entry.points >= 0 ? '+' : ''}{entry.points}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="mt-4 text-sm text-mute">Every PKR 100 you pay earns points. Your first booking starts the count.</p>
+                        )}
+                    </div>
+                </section>
 
                 <section className="grid gap-6 lg:grid-cols-12" aria-labelledby="next-show">
                     <div className="lg:col-span-8">

@@ -23,6 +23,8 @@ class AuthController extends Controller
 {
     private const RESET_TOKEN_MINUTES = 15;
 
+    private const TWO_FACTOR_MINUTES = 10;
+
     public function showUserLogin(): Response
     {
         return $this->page('Auth/Login', [
@@ -63,10 +65,102 @@ class AuthController extends Controller
                 ->withErrors(['code' => 'Please verify your email address to finish setting up your account.']);
         }
 
-        Auth::login($user, $request->boolean('remember'));
+        if ($user->two_factor_enabled) {
+            // Password was right; hold the sign-in until the emailed code is entered.
+            $request->session()->regenerate();
+            $this->sendTwoFactorCode($request, $user, $request->boolean('remember'));
+
+            return redirect()->route('user.two-factor')->with('status', 'We emailed you a 6-digit sign-in code.');
+        }
+
+        return $this->completeLogin($request, $user, $request->boolean('remember'), 'password');
+    }
+
+    public function showTwoFactor(Request $request): Response|RedirectResponse
+    {
+        $pending = $request->session()->get('two_factor');
+
+        if (! $pending || now()->timestamp > $pending['expires']) {
+            return redirect()->route('user.login')->withErrors(['email' => 'Your sign-in code expired. Please sign in again.']);
+        }
+
+        return $this->page('Auth/TwoFactor', [
+            'email' => Str::mask((string) User::query()->whereKey($pending['user_id'])->value('email'), '•', 2, -6),
+            'minutes' => self::TWO_FACTOR_MINUTES,
+        ], ['title' => 'Sign-in code | BookMyMovie', 'description' => 'Enter the code we emailed to finish signing in.']);
+    }
+
+    public function verifyTwoFactor(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'size:6']]);
+        $pending = $request->session()->get('two_factor');
+
+        if (! $pending || now()->timestamp > $pending['expires']) {
+            $request->session()->forget('two_factor');
+
+            return redirect()->route('user.login')->withErrors(['email' => 'Your sign-in code expired. Please sign in again.']);
+        }
+
+        if (++$pending['attempts'] > 5) {
+            $request->session()->forget('two_factor');
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['layer' => 'two_factor_lockout']);
+
+            return redirect()->route('user.login')->withErrors(['email' => 'Too many wrong codes. Please sign in again.']);
+        }
+
+        $request->session()->put('two_factor', $pending);
+
+        if (! Hash::check($data['code'], $pending['code'])) {
+            SecurityLog::record(SecurityLog::FAILED_LOGIN, $request, ['layer' => 'two_factor']);
+
+            return back()->withErrors(['code' => 'That code is not right. Check the latest email and try again.']);
+        }
+
+        $user = User::query()->whereKey($pending['user_id'])->where('is_blocked', false)->first();
+        $request->session()->forget('two_factor');
+
+        if (! $user) {
+            return redirect()->route('user.login')->withErrors(['email' => 'This account is not available. Please contact support.']);
+        }
+
+        return $this->completeLogin($request, $user, (bool) $pending['remember'], 'password + email code');
+    }
+
+    public function resendTwoFactor(Request $request): RedirectResponse
+    {
+        $pending = $request->session()->get('two_factor');
+        $user = $pending ? User::query()->find($pending['user_id']) : null;
+
+        if (! $user) {
+            return redirect()->route('user.login');
+        }
+
+        $this->sendTwoFactorCode($request, $user, (bool) $pending['remember']);
+
+        return back()->with('status', 'A new code is on its way. Earlier codes no longer work.');
+    }
+
+    private function sendTwoFactorCode(Request $request, User $user, bool $remember): void
+    {
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $request->session()->put('two_factor', [
+            'user_id' => $user->id,
+            'code' => Hash::make($code),
+            'expires' => now()->addMinutes(self::TWO_FACTOR_MINUTES)->timestamp,
+            'remember' => $remember,
+            'attempts' => 0,
+        ]);
+
+        TransactionalMailer::twoFactorCode($user, $code, self::TWO_FACTOR_MINUTES);
+    }
+
+    private function completeLogin(Request $request, User $user, bool $remember, string $method): RedirectResponse
+    {
+        Auth::login($user, $remember);
         $request->session()->regenerate();
-        AuditLog::record('auth.login', $user, ['method' => 'password'], $request, 'user', $user->id);
-        TransactionalMailer::userLogin($user, $request);
+        AuditLog::record('auth.login', $user, ['method' => $method], $request, 'user', $user->id);
+        TransactionalMailer::userLogin($user, $request, ucfirst($method));
 
         return redirect()->intended(route('user.dashboard'));
     }
@@ -428,6 +522,12 @@ class AuthController extends Controller
         $request->session()->put('admin_id', $admin->id);
         $request->session()->put('admin_authenticated_at', now()->timestamp);
         SecurityLog::record(SecurityLog::ADMIN_LOGIN, $request, ['admin_id' => $admin->id]);
+
+        // A scanned ticket QR sent the admin here first; go back to it.
+        $intended = (string) $request->session()->pull('admin_intended', '');
+        if ($intended !== '' && Str::startsWith($intended, url('/admin/'))) {
+            return redirect()->to($intended);
+        }
 
         return redirect()->route('admin.dashboard');
     }

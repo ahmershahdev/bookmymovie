@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminOperationsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CinemaController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MovieController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,6 +55,9 @@ Route::get('/refund-policy', [PublicController::class, 'refund'])->name('refund'
 Route::get('/cookie-policy', [PublicController::class, 'cookies'])->name('cookies');
 Route::get('/accessibility', [PublicController::class, 'accessibility'])->name('accessibility');
 Route::get('/e-ticket-info', [PublicController::class, 'eticket'])->name('eticket.info');
+Route::get('/gift-cards', [PublicController::class, 'giftCards'])->name('gift-cards');
+Route::post('/gift-cards/balance', [PublicController::class, 'giftCardBalance'])->name('gift-cards.balance')->middleware('throttle:10,1');
+Route::post('/language', [LocaleController::class, 'update'])->name('locale.update')->middleware('throttle:30,1');
 
 /*
 | Customer authentication
@@ -67,6 +73,9 @@ Route::middleware('guest')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->middleware('throttle:password-reset');
     Route::get('/reset-password', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
+    Route::get('/login/code', [AuthController::class, 'showTwoFactor'])->name('user.two-factor');
+    Route::post('/login/code', [AuthController::class, 'verifyTwoFactor'])->middleware('throttle:login');
+    Route::post('/login/code/resend', [AuthController::class, 'resendTwoFactor'])->name('user.two-factor.resend')->middleware('throttle:password-reset');
 });
 
 Route::get('/verify-email', [AuthController::class, 'showEmailVerification'])->name('user.verify.notice');
@@ -100,6 +109,14 @@ Route::prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/dashboard/movies/{movie}', [AdminController::class, 'dashboard'])->whereNumber('movie')->name('admin.dashboard.movie');
     Route::post('/dashboard', [AdminController::class, 'handleDashboard'])->middleware('throttle:30,1');
+
+    Route::get('/activity', [AdminOperationsController::class, 'activity'])->name('admin.activity');
+    Route::post('/bookings/{number}/refund', [AdminOperationsController::class, 'refund'])->name('admin.bookings.refund')->middleware('throttle:30,1');
+    Route::post('/gift-cards', [AdminOperationsController::class, 'issueGiftCard'])->name('admin.gift-cards.store')->middleware('throttle:30,1');
+    Route::delete('/gift-cards/{card}', [AdminOperationsController::class, 'deactivateGiftCard'])->name('admin.gift-cards.destroy')->middleware('throttle:30,1');
+    // Printed in every e-ticket QR code; the signature stops forged numbers.
+    Route::get('/tickets/{number}/{signature}', [AdminOperationsController::class, 'verifyTicket'])->where('signature', '[a-f0-9]{16}')->name('admin.tickets.verify');
+    Route::post('/tickets/{number}/{signature}/admit', [AdminOperationsController::class, 'admit'])->where('signature', '[a-f0-9]{16}')->name('admin.tickets.admit')->middleware('throttle:60,1');
 });
 
 /*
@@ -111,6 +128,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/account/bookings', [AccountController::class, 'bookings'])->name('user.bookings');
     Route::get('/account/bookings/{number}', [AccountController::class, 'bookingShow'])->name('user.booking.show');
     Route::get('/account/bookings/{number}/track', [AccountController::class, 'tracking'])->name('user.tracking');
+    Route::get('/account/bookings/{number}/wallet/apple', [TicketController::class, 'apple'])->name('tickets.wallet.apple')->middleware('throttle:profile-updates');
+    Route::get('/account/bookings/{number}/wallet/google', [TicketController::class, 'google'])->name('tickets.wallet.google')->middleware('throttle:profile-updates');
     Route::post('/account/bookings/{number}/cancel', [AccountController::class, 'cancelBooking'])->name('user.booking.cancel')->middleware('throttle:booking-changes');
     Route::get('/account/wishlist', [AccountController::class, 'wishlist'])->name('user.wishlist');
     Route::post('/account/wishlist', [AccountController::class, 'addWishlist'])->middleware('throttle:wishlist-actions');

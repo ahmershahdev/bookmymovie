@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource-variable/geist-mono';
+/* Urdu: its unicode-range only covers Arabic script, so Latin text never loads it. */
+@import '@fontsource-variable/noto-naskh-arabic';
 @import 'lenis/dist/lenis.css';
 
 @source '../../storage/framework/views/*.php';
@@ -22,8 +24,9 @@
 */
 
 @theme {
-    --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-sans: 'Archivo Variable', 'Noto Naskh Arabic Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --font-urdu: 'Noto Naskh Arabic Variable', 'Segoe UI', Tahoma, sans-serif;
 
     --color-ink: #0a0a0a;
     --color-ink-2: #111111;
@@ -129,6 +132,10 @@
     }
 
     html::-webkit-scrollbar { display: none; }
+
+    /* While a full-screen overlay scrolls on its own, the drawn page scrollbar steps aside: one scrollbar, never two. */
+    html[data-scroll-locked] [data-page-scrollbar] { display: none !important; }
+
 
     body {
         overflow-x: clip;
@@ -498,7 +505,8 @@
 
     .poster {
         position: relative;
-        aspect-ratio: 2 / 3;
+        /* Films ship 4:3 card art (public/images/movies/{slug}/card.webp). */
+        aspect-ratio: 4 / 3;
         overflow: hidden;
         background: var(--color-ink-3);
         isolation: isolate;
@@ -627,3 +635,13 @@
     body { background: #fff !important; color: #000 !important; }
     .ticket { -webkit-mask: none; mask: none; border: 1px solid #000; background: #fff; }
 }
+
+/* Unlayered, so these beat utility classes such as leading-[.8] and tracking-*. */
+/*
+| Urdu. Letter-spacing breaks the joins of Arabic script, and the tight
+| poster line-heights clip its tall ascenders and deep descenders.
+*/
+:lang(ur) body { line-height: 1.8; }
+:lang(ur) *, :lang(ur) *::before { letter-spacing: normal !important; }
+:lang(ur) :is(.display, .headline, h1, h2, h3) { line-height: 1.3 !important; }
+:lang(ur) .label { font-size: 0.8rem; }

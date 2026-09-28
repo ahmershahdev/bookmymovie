@@ -35,6 +35,7 @@ class Movie extends Model
         'hero_eyebrow',
         'hero_tagline',
         'hero_image',
+        'trailers',
         'meta_title',
         'meta_description',
         'base_price',
@@ -62,6 +63,7 @@ class Movie extends Model
     protected function casts(): array
     {
         return [
+            'trailers' => 'array',
             'release_date' => 'date',
             'kids_discount_eligible' => 'boolean',
             'hero_carousel_enabled' => 'boolean',
@@ -267,6 +269,7 @@ class Movie extends Model
             'banner_url' => $this->publicMediaUrl($this->hero_image ?: $this->banner_image),
             'hero_image_url' => $this->publicMediaUrl($this->hero_image ?: $this->banner_image ?: $this->poster_image),
             'hero_eyebrow' => $this->hero_eyebrow ?: $this->statusLabel(),
+            'trailers' => $this->trailerList(),
             'genre' => $this->genres->pluck('name')->take(2)->join(' · ') ?: 'Feature',
             'genres' => $this->genres->pluck('name')->all(),
             'language' => $this->language,
@@ -285,6 +288,22 @@ class Movie extends Model
             'first_show_id' => $this->firstScheduledShowId(),
             'palette' => $this->posterPalette(),
         ];
+    }
+
+    /**
+     * @return list<array{src: string, label: string, poster: ?string}>
+     */
+    public function trailerList(): array
+    {
+        return collect((array) $this->trailers)
+            ->filter(fn ($trailer) => is_array($trailer) && filled($trailer['src'] ?? null))
+            ->map(fn (array $trailer) => [
+                'src' => (string) $this->publicMediaUrl($trailer['src']),
+                'label' => (string) ($trailer['label'] ?? 'Trailer'),
+                'poster' => $this->publicMediaUrl($trailer['poster'] ?? null),
+            ])
+            ->values()
+            ->all();
     }
 
     public function displayRating(): float
@@ -361,7 +380,7 @@ class Movie extends Model
             return $path;
         }
 
-        if (Str::startsWith($path, ['storage/', '/storage/', 'images/', '/images/'])) {
+        if (Str::startsWith($path, ['storage/', '/storage/', 'images/', '/images/', 'videos/', '/videos/'])) {
             return asset(ltrim($path, '/'));
         }
 

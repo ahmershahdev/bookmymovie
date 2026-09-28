@@ -5,6 +5,7 @@ import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
 import { Alert, Breadcrumbs } from '@/components/ui';
 import { SplitHeading } from '@/components/motion';
+import { useT } from '@/lib/i18n';
 import { cn, money, route, useShared } from '@/lib/utils';
 import type { MovieCard } from '@/types';
 
@@ -26,7 +27,36 @@ interface Props {
     holdMinutes: number;
 }
 
+/**
+ * The best block of `count` free seats side by side in one row, never across
+ * an aisle. Scores favour rows about 60% of the way back and blocks centred on
+ * the screen, the way projectionists and sound engineers sit.
+ */
+function bestSeats(rows: Props['rows'], aisles: number[], count: number): Seat[] | null {
+    const ideal = (rows.length - 1) * 0.6;
+    let best: { seats: Seat[]; score: number } | null = null;
+
+    rows.forEach((row, rowIndex) => {
+        const numbers = row.seats.map((seat) => seat.number);
+        const middle = (Math.min(...numbers) + Math.max(...numbers)) / 2;
+        const width = Math.max(1, Math.max(...numbers) - Math.min(...numbers));
+
+        for (let start = 0; start + count <= row.seats.length; start++) {
+            const block = row.seats.slice(start, start + count);
+            const together = block.every((seat, index) => seat.available && (index === 0 || (seat.number === block[index - 1].number + 1 && !aisles.includes(block[index - 1].number))));
+            if (!together) continue;
+
+            const centre = (block[0].number + block[block.length - 1].number) / 2;
+            const score = Math.abs(rowIndex - ideal) / Math.max(1, rows.length) + (Math.abs(centre - middle) / width) * 1.4;
+            if (!best || score < best.score) best = { seats: block, score };
+        }
+    });
+
+    return best ? (best as { seats: Seat[] }).seats : null;
+}
+
 export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, pricingTiers, otherTimes, maxSeats, holdMinutes }: Props) {
+    const t = useT();
     const { auth, errors } = useShared();
     const [selected, setSelected] = useState<Seat[]>([]);
     const [ticketType, setTicketType] = useState<'adult' | 'kid'>('adult');
@@ -69,6 +99,17 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
         });
     };
 
+    const recommend = (count: number) => {
+        const block = bestSeats(rows, aisles, count);
+        if (!block) {
+            setMessage(t('No :count seats together are left for this show. Try a smaller group or another time.', { count }));
+            return;
+        }
+        setSelected(block);
+        setFocus(block[Math.floor(block.length / 2)].id);
+        setMessage('');
+    };
+
     const lastRow = rows[rows.length - 1]?.label;
     const serverError = errors.seats || errors.show_id || errors.cart;
 
@@ -101,6 +142,25 @@ export default function Seats({ movie, show, onSale, aisles, rows, seatSummary, 
                     <div className="xl:col-span-8">
                         {serverError && <div className="mb-6"><Alert tone="error">{serverError}</Alert></div>}
                         {!onSale && <div className="mb-6"><Alert icon="clock">This show has started or is no longer on sale. Choose another time from the film page.</Alert></div>}
+
+                        {onSale && seatSummary.available > 0 && (
+                            <div className="panel mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-3">
+                                    <Icon name="star" size={18} className="mt-0.5 shrink-0 text-accent" />
+                                    <div>
+                                        <p className="font-semibold">{t('Let us pick the best seats')}</p>
+                                        <p className="text-xs text-mute">{t('Side by side, near the centre, about two thirds of the way back.')}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1" aria-label={t('Recommend seats together')}>
+                                    {Array.from({ length: maxSeats }, (_, index) => index + 1).map((count) => (
+                                        <button key={count} type="button" onClick={() => recommend(count)} className="chip">
+                                            {count === 1 ? t('Best seat') : t('Best :count together', { count })}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Map or 3D hall ---------------------------------------------- */}
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

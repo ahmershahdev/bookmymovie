@@ -67,7 +67,9 @@ class AddSecurityHeaders
             "connect-src 'self' https://www.google.com{$dev}",
             'frame-src https://www.google.com https://recaptcha.google.com',
             "manifest-src 'self'",
-            "worker-src 'none'",
+            // The service worker (/sw.js) keeps e-tickets available offline.
+            "worker-src 'self'",
+            "media-src 'self' blob:",
             app()->isLocal() ? null : 'upgrade-insecure-requests',
         ]));
     }

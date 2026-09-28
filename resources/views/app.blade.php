@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="bg-ink">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'ur' ? 'rtl' : 'ltr' }}" class="bg-ink">
 <head>
     @include('partials.head')
     {{-- Apply the saved or system theme before first paint, so there is no flash. --}}

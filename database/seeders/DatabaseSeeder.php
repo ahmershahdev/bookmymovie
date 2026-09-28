@@ -8,6 +8,7 @@ use App\Models\Movie;
 use App\Models\Review;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\MovieMedia;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +87,7 @@ class DatabaseSeeder extends Seeder
         $categories = $this->seedSeatCategories();
         $screens = $this->seedCinemaNetwork($categories);
         $movies = $this->seedMovies();
+        MovieMedia::attach();
         $shows = $this->seedShowtimes($screens, $movies);
         $this->seedPricing($shows, $categories);
         $this->seedReviews($movies);
@@ -102,6 +104,7 @@ class DatabaseSeeder extends Seeder
         Schema::disableForeignKeyConstraints();
 
         foreach ([
+            'audit_logs', 'loyalty_transactions', 'booking_concessions', 'gift_cards',
             'security_events', 'booking_events', 'contact_messages', 'faqs', 'content_pages', 'site_settings',
             'admin_activity_logs', 'admin_notifications', 'notifications', 'wishlists', 'reviews', 'coupon_usages',
             'payments', 'booking_seats', 'bookings', 'cart_items', 'carts', 'coupons', 'show_seat_row_prices',
@@ -735,7 +738,7 @@ class DatabaseSeeder extends Seeder
             'canonical_base_url' => config('bookmymovie.canonical_url'),
             'site_tagline' => 'Every seat, every showtime, honestly priced.',
             'footer_description' => 'An independent, open-source cinema booking platform. Live seat maps, row-by-row pricing and tickets that just work at the door.',
-            'copyright_note' => 'Designed and built by Syed Ahmer Shah. Open source under the MIT licence.',
+            'copyright_note' => 'By Syed Ahmer Shah · MIT licence',
             'support_email' => 'support@ahmershah.dev',
             'support_phone' => '+92 370 4831994',
             'service_area' => 'Karachi, Lahore, Islamabad and Rawalpindi',

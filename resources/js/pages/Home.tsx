@@ -6,7 +6,9 @@ import Icon from '@/components/Icon';
 import MovieCard from '@/components/MovieCard';
 import { CountUp, Reveal, SplitHeading } from '@/components/motion';
 import Poster from '@/components/Poster';
+import { BackdropVideo, TrailerModal } from '@/components/Trailer';
 import { SectionHeading, StarRating } from '@/components/ui';
+import { useT } from '@/lib/i18n';
 import { cn, pad, route } from '@/lib/utils';
 import type { MovieCard as Movie } from '@/types';
 
@@ -69,6 +71,11 @@ function Hero({ slides }: { slides: Movie[] }) {
     const count = Math.max(1, slides.length);
     const slide = slides[active];
     const [webgl, setWebgl] = useState(false);
+    const [watching, setWatching] = useState(false);
+    const t = useT();
+    // Real artwork (a 16:9 still or a trailer) replaces the 3D ring when every slide has it.
+    const cinematic = slides.length > 0 && slides.every((item) => item.hero_image_url || item.trailers.length);
+    const hasTrailer = Boolean(slide?.trailers.length);
 
     useEffect(() => {
         try {
@@ -80,17 +87,18 @@ function Hero({ slides }: { slides: Movie[] }) {
     }, []);
 
     useEffect(() => {
-        if (paused || reduce || count < 2) return;
-        const timer = window.setInterval(() => !document.hidden && setActive((index) => (index + 1) % count), 7000);
+        if (paused || watching || reduce || count < 2) return;
+        // A slide with a trailer stays up for the whole 10-second clip.
+        const timer = window.setInterval(() => !document.hidden && setActive((index) => (index + 1) % count), hasTrailer ? 10000 : 7000);
         return () => window.clearInterval(timer);
-    }, [paused, reduce, count, active]);
+    }, [paused, watching, reduce, count, active, hasTrailer]);
 
     if (!slide) return <div className="h-[var(--header)]" />;
 
     const go = (index: number) => setActive((index + count) % count);
 
     return (
-        <section className="relative isolate h-[100svh] min-h-[720px] overflow-hidden" aria-roledescription="carousel" aria-label="Featured films"
+        <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden pt-[calc(var(--header)+2rem)]" aria-roledescription="carousel" aria-label="Featured films"
             onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
             {/* Colour wash from the active film's palette. */}
             <AnimatePresence>
@@ -98,7 +106,14 @@ function Hero({ slides }: { slides: Movie[] }) {
                     style={{ background: `radial-gradient(60% 55% at 50% 42%, color-mix(in oklab, ${slide.palette[1]} 26%, transparent), transparent 70%), var(--color-ink)` }} />
             </AnimatePresence>
 
-            {webgl && !reduce ? (
+            {cinematic ? (
+                <AnimatePresence>
+                    <motion.div key={slide.slug} className="absolute inset-0 -z-10" initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                        transition={{ opacity: { duration: 1.1 }, scale: { duration: 8, ease: 'linear' } }}>
+                        <BackdropVideo trailer={slide.trailers[0]} image={slide.hero_image_url} />
+                    </motion.div>
+                </AnimatePresence>
+            ) : webgl && !reduce ? (
                 <Suspense fallback={null}>
                     <PosterRing movies={slides} active={active} offset={0.2} className="absolute inset-0 -z-10" />
                 </Suspense>
@@ -108,10 +123,10 @@ function Hero({ slides }: { slides: Movie[] }) {
                 </div>
             )}
 
-            <div className="pointer-events-none absolute inset-0 -z-10 hidden bg-[linear-gradient(90deg,var(--color-ink)_0%,color-mix(in_oklab,var(--color-ink)_82%,transparent)_34%,transparent_62%)] lg:block" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-0 -z-10 hidden rtl:-scale-x-100 bg-[linear-gradient(90deg,var(--color-ink)_0%,color-mix(in_oklab,var(--color-ink)_82%,transparent)_34%,transparent_62%)] lg:block" aria-hidden="true" />
             <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-ink)_55%,transparent)_0%,transparent_28%,transparent_45%,color-mix(in_oklab,var(--color-ink)_92%,transparent)_78%,var(--color-ink)_100%)]" aria-hidden="true" />
 
-            <div className="shell flex h-full flex-col justify-end pb-10 sm:pb-14">
+            <div className="shell flex w-full flex-1 flex-col justify-end pb-10 sm:pb-14">
                 <div className="grid items-end gap-8 lg:grid-cols-12">
                     <div className="lg:col-span-9" role="group" aria-roledescription="slide" aria-label={`${active + 1} of ${count}: ${slide.title}`}>
                         <AnimatePresence mode="wait">
@@ -120,12 +135,12 @@ function Hero({ slides }: { slides: Movie[] }) {
                                     <span className="num">{pad(active + 1)}</span><span className="h-px w-8 bg-volt" />{slide.hero_eyebrow}
                                 </motion.p>
                                 {active === 0 ? (
-                                    <SplitHeading as="h1" text={slide.title} className="mt-4 max-w-[14ch] text-[clamp(3.25rem,9.5vw,10rem)] leading-[.8]" />
+                                    <SplitHeading as="h1" text={slide.title} className="mt-4 max-w-[14ch] text-[clamp(3.25rem,min(9.5vw,14svh),10rem)] leading-[.8]" />
                                 ) : (
-                                    <SplitHeading as="h2" text={slide.title} className="mt-4 max-w-[14ch] text-[clamp(3.25rem,9.5vw,10rem)] leading-[.8]" />
+                                    <SplitHeading as="h2" text={slide.title} className="mt-4 max-w-[14ch] text-[clamp(3.25rem,min(9.5vw,14svh),10rem)] leading-[.8]" />
                                 )}
                                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease, delay: 0.35 }}>
-                                    <p className="lede mt-5 max-w-xl">{slide.tagline}</p>
+                                    <p className="lede mt-5 max-w-xl" dir="auto">{slide.tagline}</p>
                                     <p className="num mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase text-mute">
                                         <span>{slide.genre}</span><span className="text-dim">/</span>
                                         <span>{slide.duration}</span><span className="text-dim">/</span>
@@ -135,9 +150,14 @@ function Hero({ slides }: { slides: Movie[] }) {
                                     </p>
                                     <div className="mt-8 flex flex-wrap gap-2">
                                         <Link href={`${route('movies.show', slide.slug)}${slide.first_show_id ? '#showtimes' : ''}`} className="btn btn-primary btn-lg">
-                                            {slide.first_show_id ? 'Book tickets' : `Opens ${slide.release_date}`} <Icon name="arrow-right" size={18} className="arrow" />
+                                            {slide.first_show_id ? t('Book tickets') : t('Opens :date', { date: slide.release_date ?? '' })} <Icon name="arrow-right" size={18} className="arrow" />
                                         </Link>
-                                        <Link href={route('movies.show', slide.slug)} className="btn btn-ghost btn-lg">Film details</Link>
+                                        {hasTrailer && (
+                                            <button type="button" onClick={() => setWatching(true)} className="btn btn-ghost btn-lg">
+                                                <Icon name="play" size={18} /> {slide.trailers.length > 1 ? t('Watch :count trailers', { count: slide.trailers.length }) : t('Watch trailer')}
+                                            </button>
+                                        )}
+                                        <Link href={route('movies.show', slide.slug)} className="btn btn-ghost btn-lg">{t('Film details')}</Link>
                                     </div>
                                 </motion.div>
                             </motion.div>
@@ -170,6 +190,8 @@ function Hero({ slides }: { slides: Movie[] }) {
                     </div>
                 )}
             </div>
+
+            <TrailerModal title={slide.title} trailers={slide.trailers} open={watching} onClose={() => setWatching(false)} />
         </section>
     );
 }

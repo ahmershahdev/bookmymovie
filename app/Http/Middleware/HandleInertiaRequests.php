@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'admin' => (bool) ($request->hasSession() && $request->session()->has('admin_id')),
             ],
+            'locale' => app()->getLocale(),
             'site' => fn () => $this->site(),
             'counts' => fn () => LayoutData::counts(),
             'navMovies' => fn () => collect(LayoutData::navMovies())
@@ -49,6 +50,7 @@ class HandleInertiaRequests extends Middleware
                 'genres' => LayoutData::footerGenres(),
                 'cinemas' => LayoutData::footerCinemas(),
             ],
+            'giftCard' => fn () => $request->session()->get('giftCard'),
             'flash' => fn () => $request->session()->has('status')
                 ? ['status' => $request->session()->get('status'), 'id' => (string) Str::uuid()]
                 : null,
@@ -67,7 +69,7 @@ class HandleInertiaRequests extends Middleware
             'support_email' => $settings['support_email'] ?? 'support@ahmershah.dev',
             'support_phone' => $settings['support_phone'] ?? '+92 370 4831994',
             'footer_description' => $settings['footer_description'] ?? 'An independent, open-source cinema booking platform for Pakistan.',
-            'copyright_note' => $settings['copyright_note'] ?? 'Open source under the MIT licence.',
+            'copyright_note' => $settings['copyright_note'] ?? 'By Syed Ahmer Shah · MIT licence',
             'response_sla' => $settings['response_sla'] ?? 'Within one working day',
             'service_area' => $settings['service_area'] ?? 'Pakistan',
             'contact_heading' => $settings['contact_heading'] ?? null,

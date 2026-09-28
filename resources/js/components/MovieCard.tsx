@@ -2,11 +2,13 @@ import { Link } from '@inertiajs/react';
 import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
 import { useCompare } from '@/lib/compare';
+import { useT } from '@/lib/i18n';
 import { cn, money, pad, route } from '@/lib/utils';
 import type { MovieCard as Movie } from '@/types';
 
 export default function MovieCard({ movie, eager = false, index, className }: { movie: Movie; eager?: boolean; index?: number; className?: string }) {
     const compare = useCompare();
+    const t = useT();
     const inCompare = compare.has(movie.id);
     const onSale = Number(movie.original_price) > Number(movie.price);
     const href = route('movies.show', movie.slug);
@@ -21,13 +23,13 @@ export default function MovieCard({ movie, eager = false, index, className }: { 
 
                 {/* Hover state: a volt ticket strip rises from the bottom edge. */}
                 <div className="absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-between bg-volt px-4 py-3 text-noir transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:translate-y-0 group-focus-visible:translate-y-0">
-                    <span className="text-[11px] font-bold uppercase tracking-[.08em] [font-stretch:115%]">{movie.first_show_id ? 'Book seats' : 'Details'}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-[.08em] [font-stretch:115%]">{movie.first_show_id ? t('Book seats') : t('Details')}</span>
                     <Icon name="arrow-up-right" size={18} />
                 </div>
 
                 <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between">
-                    <span className={cn('tag', statusTone)}>{movie.status}</span>
-                    {index !== undefined && (
+                    <span className={cn('tag', statusTone)}>{t(movie.status)}</span>
+                    {index !== undefined && !movie.poster_url && (
                         <span className="display display-outline text-6xl text-paper/90">{pad(index)}</span>
                     )}
                 </div>
@@ -41,7 +43,7 @@ export default function MovieCard({ movie, eager = false, index, className }: { 
 
             <div className="mt-4 flex flex-1 flex-col">
                 <p className="label truncate">{movie.genre}</p>
-                <h3 className="headline mt-2 text-[1.65rem] text-balance">
+                <h3 className="headline mt-2 text-[1.65rem] text-balance" dir="auto">
                     <Link href={href} className="link">{movie.title}</Link>
                 </h3>
                 <p className="num mt-2 text-[11px] uppercase text-mute">{movie.duration} · {movie.certificate} · {movie.language}</p>
@@ -55,12 +57,12 @@ export default function MovieCard({ movie, eager = false, index, className }: { 
                                 <span className="text-mute">({movie.reviews})</span>
                             </>
                         ) : (
-                            <span className="text-mute">{movie.status_key === 'coming_soon' ? `Opens ${movie.release_date}` : 'New'}</span>
+                            <span className="text-mute">{movie.status_key === 'coming_soon' ? t('Opens :date', { date: movie.release_date ?? '' }) : t('New')}</span>
                         )}
                     </div>
                     {movie.first_show_id && Number(movie.price) > 0 ? (
                         <p className="text-right leading-tight">
-                            <span className="label block text-[9px]">from</span>
+                            <span className="label block text-[9px]">{t('from')}</span>
                             <span className={cn('num text-sm font-semibold', onSale ? 'text-signal' : 'text-paper')}>{money(movie.price)}</span>
                         </p>
                     ) : null}

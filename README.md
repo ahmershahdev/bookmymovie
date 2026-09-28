@@ -1,187 +1,149 @@
-# BookMyMovie
-
 <p align="center">
-  <img src="public/images/header-logo-3.png" width="96" alt="BookMyMovie logo">
+  <img src="public/images/logo-sm.webp" width="220" alt="BookMyMovie">
 </p>
 
 <p align="center">
-  <strong>A premium Laravel cinema booking project for movie discovery, seat selection, carts, wishlists, checkout, bookings, support, and admin workflows.</strong>
+  <strong>Cinema tickets for Pakistan: live seat maps, trailers, QR e-tickets, food add-ons, loyalty points and Urdu, with no page reloads.</strong>
 </p>
 
 <p align="center">
-  <img alt="Laravel" src="https://img.shields.io/badge/Laravel-11-red?style=for-the-badge">
-  <img alt="Blade" src="https://img.shields.io/badge/Blade-Views-orange?style=for-the-badge">
-  <img alt="Tailwind" src="https://img.shields.io/badge/Tailwind-CDN-38BDF8?style=for-the-badge">
-  <img alt="Alpine" src="https://img.shields.io/badge/Alpine.js-Interactive-77C1D2?style=for-the-badge">
+  <img alt="Laravel 12" src="https://img.shields.io/badge/Laravel-12-FF2D20?style=flat-square&logo=laravel&logoColor=white">
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black">
+  <img alt="Inertia 2" src="https://img.shields.io/badge/Inertia-2-9553E9?style=flat-square">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind-4-38BDF8?style=flat-square&logo=tailwindcss&logoColor=white">
+  <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r186-000000?style=flat-square&logo=threedotjs">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-e3ff3b?style=flat-square">
 </p>
 
-## Overview
+---
 
-BookMyMovie is a full-stack movie ticket booking system built with Laravel, Blade, Tailwind CSS, and Alpine.js. It is designed as a complete academic portfolio project with a polished public experience and practical admin/user workflows.
+BookMyMovie is a full-stack cinema booking platform. Visitors browse films, watch trailers, pick seats on a live map (or in a 3D model of the hall), add snacks and book. Customers get a QR e-ticket that also works offline and can go into Apple or Google Wallet. Box-office staff scan tickets, issue refunds and gift cards, and can see every change in an audit log.
 
-The interface uses a dark cinema theme, glass panels, 3D tilt effects, rich tables, responsive cards, breadcrumbs, validation states, and captcha-ready forms.
+Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptech DISM project.
 
-## Feature Matrix
+## Features
 
-| Area | Features |
+### For moviegoers
+
+| | |
 | --- | --- |
-| Public site | Home, movies, movie details, compare, search, about, contact, FAQ, legal pages |
-| Booking flow | 4 showtimes per seeded movie, row-tier seat pricing, visual seats, cart, checkout, booking tracking |
-| User account | Login, register, forgot password, reset password, profile, wishlist, bookings |
-| Security UX | CSRF protection, min/max validation, password strength UI, disposable email blocking |
-| Captcha | Google reCAPTCHA v2 checkbox and v3 score verification when keys are configured |
-| Support | Detailed contact page, Pakistan map, message limits, placeholders, clean feedback |
-| Legal content | Privacy policy, refund policy, terms of service with detailed tables and cards |
-| Admin | Unified dashboard, theme selector, movie CRUD, media uploads, hero carousel, SEO, coupons, notifications |
+| **Films and trailers** | 4:3 card art on every listing, a 16:9 hero, and 10-second trailers that play silently behind the home carousel and film pages. Films with two cuts list both, labelled, side by side. |
+| **Seats** | Row-tier pricing, a live seat map, a Three.js model of the hall, and **"best 2 (or 4) together"** recommendations that favour centred seats about two thirds of the way back. Seats are held for 10 minutes. |
+| **Checkout** | Food and drink add-ons, coupons, **gift cards** and **loyalty points** in one step. Cash at the counter, or JazzCash / Easypaisa / card once gateway keys are set. |
+| **E-tickets** | A signed **QR code** on every ticket, **Apple Wallet** and **Google Wallet** passes (when credentials are configured), and **offline access** via a service worker (installable PWA). |
+| **Account** | Bookings, tracking, watchlist, profile photo, points history, and optional **two-step sign-in** with an emailed 6-digit code. |
+| **Urdu** | A full English/Urdu switch with right-to-left layout and Noto Naskh Arabic. Film titles, prices and booking numbers stay in Latin script so they match the ticket. |
 
-## UI Highlights
+### For the box office
 
-| Detail | Implementation |
+| | |
 | --- | --- |
-| 3D feel | Reusable `premium-tilt` and `auth-shell` hover transforms |
-| Navigation clarity | Global breadcrumbs on every non-home page |
-| Admin theming | Persistent admin theme selector and custom scrollbar styling |
-| Auth polish | Social buttons, password visibility toggles, strength meter, captcha block |
-| Contact UX | Pakistan service map, live message counter, validation limits |
-| Legal readability | Tables, cards, sectioned policy groups, responsive layout |
+| **Dashboard** | Movies, media, hero carousel, shows, seat pricing, coupons, users, reviews, SEO and site settings. |
+| **Audit log** | Every data-changing action by admins and customers, searchable, with the before/after changes. |
+| **Refunds** | Cancel a confirmed booking in one step: seats, coupon use, gift card balance and points all return, and the customer is emailed. |
+| **Gift cards** | Issue cards with a balance, expiry and message, emailed to the recipient; switch them off at any time. |
+| **Ticket check** | Scanning a ticket's QR opens a check page that verifies its signature, shows seats and snacks, and admits the guests (taking payment first if it is due). |
 
-## Tech Stack
+### Under the hood
+
+- **No page reloads**: Inertia 2 with React 19 and strict TypeScript; Lenis smooth scrolling; Motion for animation.
+- **Emails never block a page**: receipts and notices go through Laravel's database queue with retries; one-time codes are sent immediately.
+- **Security**: strict nonce-based Content-Security-Policy, rate limiting on every sensitive route, Argon2id password hashing, reCAPTCHA v2/v3 support, disposable-email blocking, signed ticket QR codes.
+- **SEO**: server-rendered meta, Open Graph, JSON-LD, sitemap and `llms.txt`.
+- **Optimised media**: artwork is WebP (about 85 MB of PNG down to 5.4 MB); trailers are 720p H.264 with fast-start (34 MB down to 9.4 MB).
+
+## Tech stack
 
 | Layer | Tools |
 | --- | --- |
-| Backend | Laravel, PHP, Eloquent, Blade |
-| Frontend | Tailwind CDN, Alpine.js, Chart.js on selected pages |
-| Database | SQLite by default, MySQL compatible with Laravel config |
-| Auth | Laravel session auth plus optional Socialite provider hooks |
-| Security | CSRF, hashed passwords, validation rules, optional Google reCAPTCHA |
+| Backend | PHP 8.2+, Laravel 12, Eloquent, Inertia (server), Ziggy |
+| Frontend | React 19, TypeScript, Tailwind CSS 4, Motion, Lenis, Three.js with @react-three/fiber, uqr |
+| Type | Archivo (variable width), Geist Mono, Noto Naskh Arabic |
+| Data | MySQL (SQLite works for local development) |
+| Mail and jobs | Resend or any Laravel mailer; database queue |
 
-## Project Structure
-
-```text
-app/
-  Http/Controllers/      Public, movie, auth, account, and admin controllers
-  Models/                Movie, booking, user, contact, FAQ, theater models
-  Support/FormSecurity.php
-resources/views/
-  auth/                  Login, register, forgot password, reset password
-  public/                Home, contact, FAQ, about, compare, search
-  public/static/         Privacy, refund, terms, e-ticket info
-  components/            Navbar, cards, breadcrumbs, captcha, shared UI
-routes/web.php           Public, auth, account, and admin web routes
-database/                Migrations, seeders, SQL export
-public/images/           Logos and public assets
-```
-
-## Setup
-
-1. Install dependencies.
+## Getting started
 
 ```bash
+git clone https://github.com/ahmershahdev/bookmymovie.git
+cd bookmymovie
+
 composer install
 npm install
-```
 
-2. Create the environment file.
-
-```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-3. Configure the database in `.env`.
-
-```env
-DB_CONNECTION=sqlite
-```
-
-For MySQL, set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`.
-
-4. Run migrations and seeders.
+Set the database in `.env` (`DB_CONNECTION`, `DB_DATABASE`, and so on), then:
 
 ```bash
-php artisan migrate --seed
-```
-
-5. Start the app.
-
-```bash
+php artisan migrate --seed    # films, cinemas, shows, artwork and trailers
+npm run build                 # or: npm run dev
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000`.
+Open <http://127.0.0.1:8000>.
 
-## Google reCAPTCHA
+### Background email
 
-The project is captcha-ready but local development can run without keys. Add these values to `.env` to enable live verification:
+Emails are queued (`QUEUE_CONNECTION=database`). Run a worker:
 
-```env
-RECAPTCHA_V2_SITE_KEY=
-RECAPTCHA_V2_SECRET_KEY=
-RECAPTCHA_V3_SITE_KEY=
-RECAPTCHA_V3_SECRET_KEY=
-RECAPTCHA_V3_MIN_SCORE=0.5
+```bash
+php artisan queue:work --tries=3
 ```
 
-Protected forms:
+Or, where a long-running worker is not available, let the scheduler drain the queue every minute:
 
-| Form | v3 action |
-| --- | --- |
-| Login | `user_login` |
-| Register | `user_register` |
-| Forgot password | `forgot_password` |
-| Reset password | `reset_password` |
-| Contact | `contact` |
-
-## Social Login
-
-Google and Facebook buttons are present in the auth UI. To enable OAuth, install/configure Socialite and set:
-
-```env
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
-
-FACEBOOK_CLIENT_ID=
-FACEBOOK_CLIENT_SECRET=
-FACEBOOK_REDIRECT_URI="${APP_URL}/auth/facebook/callback"
+```cron
+* * * * * php /path/to/artisan schedule:run
 ```
 
-## Validation Rules
+### Optional integrations
 
-| Field | Rules |
+Everything below is off until its keys are set; the site works without them.
+
+| Feature | `.env` keys |
 | --- | --- |
-| Name | Required, 3 to 100 characters |
-| Email | Required, valid email, 6 to 150 characters, disposable domains blocked |
-| Phone | Optional, 10 to 20 characters, numbers and phone symbols only |
-| Password | Required, 8 to 72 characters, confirmation required where applicable |
-| Contact message | Required, 20 to 1,200 characters |
+| reCAPTCHA | `RECAPTCHA_V2_SITE_KEY`, `RECAPTCHA_V2_SECRET_KEY`, `RECAPTCHA_V3_SITE_KEY`, `RECAPTCHA_V3_SECRET_KEY` |
+| Apple Wallet | `APPLE_WALLET_PASS_TYPE_ID`, `APPLE_WALLET_TEAM_ID`, `APPLE_WALLET_CERTIFICATE`, `APPLE_WALLET_CERTIFICATE_PASSWORD`, `APPLE_WALLET_WWDR` |
+| Google Wallet | `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_KEY_FILE` |
+| Online payments | JazzCash, Easypaisa and card keys (see `config/payments.php`) |
+| Social sign-in | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` |
 
-## Main Routes
+## Film artwork and trailers
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Home |
-| `/movies` | Movie listing |
-| `/movies/{slug}` | Movie details |
-| `/movies/{slug}/book/{show}` | Seat selection |
-| `/compare` | Movie comparison |
-| `/contact` | Contact support |
-| `/faq` | Help center |
-| `/login` | User login |
-| `/register` | User registration |
-| `/account` | User dashboard |
-| `/admin/dashboard` | Admin dashboard |
+Drop files into `public/` using the film's slug, then run `php artisan migrate` (or re-seed). `App\Support\MovieMedia` links whatever it finds:
 
-## Testing
+```text
+public/images/movies/{slug}/card.webp     4:3 card, used on listings (1200×900)
+public/images/movies/{slug}/hero.webp     16:9 backdrop (1600×900)
+public/videos/trailers/{slug}-1.mp4       first trailer
+public/videos/trailers/{slug}-2.mp4       optional second cut
+public/videos/trailers/{slug}-N.webp      optional still shown before playback
+```
+
+A film without a card falls back to its hero, then to a generated typographic poster, so nothing shows an empty box. Admin uploads are never overwritten.
+
+## Project layout
+
+```text
+app/Http/Controllers/     Public, movie, cinema, account, auth, payment, ticket and admin controllers
+app/Support/              Booking lifecycle, wallet passes, media, mail, security helpers
+resources/js/pages/       Inertia pages (Home, Movies, Account, Admin, Auth, Public)
+resources/js/components/  UI kit, shell (navbar, footer), trailer player, QR code
+resources/js/three/       Poster ring and 3D cinema hall
+resources/js/lang/ur.ts   Urdu strings (English text is the key)
+public/sw.js              Service worker for offline tickets
+```
+
+## Tests
 
 ```bash
 php artisan test
 ```
 
-## Seat Pricing
+## Licence
 
-Seat prices are assigned per show and row. Row A is the highest front premium tier, then B, C, D, E, and F decrease progressively. Each row tier stores benefits such as priority entry, extra legroom, central sound coverage, family pricing, value seating, or group-friendly rear seating.
-
-## Notes
-
-This project was created by Syed Ahmer Shah for an Aptech DISM project. Policy pages and support workflows are written for project completeness and should be reviewed before any production deployment.
+[MIT](LICENSE) © 2026 Syed Ahmer Shah. Policy pages and support copy were written for the project and should be reviewed before a production launch.

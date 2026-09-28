@@ -57,6 +57,8 @@ class User extends Authenticatable
             'date_of_birth' => 'date',
             'is_blocked' => 'boolean',
             'password' => 'hashed',
+            'two_factor_enabled' => 'boolean',
+            'loyalty_points' => 'integer',
         ];
     }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import Poster from '@/components/Poster';
 import ThemeToggle from '@/components/ThemeToggle';
+import { useLocale, useT } from '@/lib/i18n';
 import { lockScroll } from '@/lib/scroll';
 import { cn, pad, route, useShared } from '@/lib/utils';
 
@@ -81,6 +82,7 @@ function Magnetic({ children, strength = 0.25 }: { children: ReactNode; strength
 export default function Navbar() {
     const { auth, counts, navMovies } = useShared();
     const isActive = useActive();
+    const t = useT();
     const [compact, setCompact] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -153,8 +155,8 @@ export default function Navbar() {
                                     className={cn('group relative flex items-center px-3.5 text-[11px] font-semibold uppercase tracking-[.09em] [font-stretch:115%] transition-colors xl:px-4',
                                         compact ? 'h-14' : 'h-[var(--header)]', link.active ? 'text-paper' : 'text-mute hover:text-paper')}>
                                     <span className="relative overflow-hidden">
-                                        <span className="block transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:-translate-y-full">{link.label}</span>
-                                        <span className="absolute inset-0 translate-y-full text-accent transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:translate-y-0" aria-hidden="true">{link.label}</span>
+                                        <span className="block transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:-translate-y-full">{t(link.label)}</span>
+                                        <span className="absolute inset-0 translate-y-full text-accent transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:translate-y-0" aria-hidden="true">{t(link.label)}</span>
                                     </span>
                                     {link.active && <motion.span layoutId="nav-active" className="absolute inset-x-3.5 bottom-2 h-[2px] bg-volt" aria-hidden="true" />}
                                 </Link>
@@ -167,10 +169,11 @@ export default function Navbar() {
                         <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search films and cinemas"
                             className={cn('hidden h-11 items-center gap-3 border border-line-2 pl-3.5 pr-2 text-sm text-mute transition hover:border-paper hover:text-paper', compact ? '' : 'md:flex')}>
                             <Icon name="search" size={16} />
-                            <span className="pr-6">Search</span>
+                            <span className="pe-6">{t('Search')}</span>
                             <kbd className="num border border-line-2 px-1.5 py-0.5 text-[10px]">/</kbd>
                         </button>
                         <button type="button" onClick={() => setSearchOpen(true)} className={cn('btn btn-ghost btn-icon', compact ? '' : 'md:hidden')} aria-label="Search"><Icon name="search" size={18} /></button>
+                        <LanguageToggle className="hidden xl:inline-flex" />
                         <ThemeToggle className="hidden sm:inline-flex" />
                         <Link href={route('user.wishlist')} className="btn btn-ghost btn-icon relative hidden sm:inline-flex" aria-label={`Watchlist${counts.wishlist ? `, ${counts.wishlist} films` : ''}`}>
                             <Icon name="heart" size={18} />{badge(counts.wishlist)}
@@ -182,13 +185,13 @@ export default function Navbar() {
                         {auth.user ? (
                             <AccountMenu open={accountOpen} setOpen={setAccountOpen} />
                         ) : (
-                            <Link href={route('user.login')} className="btn btn-light btn-sm hidden sm:inline-flex">Sign in</Link>
+                            <Link href={route('user.login')} className="btn btn-light btn-sm hidden sm:inline-flex">{t('Sign in')}</Link>
                         )}
 
                         <Magnetic>
                             <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu" aria-expanded={menuOpen} aria-controls="site-menu"
                                 className="group flex h-11 items-center gap-2.5 bg-paper pl-3.5 pr-3 text-[11px] font-bold uppercase tracking-[.08em] text-ink transition-colors [font-stretch:115%] hover:bg-volt hover:text-noir">
-                                <span className="hidden sm:inline">Menu</span>
+                                <span className="hidden sm:inline">{t('Menu')}</span>
                                 <span className="flex w-4 flex-col gap-[5px]" aria-hidden="true">
                                     <span className="h-[1.5px] w-full bg-current transition-transform duration-300 group-hover:translate-x-0.5" />
                                     <span className="h-[1.5px] w-2/3 bg-current transition-all duration-300 group-hover:w-full" />
@@ -209,6 +212,7 @@ export default function Navbar() {
 
 function AccountMenu({ open, setOpen }: { open: boolean; setOpen: (value: boolean | ((current: boolean) => boolean)) => void }) {
     const { auth } = useShared();
+    const t = useT();
     if (!auth.user) return null;
 
     return (
@@ -227,19 +231,19 @@ function AccountMenu({ open, setOpen }: { open: boolean; setOpen: (value: boolea
                     <>
                         <div className="fixed inset-0 z-0" onClick={() => setOpen(false)} aria-hidden="true" />
                         <motion.div role="menu" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}
-                            className="fixed right-4 top-20 z-10 w-64 border border-line-2 bg-ink-2 p-1.5 shadow-2xl shadow-black/40">
+                            className="fixed end-4 top-20 z-10 w-64 border border-line-2 bg-ink-2 p-1.5 shadow-2xl shadow-black/40">
                             <div className="px-3 pb-3 pt-2">
                                 <p className="truncate text-sm font-semibold">{auth.user.name}</p>
                                 <p className="truncate text-xs text-mute">{auth.user.email}</p>
                             </div>
                             <div className="rule mb-1" />
-                            {[['Overview', 'user.dashboard', 'grid'], ['Bookings', 'user.bookings', 'ticket'], ['Watchlist', 'user.wishlist', 'heart'], ['Profile & security', 'user.profile', 'user']].map(([label, name, icon]) => (
+                            {[['Overview', 'user.dashboard', 'grid'], ['Bookings', 'user.bookings', 'ticket'], ['Watchlist', 'user.wishlist', 'heart'], ['Profile & security', 'user.profile', 'user'], ['Gift cards', 'gift-cards', 'gift']].map(([label, name, icon]) => (
                                 <Link key={name} href={route(name)} role="menuitem" className="flex items-center gap-3 px-3 py-2.5 text-sm text-paper-2 transition hover:bg-volt hover:text-noir">
-                                    <Icon name={icon} size={16} /> {label}
+                                    <Icon name={icon} size={16} /> {t(label)}
                                 </Link>
                             ))}
                             <Link href={route('user.logout')} method="post" as="button" role="menuitem" className="mt-1 flex w-full items-center gap-3 border-t border-line px-3 py-2.5 text-left text-sm text-mute transition hover:bg-signal hover:text-noir">
-                                <Icon name="logout" size={16} /> Sign out
+                                <Icon name="logout" size={16} /> {t('Sign out')}
                             </Link>
                         </motion.div>
                     </>
@@ -249,42 +253,75 @@ function AccountMenu({ open, setOpen }: { open: boolean; setOpen: (value: boolea
     );
 }
 
-/** Full-screen menu: giant condensed links, now showing, and contact. */
+/** What the menu's "New here" panel lists. Links go where each feature lives. */
+function useFeatures() {
+    const t = useT();
+    return [
+        { icon: 'qr', title: t('QR e-tickets and Wallet passes'), text: t('Scan in at the door, or add the ticket to Apple or Google Wallet.'), href: route('eticket.info') },
+        { icon: 'seat', title: t('Best seats, picked for you'), text: t('One tap finds the best 2 (or 4) seats together.'), href: route('movies.index') },
+        { icon: 'popcorn', title: t('Food and drink at checkout'), text: t('Add popcorn, nachos and combos with your seats.'), href: route('movies.index') },
+        { icon: 'gift', title: t('Loyalty points and gift cards'), text: t('Earn points on every booking and pay with gift cards.'), href: route('gift-cards') },
+        { icon: 'shield', title: t('Two-step sign-in'), text: t('Turn on a one-time email code in your profile.'), href: route('user.profile') },
+        { icon: 'language', title: t('Urdu and offline tickets'), text: t('Switch to Urdu. Tickets you open once work without signal.'), href: route('user.bookings') },
+        { icon: 'chart', title: t('Admin audit log and refunds'), text: t('Every admin action on record, with one-click refunds.'), href: route('admin.activity') },
+        { icon: 'mail', title: t('Emails sent in the background'), text: t('Confirmations queue up, so pages never wait on email.'), href: null },
+    ];
+}
+
+/** English and Urdu. Posts the choice and reloads the page props in place. */
+export function LanguageToggle({ className }: { className?: string }) {
+    const locale = useLocale();
+    const next = locale === 'ur' ? 'en' : 'ur';
+    return (
+        <button type="button" onClick={() => router.post(route('locale.update'), { locale: next }, { preserveScroll: true })}
+            className={cn('btn btn-ghost btn-sm gap-2', className)} lang={next} aria-label={next === 'ur' ? 'اردو میں دیکھیں' : 'View in English'}>
+            <Icon name="language" size={16} />
+            <span className={next === 'ur' ? 'font-urdu text-base leading-none' : ''}>{next === 'ur' ? 'اردو' : 'English'}</span>
+        </button>
+    );
+}
+
+/** Full-screen menu: condensed links, what is new, now showing and contact. */
 function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void; links: { label: string; href: string; active: boolean }[] }) {
     const { auth, navMovies } = useShared();
     const [hovered, setHovered] = useState<number | null>(null);
+    const features = useFeatures();
+    const t = useT();
 
     return (
         <AnimatePresence>
             {open && (
-                <motion.div id="site-menu" role="dialog" aria-modal="true" aria-label="Menu" data-lenis-prevent
+                <motion.div id="site-menu" role="dialog" aria-modal="true" aria-label={t('Menu')} data-lenis-prevent
                     initial={{ clipPath: 'inset(0 0 100% 0)' }} animate={{ clipPath: 'inset(0 0 0% 0)' }} exit={{ clipPath: 'inset(0 0 100% 0)' }}
                     transition={{ duration: 0.8, ease }}
-                    className="fixed inset-0 z-[70] overflow-y-auto bg-ink text-paper">
-                    <div className="shell flex h-[var(--header)] items-center justify-between border-b border-line">
-                        <Link href={route('home')}><Wordmark /></Link>
-                        <div className="flex items-center gap-2">
-                            <ThemeToggle />
-                            <button type="button" onClick={onClose} className="group flex h-11 items-center gap-2.5 bg-volt px-4 text-[11px] font-bold uppercase tracking-[.08em] text-noir [font-stretch:115%]" aria-label="Close menu">
-                                Close <Icon name="close" size={16} className="transition-transform duration-500 group-hover:rotate-90" />
-                            </button>
+                    className="fixed inset-0 z-[70] overflow-y-auto overflow-x-hidden overscroll-contain bg-ink text-paper">
+                    <div className="sticky top-0 z-10 border-b border-line bg-ink/90 backdrop-blur-xl">
+                        <div className="shell flex h-[var(--header)] items-center justify-between gap-3">
+                            <Link href={route('home')} aria-label="BookMyMovie home"><Wordmark /></Link>
+                            <div className="flex items-center gap-2">
+                                <LanguageToggle className="hidden sm:inline-flex" />
+                                <ThemeToggle />
+                                <button type="button" onClick={onClose} className="group flex h-11 items-center gap-2.5 bg-volt px-4 text-[11px] font-bold uppercase tracking-[.08em] text-noir [font-stretch:115%]" aria-label={t('Close menu')}>
+                                    {t('Close')} <Icon name="close" size={16} className="transition-transform duration-500 group-hover:rotate-90" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="shell grid gap-12 py-10 lg:grid-cols-12 lg:py-14">
-                        <nav className="lg:col-span-7" aria-label="Site" onPointerLeave={() => setHovered(null)}>
+                    <div className="shell grid gap-12 py-10 lg:grid-cols-12 lg:gap-10 lg:py-12">
+                        <nav className="lg:col-span-6" aria-label={t('Site')} onPointerLeave={() => setHovered(null)}>
                             <ul>
                                 {links.map((link, index) => (
                                     <li key={link.label} className="overflow-hidden border-b border-line" onPointerEnter={() => setHovered(index)}>
                                         <motion.div initial={{ y: '110%' }} animate={{ y: 0 }} exit={{ y: '110%' }} transition={{ duration: 0.9, ease: easeOut, delay: 0.2 + index * 0.05 }}>
-                                            <Link href={link.href} className="group flex items-center justify-between gap-6 py-2">
-                                                <span className={cn('display text-[clamp(3.75rem,10vw,8.5rem)] transition-[color,opacity,transform] duration-500 ease-[var(--ease-out-expo)] group-hover:translate-x-4',
+                                            <Link href={link.href} className="group flex items-center justify-between gap-6 py-1.5">
+                                                <span className={cn('display text-[clamp(3rem,7vw,6.25rem)] transition-[color,opacity,transform] duration-500 ease-[var(--ease-out-expo)] group-hover:translate-x-4 rtl:group-hover:-translate-x-4',
                                                     hovered !== null && hovered !== index ? 'opacity-25' : 'opacity-100', link.active && '!text-accent')}>
-                                                    {link.label}
+                                                    {t(link.label)}
                                                 </span>
                                                 <span className="flex items-center gap-4">
                                                     <span className="num text-sm text-mute">{pad(index + 1)}</span>
-                                                    <Icon name="arrow-up-right" size={32} className="text-dim transition duration-500 group-hover:rotate-45 group-hover:text-accent" />
+                                                    <Icon name="arrow-up-right" size={28} className="text-dim transition duration-500 group-hover:rotate-45 group-hover:text-accent" />
                                                 </span>
                                             </Link>
                                         </motion.div>
@@ -294,23 +331,22 @@ function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void
                             <div className="mt-8 flex flex-wrap gap-2">
                                 {auth.user ? (
                                     <>
-                                        <Link href={route('user.dashboard')} className="btn btn-primary">My account</Link>
-                                        <Link href={route('user.bookings')} className="btn btn-ghost">Bookings</Link>
-                                        <Link href={route('user.logout')} method="post" as="button" className="btn btn-ghost">Sign out</Link>
+                                        <Link href={route('user.dashboard')} className="btn btn-primary">{t('My account')}</Link>
+                                        <Link href={route('user.bookings')} className="btn btn-ghost">{t('Bookings')}</Link>
+                                        <Link href={route('user.logout')} method="post" as="button" className="btn btn-ghost">{t('Sign out')}</Link>
                                     </>
                                 ) : (
                                     <>
-                                        <Link href={route('user.login')} className="btn btn-primary">Sign in</Link>
-                                        <Link href={route('user.register')} className="btn btn-ghost">Create account</Link>
+                                        <Link href={route('user.login')} className="btn btn-primary">{t('Sign in')}</Link>
+                                        <Link href={route('user.register')} className="btn btn-ghost">{t('Create account')}</Link>
                                     </>
                                 )}
+                                <LanguageToggle className="sm:hidden" />
                             </div>
-                        </nav>
 
-                        <motion.aside className="space-y-10 lg:col-span-4 lg:col-start-9" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: easeOut, delay: 0.45 }}>
-                            <div>
-                                <p className="label">Now showing</p>
-                                <div className="mt-4 grid grid-cols-4 gap-2">
+                            <div className="mt-12">
+                                <p className="label">{t('Now showing')}</p>
+                                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                                     {navMovies.slice(0, 4).map((movie) => (
                                         <Link key={movie.slug} href={route('movies.show', movie.slug)} className="group block overflow-hidden" aria-label={movie.title}>
                                             <div className="transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-105"><Poster movie={movie} size="sm" meta={false} /></div>
@@ -318,22 +354,52 @@ function SiteMenu({ open, onClose, links }: { open: boolean; onClose: () => void
                                     ))}
                                 </div>
                             </div>
+                        </nav>
+
+                        <motion.aside className="space-y-10 lg:col-span-6 lg:border-s lg:border-line lg:ps-10" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: easeOut, delay: 0.4 }}>
                             <div>
-                                <p className="label">Get in touch</p>
-                                <a href={`mailto:${CONTACT.email}`} className="link headline mt-4 block text-3xl">{CONTACT.email}</a>
-                                <a href={`tel:${CONTACT.phoneHref}`} className="link num mt-2 block text-xl text-paper-2">{CONTACT.phone}</a>
-                            </div>
-                            <div>
-                                <p className="label">Elsewhere</p>
-                                <ul className="mt-4 grid gap-1">
-                                    {[['Portfolio', CONTACT.website], ['GitHub', CONTACT.github], ['LinkedIn', CONTACT.linkedin]].map(([label, href]) => (
-                                        <li key={label}>
-                                            <a href={href} target="_blank" rel="noopener" className="group flex items-center justify-between border-b border-line py-3 text-sm transition-colors hover:text-accent">
-                                                {label} <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
-                                            </a>
-                                        </li>
-                                    ))}
+                                <p className="label label-accent">{t('New on BookMyMovie')}</p>
+                                <ul className="mt-4 grid gap-px border border-line bg-line sm:grid-cols-2">
+                                    {features.map((feature) => {
+                                        const body = (
+                                            <>
+                                                <span className="grid h-9 w-9 shrink-0 place-items-center border border-line-2 text-accent transition-colors group-hover:border-accent"><Icon name={feature.icon} size={17} /></span>
+                                                <span className="min-w-0">
+                                                    <span className="block text-sm font-semibold leading-snug">{feature.title}</span>
+                                                    <span className="mt-1 block text-xs leading-relaxed text-mute">{feature.text}</span>
+                                                </span>
+                                            </>
+                                        );
+                                        return (
+                                            <li key={feature.icon} className="bg-ink">
+                                                {feature.href ? (
+                                                    <Link href={feature.href} className="group flex h-full gap-3 p-4 transition-colors hover:bg-ink-2">{body}</Link>
+                                                ) : (
+                                                    <div className="group flex h-full gap-3 p-4">{body}</div>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
+                            </div>
+                            <div className="grid gap-10 sm:grid-cols-2">
+                                <div>
+                                    <p className="label">{t('Get in touch')}</p>
+                                    <a href={`mailto:${CONTACT.email}`} className="link headline mt-4 block break-all text-2xl">{CONTACT.email}</a>
+                                    <a href={`tel:${CONTACT.phoneHref}`} dir="ltr" className="link num mt-2 block text-lg text-paper-2">{CONTACT.phone}</a>
+                                </div>
+                                <div>
+                                    <p className="label">{t('Elsewhere')}</p>
+                                    <ul className="mt-3 grid">
+                                        {[['Portfolio', CONTACT.website], ['GitHub', CONTACT.github], ['LinkedIn', CONTACT.linkedin]].map(([label, href]) => (
+                                            <li key={label}>
+                                                <a href={href} target="_blank" rel="noopener" className="group flex items-center justify-between border-b border-line py-2.5 text-sm transition-colors hover:text-accent">
+                                                    {label} <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         </motion.aside>
                     </div>

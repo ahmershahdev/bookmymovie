@@ -42,7 +42,7 @@ export default function Poster({ movie, eager = false, size = 'md', meta = true,
     if (movie.poster_url) {
         return (
             <div className={cn('poster', className)}>
-                <img src={movie.poster_url} alt={`Poster for ${movie.title}`} width={600} height={900}
+                <img src={movie.poster_url} alt={`Poster for ${movie.title}`} width={1200} height={900}
                     loading={eager ? 'eager' : 'lazy'} decoding="async" {...(eager ? { fetchPriority: 'high' as const } : {})}
                     className="absolute inset-0 h-full w-full object-cover" />
             </div>

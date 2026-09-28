@@ -10,16 +10,17 @@ interface Props {
     profile: {
         name: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
         avatar: string | null; verified: boolean; member_since: string | null; last_film: string | null; max_birth_date: string;
+        two_factor_enabled: boolean;
     };
 }
 
 export default function Profile({ profile }: Props) {
     const form = useForm<{
         name: string; email: string; phone: string; address: string; date_of_birth: string; gender: string;
-        current_password: string; password: string; password_confirmation: string; profile_picture: File | null;
+        current_password: string; password: string; password_confirmation: string; profile_picture: File | null; two_factor_enabled: boolean;
     }>({
         name: profile.name, email: profile.email, phone: profile.phone, address: profile.address, date_of_birth: profile.date_of_birth, gender: profile.gender,
-        current_password: '', password: '', password_confirmation: '', profile_picture: null,
+        current_password: '', password: '', password_confirmation: '', profile_picture: null, two_factor_enabled: profile.two_factor_enabled,
     });
     const [preview, setPreview] = useState<string | null>(profile.avatar);
     const [changePassword, setChangePassword] = useState(false);
@@ -104,6 +105,22 @@ export default function Profile({ profile }: Props) {
                         </AnimatePresence>
                         <Field label="Current password" type="password" value={form.data.current_password} onChange={(event) => form.setData('current_password', event.target.value)} error={form.errors.current_password} autoComplete="current-password" maxLength={72}
                             hint="Only needed to change your email or password. Other devices are signed out after a password change." />
+
+                        <div className="flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <Icon name="shield" size={20} className={cn('mt-0.5 shrink-0', form.data.two_factor_enabled ? 'text-mint' : 'text-mute')} />
+                                <div>
+                                    <p className="font-semibold">Two-step sign-in</p>
+                                    <p className="mt-1 max-w-md text-sm text-mute">After your password, we email a 6-digit code that expires in 10 minutes. Someone who learns your password still cannot get in.</p>
+                                </div>
+                            </div>
+                            <label className="flex shrink-0 cursor-pointer items-center gap-3">
+                                <span className="label">{form.data.two_factor_enabled ? 'On' : 'Off'}</span>
+                                <input type="checkbox" role="switch" className="peer sr-only" checked={form.data.two_factor_enabled}
+                                    onChange={(event) => form.setData('two_factor_enabled', event.target.checked)} aria-label="Two-step sign-in with an email code" />
+                                <span className="relative h-7 w-12 border border-line-2 bg-ink-3 transition peer-checked:border-accent peer-checked:bg-volt peer-focus-visible:outline-2 peer-focus-visible:outline-accent after:absolute after:start-1 after:top-1 after:h-[18px] after:w-[18px] after:bg-paper after:transition-transform peer-checked:after:translate-x-5 peer-checked:after:bg-noir rtl:peer-checked:after:-translate-x-5" aria-hidden="true" />
+                            </label>
+                        </div>
                     </fieldset>
 
                     <div className="flex flex-wrap items-center justify-between gap-4">

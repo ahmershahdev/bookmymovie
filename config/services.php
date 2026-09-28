@@ -49,6 +49,26 @@ return [
         'skip_google_on_localhost' => env('RECAPTCHA_SKIP_GOOGLE_ON_LOCALHOST', true),
     ],
 
+    /*
+    | Wallet passes. Each button appears on the e-ticket only once its
+    | credentials are set. Apple: a Pass Type ID certificate (.p12) from the
+    | Apple Developer account plus Apple's WWDR intermediate (.pem). Google:
+    | a Wallet API issuer ID and a service-account JSON key.
+    */
+    'wallet' => [
+        'apple' => [
+            'pass_type_id' => env('APPLE_WALLET_PASS_TYPE_ID'),
+            'team_id' => env('APPLE_WALLET_TEAM_ID'),
+            'certificate' => env('APPLE_WALLET_CERTIFICATE') ? base_path(env('APPLE_WALLET_CERTIFICATE')) : null,
+            'password' => env('APPLE_WALLET_CERTIFICATE_PASSWORD'),
+            'wwdr' => env('APPLE_WALLET_WWDR') ? base_path(env('APPLE_WALLET_WWDR')) : null,
+        ],
+        'google' => [
+            'issuer_id' => env('GOOGLE_WALLET_ISSUER_ID'),
+            'key_file' => env('GOOGLE_WALLET_KEY_FILE') ? base_path(env('GOOGLE_WALLET_KEY_FILE')) : null,
+        ],
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -92,7 +92,7 @@ class TransactionalMailer
             ],
             'Verify email',
             route('user.verify.notice')
-        ));
+        ), now: true);
     }
 
     public static function passwordResetCode(string $email, string $code, string $url, bool $admin = false): void
@@ -108,7 +108,7 @@ class TransactionalMailer
                 : ['Code' => $code, 'Expires' => now()->addMinutes(15)->format('j M Y, g:i A')],
             $admin ? 'Reset credentials' : 'Enter your code',
             $url
-        ));
+        ), now: true);
     }
 
     public static function bookingConfirmed(User $user, Booking $booking): void
@@ -144,10 +144,64 @@ class TransactionalMailer
         ));
     }
 
-    private static function send(string $email, TransactionalEmail $mail): void
+    public static function bookingRefunded(User $user, Booking $booking, string $reason): void
+    {
+        $refunded = $booking->payment_status === 'refunded';
+
+        self::send($booking->customer_email ?: $user->email, new TransactionalEmail(
+            ($refunded ? 'Refund issued ' : 'Booking cancelled ').$booking->booking_number,
+            $refunded ? 'Your refund is on its way' : 'Your booking was cancelled',
+            $refunded
+                ? 'The cinema cancelled this booking and refunded it. Card and wallet refunds usually reach you in 5 to 10 working days; gift card balance and loyalty points are back on your account already.'
+                : 'The cinema cancelled this booking. Nothing had been paid, so nothing is owed. Any gift card balance or points you used are back on your account.',
+            [
+                'Booking' => $booking->booking_number,
+                'Amount' => 'PKR '.number_format((float) $booking->total_amount),
+                'Reason' => $reason,
+            ],
+            'Browse showtimes',
+            route('movies.index')
+        ));
+    }
+
+    public static function giftCardIssued(\App\Models\GiftCard $card): void
+    {
+        self::send((string) $card->recipient_email, new TransactionalEmail(
+            'You have a BookMyMovie gift card',
+            'A night at the movies, on us',
+            ($card->message ? '“'.$card->message.'” ' : '').'Enter this code at checkout and the balance comes off your booking. Whatever is left stays on the card for next time.',
+            [
+                'Code' => $card->code,
+                'Balance' => 'PKR '.number_format((float) $card->balance),
+                'Valid until' => $card->expires_at?->format('j M Y') ?? 'No expiry',
+            ],
+            'Find a film',
+            route('movies.index')
+        ));
+    }
+
+    public static function twoFactorCode(User $user, string $code, int $minutes): void
+    {
+        self::send($user->email, new TransactionalEmail(
+            $code.' is your BookMyMovie sign-in code',
+            'Your sign-in code',
+            'Enter this code to finish signing in. It expires in '.$minutes.' minutes. If you did not just try to sign in, change your password: someone knows it.',
+            [
+                'Code' => $code,
+                'Expires' => now()->addMinutes($minutes)->format('j M Y, g:i A'),
+            ],
+        ), now: true);
+    }
+
+    /**
+     * Receipts and notices go through the queue so the page never waits on
+     * the mail provider. One-time codes are sent at once: the person is
+     * standing at the form waiting for them.
+     */
+    private static function send(string $email, TransactionalEmail $mail, bool $now = false): void
     {
         try {
-            Mail::to($email)->send($mail);
+            $now ? Mail::to($email)->send($mail) : Mail::to($email)->queue($mail);
         } catch (\Throwable $exception) {
             Log::warning('Transactional email failed.', [
                 'email' => $email,

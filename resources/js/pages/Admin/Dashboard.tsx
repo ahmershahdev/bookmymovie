@@ -96,6 +96,9 @@ export default function AdminDashboard(props: Props) {
                             </button>
                         ))}
                     </nav>
+                    <Link href={route('admin.activity')} className="mt-3 flex shrink-0 items-center justify-between gap-3 border border-line px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[.08em] text-paper transition hover:border-accent hover:text-accent [font-stretch:115%]">
+                        <span className="flex items-center gap-3"><Icon name="shield" size={16} /> Audit log & refunds</span> <Icon name="arrow-right" size={14} />
+                    </Link>
                     <div className="mt-4 hidden gap-2 border-t border-line pt-4 lg:grid">
                         <Link href={route('home')} className="btn btn-ghost btn-sm">Public site <Icon name="arrow-up-right" size={14} /></Link>
                         <Link href={route('admin.logout')} method="post" as="button" className="btn btn-primary btn-sm"><Icon name="logout" size={14} /> Logout</Link>

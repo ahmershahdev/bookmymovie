@@ -101,7 +101,7 @@ export default function ScrollIndicator() {
     };
 
     return (
-        <div ref={track} onPointerDown={onPointerDown} onPointerEnter={wake} aria-hidden="true" data-print-hide
+        <div ref={track} onPointerDown={onPointerDown} onPointerEnter={wake} aria-hidden="true" data-print-hide data-page-scrollbar
             className={cn('group fixed inset-y-0 right-0 z-[95] hidden w-3.5 cursor-default touch-none [@media(pointer:fine)]:block', !visible && '!hidden')}>
             <div ref={thumb}
                 className={cn('absolute right-[3px] top-0 w-[3px] origin-right bg-paper/35 transition-[width,background-color,opacity] duration-300 will-change-transform',
