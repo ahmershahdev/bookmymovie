@@ -15,13 +15,16 @@ const ease = [0.16, 1, 0.3, 1] as const;
  * visitor prefers reduced motion or is on a data saver connection, and pauses
  * while the tab is hidden so it never plays unseen.
  */
-export function BackdropVideo({ trailer, image, className, onEnded }: { trailer?: Trailer | null; image?: string | null; className?: string; onEnded?: () => void }) {
+export function BackdropVideo({ trailer, image, className, onEnded, priority = false }: { trailer?: Trailer | null; image?: string | null; className?: string; onEnded?: () => void; priority?: boolean }) {
     const video = useRef<HTMLVideoElement>(null);
     const [motionOk, setMotionOk] = useState(false);
 
+    // The still shows first; the loop only starts where it will not hurt:
+    // no reduced motion, no data saver, and not on a 2G/3G connection.
     useEffect(() => {
-        const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-        setMotionOk(!window.matchMedia('(prefers-reduced-motion: reduce)').matches && !saveData);
+        const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+        const slow = connection?.saveData || /(^|-)(2g|3g)$/.test(connection?.effectiveType ?? '');
+        setMotionOk(!window.matchMedia('(prefers-reduced-motion: reduce)').matches && !slow);
     }, []);
 
     useEffect(() => {
@@ -43,7 +46,7 @@ export function BackdropVideo({ trailer, image, className, onEnded }: { trailer?
         );
     }
 
-    return still ? <img src={still} srcSet={responsiveSrcSet(still)} sizes="100vw" alt="" aria-hidden="true" decoding="async" fetchPriority="high" className={cn('h-full w-full object-cover', className)} /> : null;
+    return still ? <img src={still} srcSet={responsiveSrcSet(still)} sizes="100vw" alt="" aria-hidden="true" decoding="async" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'low'} className={cn('h-full w-full object-cover', className)} /> : null;
 }
 
 /** WebM (VP9, about a third smaller) first; MP4 for Safari and older devices. */

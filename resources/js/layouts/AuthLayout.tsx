@@ -86,10 +86,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                     </div>
 
                     <div className="flex flex-1 items-start justify-center px-5 pb-20 pt-12 sm:px-10 lg:items-center lg:pt-10">
-                        <motion.div key={component} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="w-full max-w-[28rem]">
+                        <div className="w-full max-w-[28rem]">
                             {errors.oauth && <div className="mb-6"><Alert>{errors.oauth}</Alert></div>}
                             {children}
-                        </motion.div>
+                        </div>
                     </div>
 
                 </main>

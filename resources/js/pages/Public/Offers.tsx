@@ -28,11 +28,11 @@ export default function Offers({ offers }: { offers: Offer[] }) {
                             {offers.map((offer, index) => (
                                 <Reveal key={offer.code} delay={index * 90} className={cn('ticket flex flex-col p-7 sm:p-10', !offer.live && 'opacity-60')}>
                                     <div className="flex items-start justify-between gap-6">
-                                        <p className="display text-[clamp(5rem,10vw,8rem)]">{offer.value}<span className="ml-2 text-4xl text-accent">off</span></p>
+                                        <p className="display text-[clamp(3.5rem,14vw,8rem)]">{offer.value}<span className="ml-2 text-4xl text-accent">off</span></p>
                                         <span className={cn('tag', offer.live ? 'tag-mint' : 'tag-volt')}>{offer.live ? 'Live' : `Starts ${offer.starts}`}</span>
                                     </div>
                                     <p className="mt-4 max-w-md text-paper-2">{offer.description}</p>
-                                    <div className="perforation -mx-10 my-8" />
+                                    <div className="perforation -mx-7 my-8 sm:-mx-10" />
                                     <div className="mt-auto flex flex-wrap items-center justify-between gap-4">
                                         <button type="button" onClick={() => copy(offer.code)} aria-label={`Copy code ${offer.code}`}
                                             className="num group flex items-center gap-3 border border-dashed border-accent px-5 py-3 text-lg font-semibold tracking-[.25em] text-accent transition hover:bg-volt hover:text-noir">

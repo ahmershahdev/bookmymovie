@@ -19,8 +19,10 @@ class HomeController extends Controller
     {
         $cards = fn ($query) => $query->withCardMetrics()->with('genres')->get()->map(fn (Movie $movie) => $movie->toCardArray());
 
-        // The catalogue rails are the same for everyone; build them once every few minutes.
-        [$slides, $nowShowing, $comingSoon] = Cache::remember('home.rails', now()->addMinutes(5), fn () => [
+        // The catalogue rails are the same for everyone. Fresh for 5 minutes, then
+        // served stale for up to 15 more while one request (holding a cache lock)
+        // rebuilds them in the background, so a busy home page never stampedes the DB.
+        [$slides, $nowShowing, $comingSoon] = Cache::flexible('home.rails', [300, 1200], fn () => [
             $cards(Movie::query()->where('hero_carousel_enabled', true)->publiclyListed()->orderBy('hero_sort_order')->limit(5)),
             $cards(Movie::query()->where('status', 'now_showing')->orderByDesc('total_reviews')->orderByDesc('average_rating')),
             $cards(Movie::query()->where('status', 'coming_soon')->orderBy('release_date')),
@@ -28,7 +30,7 @@ class HomeController extends Controller
 
         $topRated = $nowShowing->sortByDesc('rating')->take(3)->values();
 
-        $stats = Cache::remember('home.stats', now()->addMinutes(15), fn () => [
+        $stats = Cache::flexible('home.stats', [900, 3600], fn () => [
             'films' => Movie::query()->publiclyListed()->count(),
             'cinemas' => DB::table('theaters')->where('is_active', true)->count(),
             'screens' => DB::table('screens')->where('is_active', true)->count(),
@@ -96,6 +98,7 @@ class HomeController extends Controller
                 ->values(),
         ], [
             'title' => 'BookMyMovie | Cinema Tickets, Showtimes & Seats',
+            'preload' => Seo::preloadImage(($slides->first()['trailers'][0]['poster'] ?? null) ?: ($slides->first()['hero_image_url'] ?? null), '100vw'),
             'description' => 'Book cinema tickets across Pakistan with live seat maps, honest row pricing, IMAX and Dolby showtimes, and no booking fees.',
             'schema' => [[
                 '@type' => 'ItemList',

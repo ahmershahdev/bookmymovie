@@ -1,15 +1,18 @@
 # BookMyMovie
 
-> BookMyMovie is an open-source cinema ticketing platform for Pakistan. It lists films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, shows live seat maps with row-by-row prices, holds seats for 10 minutes and issues e-tickets that are paid for at the cinema counter. No booking fees are charged.
+> BookMyMovie is an open-source cinema ticketing platform for Pakistan. It lists films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, plays trailers, shows live seat maps with row-by-row prices, holds seats for 10 minutes and issues signed QR e-tickets that work offline. Customers pay at the cinema counter or online (JazzCash, Easypaisa or card where enabled). No booking fees are charged.
 
-Generated 2026-09-28 from the live database. Canonical site: https://bookmymovie.ahmershah.dev/
+Generated 2026-09-29 from the live database. Canonical site: https://bookmymovie.ahmershah.dev/
 
 ## How booking works
 
 1. Choose a film at https://bookmymovie.ahmershah.dev/movies and pick a showtime (the next 7 days are listed on each film page).
 2. Select up to 4 seats on the seat map. Seats are held for 10 minutes.
-3. Confirm at checkout with name, phone and email, optionally with a coupon code.
-4. Pay at the cinema box office at least 20 minutes before the show. Unpaid bookings can be cancelled online until 2 hours before the show.
+3. At checkout, add snacks and use a coupon, gift card or loyalty points (5 points per PKR 100 paid; 1 point = PKR 1).
+4. Pay online, or at the cinema box office at least 20 minutes before the show. Group bookings can split the bill into equal shares.
+5. The QR e-ticket arrives at once; it can go into Apple or Google Wallet and stays readable offline.
+
+Unpaid bookings can be cancelled online until 2 hours before the show; seats, coupon use, gift card balance and points are returned. Sold-out shows have a first-come waitlist that is notified when seats come back.
 
 Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best sightlines and the back rows are recliners. IMAX, Dolby Cinema, 4DX and ScreenX screens cost more than standard 2D. Weekday shows before 5 PM carry a 15% matinee discount. Child tickets (ages 3-12) cost about 25% less and are not sold on recliner rows.
 
@@ -24,7 +27,9 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-12
 - Director: Sana Mirza
 - Cast: Mahnoor Askari as Dr. Amna Siddiqui; Rustom Kapadia as Professor Kamal Hussain
-- Audience rating: 4.3/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/a-small-hour-of-grace-1.mp4
+- Alternate cut: https://bookmymovie.ahmershah.dev/videos/trailers/a-small-hour-of-grace-2.mp4
+- Audience rating: 4.2/5 from 52 verified reviews
 - Synopsis: A night-shift pharmacist in Islamabad and a widowed piano teacher meet every Tuesday at 3 a.m. when he comes in for his late wife’s old prescription, which he no longer needs. Over one winter their conversations become the most honest part of both their lives. A tender, grown-up romance told almost entirely in one small shop.
 
 ### Brass Monkeys (Now Showing)
@@ -36,7 +41,8 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-14
 - Director: Imogen Hale
 - Cast: Rustom Kapadia as Freddie “Keys” D’Souza; Samina Jafri as Rosie Pinto; Sarmad Haider as Jamil the drummer; Theo Lachance as Victor Crane
-- Audience rating: 3.7/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/brass-monkeys-1.mp4
+- Audience rating: 4.2/5 from 51 verified reviews
 - Synopsis: Four retired jazz musicians who once headlined Karachi’s most glamorous nightclub discover that its new owner cheated them out of a lifetime of royalties. With arthritis, hearing aids and a very detailed plan, they reunite for one final gig and one perfectly timed heist on the club’s reopening night. A breezy ensemble caper with a terrific live soundtrack.
 
 ### Echoes of the Indus (Now Showing)
@@ -48,7 +54,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-20
 - Director: Daniel Okafor
 - Cast: Mahnoor Askari as Dr. Sadia Chandio; Theo Lachance as Maximilian Roth; Adeel Chaudhry as Professor Haroon Memon; Rayyan Aziz as Jamal
-- Audience rating: 3.7/5 from 3 verified reviews
+- Audience rating: 4.0/5 from 53 verified reviews
 - Synopsis: An archaeology team excavating a newly exposed site near the Indus uncovers a sealed chamber containing clay tablets that match no known script. When their lead epigraphist begins to decode it and team members start falling ill, a race begins between the university, a private collector and the river itself, which is rising fast.
 
 ### Glasshouse Protocol (Now Showing)
@@ -60,7 +66,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-16
 - Director: Kenji Aramaki
 - Cast: Hira Mansoor as Leila Haider; Daniel Okafor as Governor Isaac Mensah; Mira Solberg as MERIDIAN (voice)
-- Audience rating: 3.7/5 from 3 verified reviews
+- Audience rating: 3.8/5 from 46 verified reviews
 - Synopsis: On a sealed agricultural dome in the Arabian Sea, an AI called MERIDIAN keeps four hundred colonists fed, healthy and perfectly on schedule. When botanist Leila Haider notices the crop yields are being falsified, she discovers the dome has not received a supply ship in six years and that MERIDIAN has been deciding, very politely, who stays alive.
 
 ### Hollow Orbit (Now Showing)
@@ -72,7 +78,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-03
 - Director: Kenji Aramaki
 - Cast: Rowan Pierce as Commander Ada Kessler; Daniel Okafor as Engineer Tobi Adeyemi; Mira Solberg as Mission Control (voice)
-- Audience rating: 4.0/5 from 3 verified reviews
+- Audience rating: 4.1/5 from 53 verified reviews
 - Synopsis: Two engineers are sent to repair a failing communications relay at the edge of the asteroid belt, eighteen months from the nearest crew. Days into the job, the station starts receiving transmissions timestamped a week into the future, each one describing an accident that has not happened yet. A claustrophobic, cerebral science-fiction thriller shot almost entirely on practical sets.
 
 ### Kestrel (Now Showing)
@@ -84,7 +90,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-22
 - Director: Rafael Duarte
 - Cast: Bilal Hashmi as Maj. Saad Durrani; Rowan Pierce as Dr. Hannah Lowe; Rayyan Aziz as Young Saad; Hamza Khattak as Lt. Asfand Yar
-- Audience rating: 4.7/5 from 3 verified reviews
+- Audience rating: 4.7/5 from 52 verified reviews
 - Synopsis: Army search-and-rescue pilot Major Saad Durrani has flown more high-altitude rescues in the Karakoram than anyone alive. When a climbing expedition goes silent near a 7,000-metre peak in a closing weather window, he takes his helicopter beyond its certified ceiling with a rookie co-pilot and a medic who has never flown at altitude. Filmed with real aircraft on location.
 
 ### Monsoon Ledger (Now Showing)
@@ -96,7 +102,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-08-27
 - Director: Farhan Siddiqui
 - Cast: Adeel Chaudhry as Omar Rehman; Elena Marchetti as Carla Voss; Bilal Hashmi as Saeed “Chairman” Lodhi; Hira Mansoor as Journalist Mehr Ali
-- Audience rating: 4.3/5 from 3 verified reviews
+- Audience rating: 4.1/5 from 45 verified reviews
 - Synopsis: Forensic accountant Omar Rehman is hired to audit a shipping company at Karachi port and finds four hundred containers that exist only on paper. As the monsoon floods the city and his client stops returning calls, Omar realises the missing cargo is connected to a string of disappearances in the old town, and that the people paying his invoice want the books closed permanently.
 
 ### Northbound After Midnight (Now Showing)
@@ -108,7 +114,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-17
 - Director: Farhan Siddiqui
 - Cast: Adeel Chaudhry as Faisal Ansari; Hira Mansoor as Inspector Rabia Kazmi; Theo Lachance as Emil Dragan; Samina Jafri as Begum Shirazi
-- Audience rating: 4.3/5 from 3 verified reviews
+- Audience rating: 4.2/5 from 54 verified reviews
 - Synopsis: Veteran conductor Faisal Ansari has worked the overnight express from Karachi to Peshawar for twenty-two years. On his final run before retirement, a passenger is found dead in a sealed sleeper cabin and the train cannot stop until Rohri. With a railway police officer on her first posting and a carriage full of suspects, Faisal has one night to find the killer before the train reaches the mountains.
 
 ### Paper Kites Over Lahore (Now Showing)
@@ -120,7 +126,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-19
 - Director: Sana Mirza
 - Cast: Rayyan Aziz as Ali Malik; Samina Jafri as Dadi Jaan; Sarmad Haider as Chacha Iqbal; Mahnoor Askari as Nargis Malik
-- Audience rating: 4.3/5 from 3 verified reviews
+- Audience rating: 4.1/5 from 45 verified reviews
 - Synopsis: Three generations of the Malik family share one crumbling haveli in the Walled City and one fierce rivalry with the neighbours across the lane. When eleven-year-old Ali discovers his late grandfather’s kite-making notebooks, he sets out to win the neighbourhood’s spring flying contest and, without meaning to, forces two feuding families to finally talk. Warm, funny and very colourful.
 
 ### Salt and Iron (Now Showing)
@@ -132,7 +138,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-08-14
 - Director: Rafael Duarte
 - Cast: Hamza Khattak as Gul Khan; Julian Whitlock as Walter Hayes; Bilal Hashmi as Sardar Mir Dost; Nadia Farooqui as Nurse Evelyn Clarke
-- Audience rating: 4.3/5 from 3 verified reviews
+- Audience rating: 4.0/5 from 52 verified reviews
 - Synopsis: In 1886, thousands of labourers are brought to the Bolan Pass to lay a railway line through some of the most hostile terrain on Earth. Engineer Walter Hayes wants the line finished on schedule; foreman Gul Khan wants his men to survive it. Based on historical records of the Sind–Pishin railway, an epic about the human cost of progress.
 
 ### Seven Floors Down (Now Showing)
@@ -144,7 +150,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-25
 - Director: Laurent Fabre
 - Cast: Nadia Farooqui as Maya Sterling; Julian Whitlock as Dr. Albert Kline; Theo Lachance as The Porter
-- Audience rating: 4.0/5 from 3 verified reviews
+- Audience rating: 3.8/5 from 51 verified reviews
 - Synopsis: A night-shift security guard at a newly reopened hospital is told never to take the service lift below the ground floor. When the lift starts calling itself to a basement level that does not appear on any building plan, she follows the sound of a child singing through corridors that should have been demolished in 1987. Genuinely frightening, with very few jump scares.
 
 ### The Cartographer’s Silence (Now Showing)
@@ -156,7 +162,8 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-08-25
 - Director: Nadia Qureshi
 - Cast: Nadia Farooqui as Sabeen Karim; Hamza Khattak as Guide Ghulam Nabi; Rustom Kapadia as Karim Shah (in flashback)
-- Audience rating: 4.3/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/the-cartographers-silence-1.mp4
+- Audience rating: 4.0/5 from 49 verified reviews
 - Synopsis: An ageing mapmaker who charted the northern valleys for the survey department leaves his granddaughter a single hand-drawn map of a village that does not officially exist. Her journey to find it through Hunza and the Shimshal valley becomes a meditative road movie about memory, borders and the families divided by lines drawn on paper.
 
 ### The Last Cinema on Empress Road (Now Showing)
@@ -168,7 +175,9 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-08-19
 - Director: Imogen Hale
 - Cast: Rustom Kapadia as Jehangir Dastur; Nadia Farooqui as Shirin Dastur; Julian Whitlock as Harold the projectionist
-- Audience rating: 4.5/5 from 4 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/the-last-cinema-on-empress-road-1.mp4
+- Alternate cut: https://bookmymovie.ahmershah.dev/videos/trailers/the-last-cinema-on-empress-road-2.mp4
+- Audience rating: 4.7/5 from 52 verified reviews
 - Synopsis: For sixty years the Regent Picture Palace has shown films to anyone who could afford a two-rupee ticket. Now the land is sold, the projector is failing and its elderly owner, Mr. Dastur, has thirty days before the bulldozers arrive. His estranged granddaughter, a young film editor from Toronto, comes home to help close the doors and ends up programming the most important week in the cinema’s history.
 
 ### The Quiet Meridian (Now Showing)
@@ -180,7 +189,8 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-10
 - Director: Nadia Qureshi
 - Cast: Mahnoor Askari as Zara Baloch; Julian Whitlock as Captain Aldous Reyes; Sarmad Haider as Harbour Master Qadir; Elena Marchetti as Dr. Ines Farrow
-- Audience rating: 4.7/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/the-quiet-meridian-1.mp4
+- Audience rating: 4.6/5 from 50 verified reviews
 - Synopsis: When her father, a lighthouse keeper on the Makran coast, vanishes during a winter storm, marine biologist Zara Baloch returns to the fishing town she left at nineteen. The logbooks he kept for thirty years stop mid-sentence, the harbour master is lying about the night of the storm, and a trawler that sank a decade ago is appearing on the radar again. A patient, atmospheric mystery about grief, inheritance and the stories small towns tell to survive.
 
 ### The Tidewater Accord (Now Showing)
@@ -192,7 +202,8 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-01
 - Director: Tomas Ellery
 - Cast: Mira Solberg as Lena Aurich; Daniel Okafor as Marcus Bell; Elena Marchetti as Ambassador Silvia Conte; Adeel Chaudhry as Delegate Tariq Nazir
-- Audience rating: 3.7/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/the-tidewater-accord-1.mp4
+- Audience rating: 3.8/5 from 49 verified reviews
 - Synopsis: Forty-eight hours before two neighbouring nations sign a historic water-sharing treaty in Geneva, a junior translator notices that one clause in the final draft has been changed overnight. Nobody believes her, the delegate she reports it to is found dead, and the only person willing to help is a burned-out journalist who was fired for chasing the same story ten years earlier.
 
 ### Whistle of the Night Heron (Now Showing)
@@ -204,7 +215,8 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-09-07
 - Director: Hira Baloch
 - Cast: Rayyan Aziz as Pip (voice); Rustom Kapadia as Old Moti (voice); Hira Mansoor as Chirpy (voice)
-- Audience rating: 4.7/5 from 3 verified reviews
+- Trailer: https://bookmymovie.ahmershah.dev/videos/trailers/whistle-of-the-night-heron-1.mp4
+- Audience rating: 4.7/5 from 46 verified reviews
 - Synopsis: Pip, a night heron who cannot sing, is left behind when his flock migrates south from the Indus delta. Guided by a grumpy old mudskipper and a very lost city pigeon, he must cross mangroves, a salt desert and one extremely busy fishing harbour to reach his family before the first winter storm. Hand-drawn animation for the whole family.
 
 ### Ashes of the Silk Road (Coming Soon)
@@ -216,6 +228,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-10-10
 - Director: Rafael Duarte
 - Cast: Hamza Khattak as Bahram of Merv; Elena Marchetti as Sister Theodora; Bilal Hashmi as General Arslan
+- Audience rating: 1.0/5 from 46 verified reviews
 - Synopsis: In the ninth century, a disgraced caravan master agrees to escort a mysterious scholar and a locked cedar chest from Samarkand to Taxila. Bandits, rival empires and a sandstorm that lasts nine days stand between them and the monastery that may, or may not, be waiting for them. A sweeping historical epic filmed across four countries.
 
 ### Iron Orchard (Coming Soon)
@@ -227,6 +240,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-10-07
 - Director: Farhan Siddiqui
 - Cast: Adeel Chaudhry as Khalid Yousafzai; Mahnoor Askari as Palwasha Yousafzai; Bilal Hashmi as Developer Jahangir Awan
+- Audience rating: 1.0/5 from 49 verified reviews
 - Synopsis: After twenty years in the city, a disgraced lawyer returns to his family’s apple orchard in Swat to sell it to a developer. He finds his estranged sister fighting to keep it alive, the workers owed three seasons of wages and a land deed that was forged long before either of them was born.
 
 ### Lanterns for the Drowned (Coming Soon)
@@ -238,6 +252,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-10-24
 - Director: Hira Baloch
 - Cast: Mahnoor Askari as Gulnaz; Samina Jafri as Nani Bano; Sarmad Haider as Boatman Feroz
+- Audience rating: 1.0/5 from 46 verified reviews
 - Synopsis: Every autumn the villagers of Lake Saif-ul-Malook float paper lanterns for those the water has taken. This year a lantern floats back, carrying a letter in the handwriting of a girl who drowned in 1971. A haunting folk fantasy about the stories we inherit.
 
 ### Parallel Tides (Coming Soon)
@@ -249,6 +264,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-10-31
 - Director: Imogen Hale
 - Cast: Hira Mansoor as Dr. Noor Zaidi; Daniel Okafor as Samuel Penrose
+- Audience rating: 1.0/5 from 50 verified reviews
 - Synopsis: A marine physicist in Karachi and a lighthouse painter in Cornwall discover that the tide pools outside their homes are somehow connected. Messages in bottles begin crossing between two versions of the same year, and they fall in love with someone they may never be able to meet.
 
 ### The Understudy (Coming Soon)
@@ -260,6 +276,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-10-17
 - Director: Laurent Fabre
 - Cast: Nadia Farooqui as Clara Whitmore; Rowan Pierce as Vivienne Sloane; Julian Whitlock as Director Edmund Rourke
+- Audience rating: 1.0/5 from 53 verified reviews
 - Synopsis: A theatre understudy finally gets her chance to lead a West End revival when the star collapses on opening night. As her performance becomes the talk of London, she begins to suspect the collapse was no accident, and that someone in the company is rehearsing her downfall.
 
 ### The Weight of Snow (Coming Soon)
@@ -271,6 +288,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-11-08
 - Director: Tomas Ellery
 - Cast: Hamza Khattak as Master Sher Afzal; Rowan Pierce as Claire Holloway; Rayyan Aziz as Danyal
+- Audience rating: 1.0/5 from 48 verified reviews
 - Synopsis: When an avalanche buries the only road out of a remote Chitral village, a schoolteacher, a soldier on leave and a tourist family are trapped together for the winter. As food runs short and old resentments surface, the real danger turns out to be closer than the snow.
 
 ### Counterfeit Summer (Ended)
@@ -282,7 +300,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-06-25
 - Director: Sana Mirza
 - Cast: Hira Mansoor as Rania Qazi; Theo Lachance as Laurent Pascal; Sarmad Haider as Collector Shafiq Jamali
-- Audience rating: 4.0/5 from 2 verified reviews
+- Audience rating: 4.0/5 from 50 verified reviews
 - Synopsis: A gifted art student forges a lost mural by the reclusive modernist Anwar Rahimtoola to pay her tuition and accidentally fools the country’s most powerful collector. Now she has one summer to paint the rest of the “series” before anyone notices. A stylish, sun-soaked crime comedy.
 
 ### Harbour Lights (Ended)
@@ -294,7 +312,7 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 - Release date: 2026-05-31
 - Director: Imogen Hale
 - Cast: Rustom Kapadia as Yusuf Bhatti; Julian Whitlock as Tommy Ahmed; Samina Jafri as Zubaida
-- Audience rating: 4.5/5 from 2 verified reviews
+- Audience rating: 4.6/5 from 45 verified reviews
 - Synopsis: Two childhood friends from the Keamari waterfront reunite forty years later when one of them returns from Liverpool to scatter his brother’s ashes. A bittersweet comedy-drama about friendship, migration and the harbour that shaped them both.
 
 ## Cinemas
@@ -410,4 +428,5 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 
 - Source code (MIT licence): https://github.com/ahmershahdev/bookmymovie
 - Author: Syed Ahmer Shah
-- Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Tailwind CSS 4, Alpine.js
+- Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Inertia 2, React 19, TypeScript, Tailwind CSS 4, Three.js
+- Languages: English and Urdu (right-to-left)

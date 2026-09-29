@@ -87,7 +87,7 @@ export default function CinemaShow({ theater, days, nearby }: Props) {
                 <div className="shell grid gap-12 lg:grid-cols-12">
                     <div className="lg:col-span-4"><SectionHeading label="Facilities" title="The venue" accent={['venue']} id="facilities" /></div>
                     <div className="lg:col-span-8">
-                        <ul className="grid-lines sm:grid-cols-2">
+                        <ul className="grid-lines grid-fill-odd sm:grid-cols-2">
                             {theater.amenities.map((amenity) => (
                                 <li key={amenity.name} className="flex gap-4 p-5">
                                     <span className="grid h-11 w-11 shrink-0 place-items-center bg-volt text-noir"><Icon name={amenity.icon} size={18} /></span>

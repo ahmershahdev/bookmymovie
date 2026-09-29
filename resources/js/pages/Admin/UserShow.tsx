@@ -2,7 +2,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import { Checkbox, Field } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, money, route } from '@/lib/utils';
 import type { MemberRow } from './Users';
 
@@ -23,6 +23,13 @@ export default function AdminUserShow({ member, bookings, reviews, logins, devic
 
     return (
         <AdminLayout label="Member" title={`@${member.username}`}
+            lede="One member's account: profile, bookings, reviews and every device and IP they used."
+            guide={<Guide id="member" steps={[
+                ['Check the profile', 'Name, email, phone, points and when they last signed in.'],
+                ['Read their history', 'Bookings and reviews show what they have actually done on the site.'],
+                ['Look for shared devices', 'Accounts that used the same browser are listed; that is often the same person.'],
+                ['Block only with a reason', 'A block also covers their IPs and browsers. Write why: it is kept on record and can be lifted any time.'],
+            ]} />}
             actions={<Link href={route('admin.users')} className="btn btn-ghost"><Icon name="arrow-left" size={14} /> All members</Link>}>
             <section className="grid gap-6 lg:grid-cols-12">
                 <div className="panel p-6 lg:col-span-5">
@@ -73,10 +80,10 @@ export default function AdminUserShow({ member, bookings, reviews, logins, devic
                                 Block the IP addresses they signed in from {member.last_ip ? <span className="num">(latest {member.last_ip})</span> : '(none on record)'}
                             </Checkbox>
                             {(ban.data.ban_ip || ban.data.ban_devices) && (
-                                <Field label="Block length in days" type="number" min={1} max={3650} value={ban.data.days} onChange={(event) => ban.setData('days', event.target.value)} error={ban.errors.days}
+                                <Field label="Block length in days" placeholder="e.g. 30" type="number" min={1} max={3650} value={ban.data.days} onChange={(event) => ban.setData('days', event.target.value)} error={ban.errors.days}
                                     hint="Empty means until lifted. Shared IPs (offices, mobile networks) can block innocent people, so a limit such as 30 is kinder." />
                             )}
-                            <button type="submit" disabled={ban.processing} className="btn w-full bg-signal text-noir hover:brightness-110"><Icon name="lock" size={16} /> Ban member</button>
+                            <button type="submit" disabled={ban.processing} aria-busy={ban.processing} className="btn w-full bg-signal text-noir hover:brightness-110"><Icon name="lock" size={16} /> Ban member</button>
                         </form>
                     )}
 

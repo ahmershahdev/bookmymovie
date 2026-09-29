@@ -1,7 +1,7 @@
 import { Link, useForm } from '@inertiajs/react';
 import { motion } from 'motion/react';
 import Captcha, { captchaDefaults } from '@/components/Captcha';
-import { EmailField, PasswordField, spotlight, SubmitButton, TrustRow } from '@/components/auth';
+import { EmailField, PasswordField, spotlight, SubmitButton } from '@/components/auth';
 import Icon from '@/components/Icon';
 import { AuthHeading, authLayout, Stagger } from '@/layouts/AuthLayout';
 import { submitForm } from '@/lib/form';
@@ -37,10 +37,7 @@ export default function AdminLogin({ captcha, sessionMinutes, recoveryEnabled, d
                     <PasswordField label="Password" value={form.data.password} onChange={(event) => form.setData('password', event.target.value)} error={errors.password} required maxLength={72} autoComplete="current-password" placeholder="Admin password" />
                     <Captcha captcha={captcha} answer={form.data.custom_captcha_answer} honeypot={form.data.website_url} error={errors.captcha}
                         onAnswer={(value) => form.setData('custom_captcha_answer', value)} onHoneypot={(value) => form.setData('website_url', value)} onV2Token={(token) => form.setData('g-recaptcha-response', token)} />
-                    <div>
-                        <SubmitButton processing={form.processing} hasErrors={form.hasErrors} busyLabel="Checking" icon="lock">Sign in to admin</SubmitButton>
-                        <TrustRow />
-                    </div>
+                    <SubmitButton processing={form.processing} hasErrors={form.hasErrors} busyLabel="Checking" icon="lock">Sign in to admin</SubmitButton>
                 </Stagger>
             </form>
             </div>

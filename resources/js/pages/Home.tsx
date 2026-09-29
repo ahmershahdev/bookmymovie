@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from 'motion/react';
+import { animate, AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Accordion from '@/components/Accordion';
 import Icon from '@/components/Icon';
@@ -64,27 +64,22 @@ export default function Home(props: Props) {
     );
 }
 
-/* Projector intro ------------------------------------------------------------- */
+/* Projector wall -------------------------------------------------------------- */
 
 /**
- * Pinned while you scroll 3 screens: the camera starts behind a projector,
- * travels down its beam through the dust and arrives at a wall of posters
- * that light up as the beam reaches them. Reduced motion or no WebGL gets
- * the wall as a plain grid.
+ * One screen tall, never pinned. When it comes into view the camera travels
+ * down a projector beam to a wall of posters that light up one by one. The
+ * headline is always readable and a flat poster collage sits underneath, so
+ * the section is never an empty black block if WebGL is slow or missing.
  */
 function ProjectorWall({ movies }: { movies: Movie[] }) {
     const section = useRef<HTMLElement>(null);
     const reduce = useReducedMotion();
     const near = useInView(section, { margin: '300px 0px' });
+    const seen = useInView(section, { amount: 0.35, once: true });
     const [webgl, setWebgl] = useState(false);
     const [lite, setLite] = useState(false);
-    const { scrollYProgress } = useScroll({ target: section, offset: ['start start', 'end end'] });
-    const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 30, mass: 0.4 });
-    const flare = useTransform(progress, [0.28, 0.42, 0.56], [0, 0.55, 0]);
-    const lineOne = useTransform(progress, [0, 0.08, 0.22, 0.3], [0, 1, 1, 0]);
-    const lineTwo = useTransform(progress, [0.3, 0.38, 0.52, 0.6], [0, 1, 1, 0]);
-    const lineThree = useTransform(progress, [0.72, 0.84, 1], [0, 1, 1]);
-    const lift = useTransform(progress, [0.72, 0.9], [40, 0]);
+    const progress = useMotionValue(0);
 
     useEffect(() => {
         const canvas = document.createElement('canvas');
@@ -92,43 +87,37 @@ function ProjectorWall({ movies }: { movies: Movie[] }) {
         setLite(window.innerWidth < 768 || (navigator.hardwareConcurrency ?? 8) <= 4);
     }, []);
 
+    useEffect(() => {
+        if (!seen) return;
+        const controls = animate(progress, 1, { duration: reduce ? 0 : 4.5, ease: [0.16, 1, 0.3, 1] });
+        return () => controls.stop();
+    }, [seen, reduce, progress]);
+
     if (movies.length === 0) return null;
-
-    if (reduce || !webgl) {
-        return (
-            <section className="shell pt-28" aria-labelledby="wall-title">
-                <h2 id="wall-title" className="display text-[clamp(3rem,8vw,6.5rem)]">Every film. <span className="text-accent">One wall.</span></h2>
-                <div className="mt-10 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                    {movies.map((movie) => <Link key={movie.id} href={route('movies.show', movie.slug)}><Poster movie={movie} size="sm" meta={false} /></Link>)}
-                </div>
-            </section>
-        );
-    }
-
     const wall = movies.map((movie) => ({ id: movie.id, title: movie.title, poster_url: movie.poster_url, palette: movie.palette }));
 
     return (
-        <section ref={section} className="relative h-[320vh]" aria-labelledby="wall-title">
-            <div className="sticky top-0 h-[100svh] overflow-hidden bg-[#050505]">
-                {near && (
-                    <Suspense fallback={null}>
-                        <ProjectorIntro movies={wall} progress={progress} lite={lite} className="absolute inset-0" />
-                    </Suspense>
-                )}
-                {/* Passing through the lens: the beam washes the frame white for a beat. */}
-                <motion.div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,#fff6dd,transparent_65%)] mix-blend-screen" style={{ opacity: flare }} />
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,#050505_100%)]" aria-hidden="true" />
+        <section ref={section} className="relative isolate h-[88svh] min-h-[560px] overflow-hidden bg-[#050505] text-[#f2f0ea]" aria-labelledby="wall-title">
+            {/* Always-there collage: what you see before, or instead of, the 3D scene. */}
+            <div className="absolute inset-0 -z-10 grid grid-cols-4 gap-2 opacity-25 [transform:perspective(1200px)_rotateX(18deg)_scale(1.15)] sm:grid-cols-6" aria-hidden="true">
+                {movies.slice(0, 18).map((movie) => <Poster key={movie.id} movie={movie} size="sm" meta={false} />)}
+            </div>
+            {webgl && !reduce && near && (
+                <Suspense fallback={null}>
+                    <ProjectorIntro movies={wall} progress={progress} lite={lite} className="absolute inset-0" />
+                </Suspense>
+            )}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_60%_45%,transparent_35%,#050505_95%)]" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#050505] to-transparent" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r from-[#050505] via-[#050505]/75 to-transparent sm:w-3/5" aria-hidden="true" />
 
-                <div className="shell pointer-events-none absolute inset-x-0 bottom-[12svh] text-paper">
-                    <motion.p style={{ opacity: lineOne }} className="label label-accent absolute">01 · Lights down</motion.p>
-                    <motion.p style={{ opacity: lineTwo }} className="label label-accent absolute">02 · Projector on</motion.p>
-                    <motion.div style={{ opacity: lineThree, y: lift }} className="pointer-events-auto">
-                        <p className="label label-accent">03 · Now showing</p>
-                        <h2 id="wall-title" className="display mt-4 text-[clamp(3.2rem,9vw,8rem)] leading-[.86]">Every film.<br /><span className="text-accent">One wall.</span></h2>
-                        <Link href={route('movies.index')} className="btn btn-primary mt-8">Browse all films <Icon name="arrow-right" size={16} className="arrow" /></Link>
-                    </motion.div>
-                </div>
-                <motion.p style={{ opacity: lineOne }} className="label absolute bottom-6 left-1/2 -translate-x-1/2 text-mute">Scroll to roll film</motion.p>
+            <div className="shell relative flex h-full flex-col justify-end pb-[10svh]">
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={seen ? { opacity: 1, y: 0 } : undefined} transition={{ duration: 1, ease }}>
+                    <p className="label !text-[#e3ff3b]">Tonight on the big screen</p>
+                    <h2 id="wall-title" className="display mt-4 text-[clamp(3rem,8vw,7.5rem)] leading-[.86]">Every film.<br /><span className="text-[#e3ff3b]">One wall.</span></h2>
+                    <p className="mt-5 max-w-md text-[#d9d6ce]">{movies.length} films on at our partner cinemas right now, from festival dramas to Friday-night thrillers.</p>
+                    <Link href={route('movies.index')} className="btn mt-8 border-[#e3ff3b] bg-[#e3ff3b] text-[#0a0a0a] hover:bg-transparent hover:text-[#e3ff3b]">Browse every film <Icon name="arrow-right" size={16} className="arrow" /></Link>
+                </motion.div>
             </div>
         </section>
     );
@@ -182,7 +171,7 @@ function Hero({ slides }: { slides: Movie[] }) {
                 <AnimatePresence>
                     <motion.div key={slide.slug} className="absolute inset-0 -z-10" initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                         transition={{ opacity: { duration: 1.1 }, scale: { duration: 8, ease: 'linear' } }}>
-                        <BackdropVideo trailer={slide.trailers[0]} image={slide.hero_image_url} />
+                        <BackdropVideo trailer={slide.trailers[0]} image={slide.hero_image_url} priority />
                     </motion.div>
                 </AnimatePresence>
             ) : webgl && !reduce ? (

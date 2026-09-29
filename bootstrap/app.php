@@ -56,11 +56,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 return back()->with('status', 'The page expired, please try again.');
             }
 
-            if (! $request->header('X-Inertia') || (app()->hasDebugModeEnabled() && $status >= 500)) {
+            if (! in_array($status, [403, 404, 429, 500, 503], true) || (app()->hasDebugModeEnabled() && $status >= 500)) {
                 return $response;
             }
 
-            if (! in_array($status, [403, 404, 429, 500, 503], true)) {
+            // Inertia visits always get the React page. Direct browser loads do
+            // too for "not found"-style errors, so a broken link lands on the
+            // full site (navbar, search, films) rather than a bare page.
+            // Server errors and non-HTML clients keep the plain responses.
+            $directPage = ! $request->header('X-Inertia') && $request->isMethod('GET') && $request->acceptsHtml() && ! $request->expectsJson();
+            if (! $request->header('X-Inertia') && ! ($directPage && in_array($status, [403, 404, 429], true))) {
                 return $response;
             }
 

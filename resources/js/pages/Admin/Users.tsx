@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Avatar from '@/components/Avatar';
 import Icon from '@/components/Icon';
 import { Field, Pagination } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, route } from '@/lib/utils';
 import type { PageLink } from '@/types';
 
@@ -25,7 +25,13 @@ export default function AdminUsers({ users, filters, bannedIps, bannedDevices, c
     const search = (next: Partial<Props['filters']>) => router.get(route('admin.users'), { ...filters, q, ...next }, { preserveState: true, preserveScroll: true, replace: true });
 
     return (
-        <AdminLayout label="People" title="Members" lede="Everyone with an account. Open a member to see their bookings, reviews and sign-ins, or ban them and the IP they use.">
+        <AdminLayout label="People" title="Members" lede="Everyone with an account. Open a member to see their bookings, reviews and sign-ins, or ban them and the IP they use."
+            guide={<Guide id="users" steps={[
+                ['Search', 'Type a name, @username, email or IP address, then filter to show only active or banned members.'],
+                ['Open a member', 'See their bookings, reviews, loyalty points and recent sign-ins.'],
+                ['Ban with a reason', 'A ban blocks the account, and optionally its IP and device, so a new account won’t help.'],
+                ['Unban any time', 'Bans and blocked IPs/devices are listed at the bottom with an undo button.'],
+            ]} />}>
             <div className="grid-lines grid-cols-2 lg:grid-cols-4">
                 {[['Members', counts.total], ['Banned accounts', counts.banned], ['Blocked IPs', counts.ips], ['Blocked devices', counts.devices]].map(([label, value]) => (
                     <div key={label} className="p-6"><p className="label">{label}</p><p className="display mt-3 text-5xl">{Number(value).toLocaleString('en-PK')}</p></div>
@@ -38,7 +44,7 @@ export default function AdminUsers({ users, filters, bannedIps, bannedDevices, c
                     <button type="submit" className="btn btn-primary">Search</button>
                     <div className="flex gap-1 sm:ms-auto">
                         {(['all', 'active', 'banned'] as const).map((status) => (
-                            <button key={status} type="button" onClick={() => search({ status })} aria-pressed={filters.status === status} className={cn('chip capitalize', filters.status === status && '!border-accent !text-accent')}>{status}</button>
+                            <button key={status} type="button" onClick={() => search({ status })} aria-pressed={filters.status === status} className={'chip capitalize'}>{status}</button>
                         ))}
                     </div>
                 </form>
@@ -92,9 +98,9 @@ function IpBans({ bans }: { bans: Props['bannedIps'] }) {
                 <p id="ip-bans" className="label label-accent">Block an IP address</p>
                 <p className="text-sm text-mute">Blocked addresses get a 403 on every page, signed in or not. Use it for scraping, card testing or abuse; ban the account too if there is one.</p>
                 <Field label="IP address" value={form.data.ip} onChange={(event) => form.setData('ip', event.target.value)} error={form.errors.ip} placeholder="203.0.113.24" required />
-                <Field label="Reason" value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} error={form.errors.reason} required maxLength={200} />
-                <Field label="For how many days?" type="number" min={1} max={3650} value={form.data.days} onChange={(event) => form.setData('days', event.target.value)} error={form.errors.days} hint="Leave empty to block until you lift it." />
-                <button type="submit" disabled={form.processing} className="btn btn-primary w-full"><Icon name="shield" size={16} /> Block address</button>
+                <Field label="Reason" placeholder="e.g. Repeated fake bookings" value={form.data.reason} onChange={(event) => form.setData('reason', event.target.value)} error={form.errors.reason} required maxLength={200} />
+                <Field label="For how many days?" placeholder="e.g. 30" type="number" min={1} max={3650} value={form.data.days} onChange={(event) => form.setData('days', event.target.value)} error={form.errors.days} hint="Leave empty to block until you lift it." />
+                <button type="submit" disabled={form.processing} aria-busy={form.processing} className="btn btn-primary w-full"><Icon name="shield" size={16} /> Block address</button>
             </form>
             <div className="lg:col-span-8">
                 <ul className="divide-y divide-line border border-line">

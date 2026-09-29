@@ -5,7 +5,7 @@ import Dropdown from '@/components/Dropdown';
 import Icon from '@/components/Icon';
 import MovieCard from '@/components/MovieCard';
 import { EmptyState, PageHeader } from '@/components/ui';
-import { plural, route, useShared } from '@/lib/utils';
+import { cn, plural, route, useShared } from '@/lib/utils';
 import type { MovieCard as Movie } from '@/types';
 
 type CatalogueMovie = Movie & { genre_slugs: string[]; released_at: string | null; people: string };
@@ -88,27 +88,28 @@ export default function MoviesIndex({ movies, genres, fixedGenre, status, status
                         </nav>
                     )}
 
-                    <div className="mt-3 grid gap-2 md:grid-cols-12">
-                        <label className="relative md:col-span-4">
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12">
+                        <label className="relative sm:col-span-2 md:col-span-4">
                             <span className="sr-only">Search films</span>
                             <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-mute" />
                             <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setLimit(PAGE); }} maxLength={120}
                                 placeholder="Title, actor, director or keyword" className="input !pl-11" />
                         </label>
                         {!fixedGenre && (
-                            <Dropdown className="md:col-span-2" hideLabel label="Genre" value={genre} onChange={(value) => { setGenre(value); setLimit(PAGE); }}
+                            <Dropdown className="min-w-0 lg:col-span-2" hideLabel label="Genre" value={genre} onChange={(value) => { setGenre(value); setLimit(PAGE); }}
                                 options={[['', 'All genres'], ...genres.map((item) => [item.slug, `${item.name} (${item.count})`] as [string, string])]} />
                         )}
-                        <Dropdown className={fixedGenre ? 'md:col-span-3' : 'md:col-span-2'} hideLabel label="Language" value={language} onChange={(value) => { setLanguage(value); setLimit(PAGE); }}
+                        <Dropdown className={cn('min-w-0', fixedGenre ? 'lg:col-span-3' : 'lg:col-span-2')} hideLabel label="Language" value={language} onChange={(value) => { setLanguage(value); setLimit(PAGE); }}
                             options={[['', 'Any language'], ...languages.map((item) => [item, item] as [string, string])]} />
-                        <Dropdown className="md:col-span-2" hideLabel label="Certificate" value={certificate} onChange={(value) => { setCertificate(value); setLimit(PAGE); }}
+                        <Dropdown className="min-w-0 lg:col-span-2" hideLabel label="Certificate" value={certificate} onChange={(value) => { setCertificate(value); setLimit(PAGE); }}
                             options={[['', 'Any rating'], ...certificates.map((item) => [item, item] as [string, string])]} />
-                        <Dropdown className={fixedGenre ? 'md:col-span-3' : 'md:col-span-2'} hideLabel label="Sort" value={sort} onChange={setSort} options={sorts} />
+                        <Dropdown className={cn('min-w-0', fixedGenre ? 'lg:col-span-3' : 'lg:col-span-2')} hideLabel label="Sort" value={sort} onChange={setSort} options={sorts} />
                     </div>
                 </div>
             </section>
 
-            <section className="pt-8" aria-label="Results">
+            <section className="pt-8" aria-labelledby="results-title">
+                <h2 id="results-title" className="sr-only">Films</h2>
                 <div className="shell">
                     <div className="mb-10 flex flex-wrap items-center justify-between gap-4 text-sm text-mute">
                         <p aria-live="polite">

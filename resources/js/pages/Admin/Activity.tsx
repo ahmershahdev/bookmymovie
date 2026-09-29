@@ -2,7 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import { Field, TextArea } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, money, route } from '@/lib/utils';
 
 type Log = { id: number; at: string; actor: string; actor_name: string; action: string; subject: string | null; changes: Record<string, unknown> | null; ip: string | null };
@@ -23,7 +23,13 @@ export default function AdminActivity({ logs, bookings, giftCards }: Props) {
     const [tab, setTab] = useState<Tab>('log');
 
     return (
-        <AdminLayout label="Back office" title="Bookings & refunds" lede="Every admin and customer action that changes data, cancellations with refunds, and gift cards.">
+        <AdminLayout label="Back office" title="Bookings & refunds" lede="Every admin and customer action that changes data, cancellations with refunds, and gift cards."
+            guide={<Guide id="activity" steps={[
+                ['Find the booking', 'Recent bookings are listed with their number, as printed on the ticket and confirmation email.'],
+                ['Refund or cancel', 'Write a short reason, then press the button. Paid bookings are refunded and cancelled; the seats go back on sale.'],
+                ['Issue gift cards', 'Pick an amount and share the code with the customer. Deactivate a card to stop it being spent.'],
+                ['Check the audit log', 'Every change made by staff or customers is listed with who, what and when.'],
+            ]} />}>
             <div className="flex flex-wrap gap-1 border-b border-line" role="tablist" aria-label="Sections">
                 {tabs.map(([id, label, icon]) => (
                     <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
@@ -62,7 +68,7 @@ function AuditLog({ logs }: { logs: Log[] }) {
                 <Field label="Search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Action, person, booking or IP" className="sm:max-w-sm sm:flex-1" />
                 <div className="flex flex-wrap gap-1">
                     {actors.map((value) => (
-                        <button key={value} type="button" onClick={() => setActor(value)} aria-pressed={actor === value} className={cn('chip capitalize', actor === value && '!border-accent !text-accent')}>{value}</button>
+                        <button key={value} type="button" onClick={() => setActor(value)} aria-pressed={actor === value} className={'chip capitalize'}>{value}</button>
                     ))}
                 </div>
             </div>
@@ -162,7 +168,7 @@ function Refunds({ bookings }: { bookings: Booking[] }) {
                                 error={form.errors.reason} required minLength={4} maxLength={200} placeholder="Screen fault, show cancelled" autoFocus />
                             <div className="flex gap-2">
                                 <button type="button" onClick={() => setTarget(null)} className="btn btn-ghost">Keep booking</button>
-                                <button type="submit" disabled={form.processing} className="btn btn-primary">{form.processing ? 'Working…' : booking.payment === 'paid' ? 'Refund and cancel' : 'Cancel booking'}</button>
+                                <button type="submit" disabled={form.processing} aria-busy={form.processing} className="btn btn-primary">{form.processing ? 'Working…' : booking.payment === 'paid' ? 'Refund and cancel' : 'Cancel booking'}</button>
                             </div>
                         </form>
                     )}
@@ -185,11 +191,11 @@ function GiftCards({ cards }: { cards: GiftCard[] }) {
             <form onSubmit={(event) => { event.preventDefault(); form.post(route('admin.gift-cards.store'), { preserveScroll: true, onSuccess: () => form.reset('recipient_email', 'message') }); }}
                 className="panel space-y-4 p-6 lg:col-span-4" noValidate>
                 <p className="label label-accent">Issue a card</p>
-                <Field label="Amount (PKR)" type="number" min={100} max={100000} step={100} value={form.data.amount} onChange={(event) => form.setData('amount', event.target.value)} error={form.errors.amount} required />
-                <Field label="Valid for (months)" type="number" min={1} max={36} value={form.data.months} onChange={(event) => form.setData('months', event.target.value)} error={form.errors.months} required />
-                <Field label="Recipient email" type="email" value={form.data.recipient_email} onChange={(event) => form.setData('recipient_email', event.target.value)} error={form.errors.recipient_email} hint="Optional. The code is emailed to them." />
-                <TextArea label="Message" value={form.data.message} onChange={(event) => form.setData('message', event.target.value)} error={form.errors.message} maxLength={200} rows={3} />
-                <button type="submit" disabled={form.processing} className="btn btn-primary w-full">{form.processing ? 'Issuing…' : 'Issue gift card'}</button>
+                <Field label="Amount (PKR)" placeholder="e.g. 2500" type="number" min={100} max={100000} step={100} value={form.data.amount} onChange={(event) => form.setData('amount', event.target.value)} error={form.errors.amount} required />
+                <Field label="Valid for (months)" placeholder="e.g. 12" type="number" min={1} max={36} value={form.data.months} onChange={(event) => form.setData('months', event.target.value)} error={form.errors.months} required />
+                <Field label="Recipient email" placeholder="name@example.com" type="email" value={form.data.recipient_email} onChange={(event) => form.setData('recipient_email', event.target.value)} error={form.errors.recipient_email} hint="Optional. The code is emailed to them." />
+                <TextArea label="Message" placeholder="e.g. Happy birthday! Enjoy a film on us." value={form.data.message} onChange={(event) => form.setData('message', event.target.value)} error={form.errors.message} maxLength={200} rows={3} />
+                <button type="submit" disabled={form.processing} aria-busy={form.processing} className="btn btn-primary w-full">{form.processing ? 'Issuing…' : 'Issue gift card'}</button>
             </form>
 
             <div className="lg:col-span-8">

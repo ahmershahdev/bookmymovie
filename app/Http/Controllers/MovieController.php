@@ -272,6 +272,7 @@ class MovieController extends Controller
             'image' => $movie->ogImageUrl(),
             'image_alt' => 'Poster artwork for '.$movie->title,
             'type' => 'video.movie',
+            'preload' => Seo::preloadImage($card['poster_url'] ?? null, '(min-width: 1024px) 30vw, (min-width: 640px) 20rem, 16rem'),
             'schema' => [Seo::movie($movie, $shows)],
         ], array_values(array_filter([
             ['label' => 'Home', 'url' => route('home')],

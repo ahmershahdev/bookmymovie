@@ -1,8 +1,6 @@
-import { Head, usePage } from '@inertiajs/react';
-import { motion, useReducedMotion } from 'motion/react';
+import { Head } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import Assistant from '@/components/shell/Assistant';
-import ReelTransition from '@/components/shell/ReelTransition';
 import CompareTray from '@/components/shell/CompareTray';
 import Footer from '@/components/shell/Footer';
 import Navbar from '@/components/shell/Navbar';
@@ -26,23 +24,18 @@ export function Meta() {
 
 /**
  * Persistent shell: the navbar, footer, scrollbar and overlays mount once and
- * survive every visit; only the page inside <main> changes, sliding up
- * into place so a new page feels like the next reel rather than a reload.
+ * survive every visit; only the page inside <main> changes, in place, so
+ * moving between pages never looks like a reload.
  */
 export default function SiteLayout({ children }: { children: ReactNode }) {
-    const { url } = usePage();
-    const reduce = useReducedMotion();
-    const path = url.split('?')[0].split('#')[0];
-
     return (
         <>
             <Meta />
             <ProgressBar />
             <Navbar />
             <main id="main" tabIndex={-1} className="min-h-[70vh] focus:outline-none">
-                <motion.div key={path} initial={reduce ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-                    {children}
-                </motion.div>
+                {/* No blanking re-mount between pages: the new page simply replaces the old one. */}
+                {children}
             </main>
             <Footer />
             <CompareTray />
@@ -52,7 +45,6 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
             </div>
             <Toaster />
             <ScrollIndicator />
-            <ReelTransition />
         </>
     );
 }

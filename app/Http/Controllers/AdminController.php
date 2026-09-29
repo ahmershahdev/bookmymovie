@@ -31,7 +31,12 @@ use RuntimeException;
 
 class AdminController extends Controller
 {
-    public function dashboard(Request $request, ?int $movie = null): Response|RedirectResponse
+    /**
+     * The command centre: today's money and seats, what needs attention,
+     * tonight's schedule, trends and a guided setup checklist. Figures are
+     * cached for a minute so a busy box office can keep it open all day.
+     */
+    public function dashboard(Request $request): Response|RedirectResponse
     {
         $admin = $this->admin($request);
 
@@ -39,23 +44,122 @@ class AdminController extends Controller
             return redirect()->route('admin.login');
         }
 
-        $stats = [
-            'revenue' => (float) Booking::query()->where('booking_status', '<>', 'cancelled')->sum('total_amount'),
-            'bookings' => Booking::query()->count(),
-            'users' => User::query()->count(),
-            'topMovie' => DB::table('v_movie_stats')->orderByDesc('tickets_sold')->value('title') ?: 'N/A',
-            'activeShows' => DB::table('v_show_details')->where('show_status', 'scheduled')->count(),
-            'pendingReviews' => Review::query()->where('is_approved', false)->count(),
+        $data = \Illuminate\Support\Facades\Cache::remember('admin.overview', now()->addMinute(), fn () => $this->overviewData());
+
+        return $this->page('Admin/Dashboard', [
+            ...$data,
+            'admin' => ['name' => $admin->name, 'role' => $admin->roleLabel(), 'twoFactor' => $admin->hasTwoFactor()],
+            'setup' => [
+                ['key' => 'films', 'label' => 'Add your films', 'detail' => 'Title, artwork, trailer and certificate. Coming-soon films can be added early.', 'done' => Movie::query()->exists(), 'href' => route('admin.movies')],
+                ['key' => 'shows', 'label' => 'Schedule shows and row prices', 'detail' => 'Each show has its own price per row, adult and child.', 'done' => DB::table('shows')->where('show_date', '>=', now()->toDateString())->exists(), 'href' => route('admin.movies')],
+                ['key' => 'coupon', 'label' => 'Create a launch coupon', 'detail' => 'Set a hard use limit so a rush can never overspend it.', 'done' => Coupon::query()->where('is_active', true)->exists(), 'href' => route('admin.commerce')],
+                ['key' => 'snacks', 'label' => 'Set snack stock', 'detail' => 'Pre-orders stop automatically when stock runs out.', 'done' => DB::table('concessions')->whereNotNull('stock')->exists(), 'href' => route('admin.commerce')],
+                ['key' => 'staff', 'label' => 'Invite your box office team', 'detail' => 'Box office staff can check tickets in but cannot change prices.', 'done' => Admin::query()->where('is_active', true)->count() > 1, 'href' => route('admin.staff')],
+                ['key' => '2fa', 'label' => 'Turn on two-step sign-in', 'detail' => 'An authenticator code on top of your password.', 'done' => $admin->hasTwoFactor(), 'href' => route('admin.security')],
+            ],
+        ], ['title' => 'Overview | Admin', 'description' => 'BookMyMovie box office overview.', 'robots' => 'noindex, nofollow']);
+    }
+
+    /** @return array<string, mixed> */
+    private function overviewData(): array
+    {
+        $today = now()->toDateString();
+        $paid = fn () => Booking::query()->where('booking_status', '<>', 'cancelled');
+        $money = 'COALESCE(SUM(total_amount + gift_card_amount), 0)';
+
+        // Last 14 days of revenue and tickets, gaps filled with zeros.
+        $from = now()->subDays(13)->startOfDay();
+        $daily = $paid()->where('booked_at', '>=', $from)->selectRaw("DATE(booked_at) AS day, {$money} AS revenue, COALESCE(SUM(seat_count), 0) AS tickets")->groupBy('day')->get()->keyBy('day');
+        $series = collect(range(0, 13))->map(function (int $offset) use ($from, $daily) {
+            $day = $from->copy()->addDays($offset)->toDateString();
+
+            return ['day' => $day, 'label' => Carbon::parse($day)->format('D j'), 'revenue' => round((float) ($daily[$day]->revenue ?? 0), 2), 'tickets' => (int) ($daily[$day]->tickets ?? 0)];
+        })->values();
+
+        $members = User::query()->where('created_at', '>=', now()->subDays(13)->startOfDay())->selectRaw('DATE(created_at) AS day, COUNT(*) AS total')->groupBy('day')->pluck('total', 'day');
+        $memberSeries = $series->map(fn ($day) => (int) ($members[$day['day']] ?? 0))->values();
+
+        // Tonight: every show today, on a timeline per screen.
+        $tonight = DB::table('v_show_details')->where('show_date', $today)->where('show_status', '<>', 'cancelled')
+            ->orderBy('theater_name')->orderBy('screen_name')->orderBy('show_time')
+            ->get(['show_id', 'show_time', 'movie_title', 'movie_slug', 'duration_minutes', 'theater_name', 'screen_name', 'screen_format', 'total_seats', 'booked_seats'])
+            ->map(fn ($show) => [
+                'id' => (int) $show->show_id,
+                'film' => $show->movie_title,
+                'slug' => $show->movie_slug,
+                'screen' => $show->theater_name.' · '.$show->screen_name,
+                'start' => substr((string) $show->show_time, 0, 5),
+                'minutes' => (int) ($show->duration_minutes ?: 120),
+                'sold' => (int) $show->booked_seats,
+                'seats' => (int) $show->total_seats,
+            ])->values();
+
+        // Seats filled by weekday and start hour, last 30 days and next 7.
+        $heat = DB::table('shows')->where('status', '<>', 'cancelled')->where('total_seats', '>', 0)
+            ->whereBetween('show_date', [now()->subDays(30)->toDateString(), now()->addDays(7)->toDateString()])
+            ->selectRaw('WEEKDAY(show_date) AS weekday, HOUR(show_time) AS hour, SUM(booked_seats) AS sold, SUM(total_seats) AS seats')
+            ->groupBy('weekday', 'hour')->get()
+            ->map(fn ($row) => ['weekday' => (int) $row->weekday, 'hour' => (int) $row->hour, 'rate' => $row->seats ? round($row->sold / $row->seats * 100) : 0, 'sold' => (int) $row->sold, 'seats' => (int) $row->seats])->values();
+
+        $top = DB::table('bookings')->join('shows', 'shows.id', '=', 'bookings.show_id')->join('movies', 'movies.id', '=', 'shows.movie_id')
+            ->where('bookings.booking_status', '<>', 'cancelled')->where('bookings.booked_at', '>=', now()->subDays(30))
+            ->selectRaw('movies.id, movies.title, movies.slug, movies.poster_image, SUM(bookings.seat_count) AS tickets, SUM(bookings.total_amount + bookings.gift_card_amount) AS revenue')
+            ->groupBy('movies.id', 'movies.title', 'movies.slug', 'movies.poster_image')->orderByDesc('tickets')->limit(5)->get()
+            ->map(fn ($row) => ['title' => $row->title, 'slug' => $row->slug, 'poster' => $row->poster_image ? (str_starts_with($row->poster_image, 'http') ? $row->poster_image : asset(str_starts_with($row->poster_image, 'images/') ? $row->poster_image : 'storage/'.$row->poster_image)) : null, 'tickets' => (int) $row->tickets, 'revenue' => round((float) $row->revenue, 2)])->values();
+
+        $methods = $paid()->where('booked_at', '>=', now()->subDays(30))->selectRaw('payment_method, COUNT(*) AS total')->groupBy('payment_method')->pluck('total', 'payment_method');
+
+        $screens = $tonight->groupBy('screen')->map(fn ($shows, $screen) => [
+            'screen' => $screen,
+            'shows' => $shows->count(),
+            'rate' => $shows->sum('seats') ? round($shows->sum('sold') / $shows->sum('seats') * 100) : 0,
+        ])->values();
+
+        $todayRevenue = (float) $paid()->whereDate('booked_at', $today)->sum(DB::raw('total_amount + gift_card_amount'));
+        $yesterday = (float) $paid()->whereDate('booked_at', now()->subDay()->toDateString())->sum(DB::raw('total_amount + gift_card_amount'));
+
+        return [
+            'kpis' => [
+                'revenue_today' => round($todayRevenue, 2),
+                'revenue_change' => $yesterday > 0 ? round(($todayRevenue - $yesterday) / $yesterday * 100) : null,
+                'tickets_today' => (int) $paid()->whereDate('booked_at', $today)->sum('seat_count'),
+                'tonight_rate' => $tonight->sum('seats') ? round($tonight->sum('sold') / $tonight->sum('seats') * 100) : 0,
+                'tonight_shows' => $tonight->count(),
+                'members_week' => (int) $memberSeries->slice(7)->sum(),
+                'members_total' => User::query()->count(),
+            ],
+            'series' => $series,
+            'memberSeries' => $memberSeries,
+            'tonight' => $tonight,
+            'heat' => $heat,
+            'top' => $top,
+            'methods' => collect(['cod' => 'Counter', 'jazzcash' => 'JazzCash', 'easypaisa' => 'Easypaisa', 'card' => 'Card'])
+                ->map(fn ($label, $key) => ['key' => $key, 'label' => $label, 'count' => (int) ($methods[$key] ?? 0)])->values(),
+            'screens' => $screens,
+            'attention' => array_values(array_filter([
+                ['label' => 'reviews waiting for a decision', 'count' => Review::query()->where('is_approved', false)->count(), 'href' => route('admin.reviews'), 'tone' => 'volt'],
+                ['label' => 'unpaid bookings for shows in the next 3 hours', 'count' => Booking::query()->where('booking_status', 'confirmed')->where('payment_status', '<>', 'paid')
+                    ->whereHas('show', fn ($query) => $query->whereRaw('TIMESTAMP(show_date, show_time) BETWEEN ? AND ?', [now()->toDateTimeString(), now()->addHours(3)->toDateTimeString()]))->count(), 'href' => route('admin.activity'), 'tone' => 'signal'],
+                ['label' => 'snacks low or sold out', 'count' => DB::table('concessions')->whereNotNull('stock')->whereColumn('stock', '<=', 'low_stock_at')->count(), 'href' => route('admin.commerce'), 'tone' => 'volt'],
+                ['label' => 'people on show waitlists', 'count' => DB::table('show_waitlists')->whereNull('notified_at')->count(), 'href' => route('admin.movies'), 'tone' => 'mint'],
+                ['label' => 'unread contact messages', 'count' => DB::table('contact_messages')->where('is_read', false)->count(), 'href' => route('admin.activity'), 'tone' => 'volt'],
+                ['label' => 'coupons used up this week', 'count' => Coupon::query()->whereNotNull('max_uses')->whereColumn('used_count', '>=', 'max_uses')->where('updated_at', '>=', now()->subWeek())->count(), 'href' => route('admin.commerce'), 'tone' => 'mint'],
+            ], fn ($item) => $item['count'] > 0)),
+            'activity' => DB::table('audit_logs')->latest('id')->limit(10)->get(['action', 'actor_type', 'created_at'])
+                ->map(fn ($row) => ['what' => Str::of($row->action)->replace(['.', '_'], ' ')->ucfirst()->value(), 'who' => $row->actor_type ?? 'system', 'ago' => Carbon::parse($row->created_at)->diffForHumans()])->values(),
         ];
-        $selectedMovie = Movie::query()->with('genres')->find($movie)
-            ?: Movie::query()->with('genres')->latest()->first();
+    }
+
+    /** Site-wide settings, page SEO and broadcasts (owner only). */
+    public function content(Request $request): Response|RedirectResponse
+    {
+        if (! $this->admin($request)) {
+            return redirect()->route('admin.login');
+        }
 
         $settings = SiteSetting::query()->pluck('value', 'key')->all();
 
-        return $this->page('Admin/Dashboard', [
-            'admin' => ['name' => $admin->name, 'email' => $admin->email],
-            'sessionMinutes' => (int) config('session.admin_lifetime', 60),
-            'stats' => $stats,
+        return $this->page('Admin/Content', [
             'settings' => [
                 'site_name' => $settings['site_name'] ?? 'BookMyMovie',
                 'canonical_base_url' => $settings['canonical_base_url'] ?? 'https://bookmymovie.ahmershah.dev',
@@ -74,6 +178,24 @@ class AdminController extends Controller
                     'canonical_path' => (string) $page->canonical_path,
                     'excerpt' => (string) $page->excerpt,
                 ])->values(),
+            'members' => User::query()->where('is_blocked', false)->count(),
+        ], ['title' => 'Content & SEO | Admin', 'description' => 'Site settings, page SEO and broadcasts.', 'robots' => 'noindex, nofollow']);
+    }
+
+    public function movies(Request $request, ?int $movie = null): Response|RedirectResponse
+    {
+        $admin = $this->admin($request);
+
+        if (! $admin) {
+            return redirect()->route('admin.login');
+        }
+
+        $selectedMovie = Movie::query()->with('genres')->find($movie)
+            ?: Movie::query()->with('genres')->latest()->first();
+
+        return $this->page('Admin/Movies', [
+            'admin' => ['name' => $admin->name, 'email' => $admin->email],
+            'sessionMinutes' => (int) config('session.admin_lifetime', 60),
             'selectedMovie' => $selectedMovie ? [
                 'id' => $selectedMovie->id,
                 'title' => $selectedMovie->title,
@@ -144,21 +266,9 @@ class AdminController extends Controller
                         'benefits' => $tier->benefits,
                     ])
                 : [],
-            'bookings' => Booking::query()->latest('booked_at')->limit(8)->get(['booking_number', 'total_amount', 'booking_status'])
-                ->map(fn (Booking $booking) => ['label' => $booking->booking_number, 'value' => ucfirst($booking->booking_status).' · PKR '.number_format((float) $booking->total_amount)])->all(),
-            'coupons' => Coupon::query()->latest()->limit(8)->get(['code', 'discount_type', 'discount_value'])
-                ->map(fn (Coupon $coupon) => ['label' => $coupon->code, 'value' => $coupon->discount_type === 'percentage' ? rtrim(rtrim(number_format((float) $coupon->discount_value, 2), '0'), '.').'% off' : 'PKR '.number_format((float) $coupon->discount_value).' off'])->all(),
-            'users' => User::query()->latest()->limit(8)->get(['name', 'created_at'])
-                ->map(fn (User $user) => ['label' => $user->name, 'value' => 'Joined '.$user->created_at?->format('j M Y')])->all(),
-            'customers' => DB::table('v_user_stats')->orderByDesc('total_spent')->limit(8)->get()
-                ->map(fn ($user) => ['label' => $user->name, 'value' => 'PKR '.number_format((float) $user->total_spent)])
-                ->all(),
-            'reviews' => Review::query()->with('movie:id,title')->latest()->limit(8)->get()
-                ->map(fn (Review $review) => ['label' => '#'.$review->id.' · '.($review->movie?->title ?? 'Film'), 'value' => $review->rating.' ★'.($review->is_approved ? '' : ' · pending')])
-                ->all(),
             'certificates' => ['U', 'UA', 'A', 'S', 'G', 'PG', 'PG-13', 'R'],
             'today' => now()->toDateString(),
-        ], ['title' => 'Admin Dashboard | BookMyMovie', 'description' => 'Manage BookMyMovie movies, pricing, bookings, users, content, SEO, and site settings.', 'robots' => 'noindex, nofollow']);
+        ], ['title' => 'Films & shows | Admin', 'description' => 'Catalogue, media, hero carousel and show pricing.', 'robots' => 'noindex, nofollow']);
     }
 
     public function handleDashboard(Request $request): RedirectResponse
@@ -241,7 +351,7 @@ class AdminController extends Controller
         $movie->genres()->sync($request->input('genre_ids', []));
 
         return redirect()
-            ->route('admin.dashboard.movie', $movie->id)
+            ->route('admin.movies', $movie->id)
             ->with('status', 'Movie details updated.');
     }
 
@@ -253,7 +363,7 @@ class AdminController extends Controller
 
         Movie::findOrFail($data['movie_id'])->delete();
 
-        return redirect()->route('admin.dashboard')->with('status', 'Movie removed from the active catalog.');
+        return redirect()->route('admin.movies')->with('status', 'Movie removed from the active catalog.');
     }
 
     private function restoreMovie(Request $request): RedirectResponse
@@ -265,7 +375,7 @@ class AdminController extends Controller
         $movie = Movie::onlyTrashed()->findOrFail($data['movie_id']);
         $movie->restore();
 
-        return redirect()->route('admin.dashboard.movie', $movie->id)->with('status', 'Movie restored.');
+        return redirect()->route('admin.movies', $movie->id)->with('status', 'Movie restored.');
     }
 
     /**

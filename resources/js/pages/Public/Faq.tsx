@@ -37,8 +37,8 @@ export default function FaqPage({ faqs }: { faqs: Faq[] }) {
             </PageHeader>
 
             <section className="pt-16">
-                <div className="shell grid gap-14 lg:grid-cols-12">
-                    <aside className="lg:col-span-3">
+                <div className="shell grid grid-cols-1 gap-14 lg:grid-cols-12">
+                    <aside className="min-w-0 lg:col-span-3">
                         <nav className="no-scrollbar sticky top-24 flex gap-1 overflow-x-auto lg:flex-col" aria-label="Help topics">
                             {[['All', faqs.length] as const, ...[...groups.entries()].map(([name, items]) => [name, items.length] as const)].map(([name, total]) => (
                                 <button key={name} type="button" onClick={() => { setCategory(name); setOpen(null); }} aria-pressed={category === name}
@@ -49,7 +49,7 @@ export default function FaqPage({ faqs }: { faqs: Faq[] }) {
                         </nav>
                     </aside>
 
-                    <div className="lg:col-span-9">
+                    <div className="min-w-0 lg:col-span-9">
                         <p className="mb-6 text-sm text-mute" aria-live="polite"><span className="num">{count}</span> answers{query && <> for “<span className="text-paper">{query}</span>”</>}</p>
                         {[...groups.entries()].map(([name, items]) => {
                             const visible = items.filter(matches);
@@ -81,7 +81,7 @@ export default function FaqPage({ faqs }: { faqs: Faq[] }) {
                         ['Cancellations', 'Cancel free until two hours before the show.', route('refund'), 'refresh'],
                         ['Contact support', `Real people, ${site.response_sla.toLowerCase()}.`, route('contact'), 'mail'],
                     ].map(([title, copy, href, icon]) => (
-                        <Link key={title} href={href} className="group p-8 transition-colors hover:!bg-volt hover:text-noir">
+                        <Link key={title} href={href} className="group min-w-0 p-6 transition-colors sm:p-8 hover:!bg-volt hover:text-noir">
                             <Icon name={icon} size={24} className="text-accent group-hover:text-noir" />
                             <span className="headline mt-8 block text-4xl">{title}</span>
                             <span className="mt-2 block text-sm text-mute group-hover:text-noir/70">{copy}</span>

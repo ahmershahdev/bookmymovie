@@ -39,7 +39,7 @@ function Beam() {
                 float along = vUv.y;                                  // 1 at the lens, 0 at the wall
                 float edge = pow(abs(dot(vNormal, vView)), 1.6);       // soft cone edges
                 float flicker = 0.92 + 0.08 * sin(uTime * 23.0) * sin(uTime * 7.0);
-                float alpha = edge * mix(0.03, 0.22, pow(along, 1.4)) * flicker;
+                float alpha = edge * mix(0.06, 0.32, pow(along, 1.2)) * flicker;
                 gl_FragColor = vec4(uColor, alpha);
             }`,
     }), []);
@@ -131,9 +131,9 @@ function Wall({ movies, progress }: { movies: WallMovie[]; progress: MotionValue
         materials.current.forEach((material, index) => {
             if (!material) return;
             const distanceFromCentre = Math.abs(index - centre);
-            const reveal = THREE.MathUtils.clamp((p - 0.45 - distanceFromCentre * 0.025) / 0.25, 0, 1);
-            const lit = index === centre ? Math.max(0.35, reveal) : reveal * 0.95;
-            material.color.setScalar(0.08 + lit * 0.92);
+            const reveal = THREE.MathUtils.clamp((p - 0.3 - distanceFromCentre * 0.03) / 0.3, 0, 1);
+            const lit = index === centre ? Math.max(0.5, reveal) : reveal;
+            material.color.setScalar(0.22 + lit * 0.78);
         });
     });
 
@@ -166,7 +166,7 @@ function Rig({ progress }: { progress: MotionValue<number> }) {
         const target = new THREE.Vector3(
             Math.sin(p * Math.PI) * 0.9,
             THREE.MathUtils.lerp(2.3, 1.15, eased),
-            THREE.MathUtils.lerp(PROJECTOR_Z + 3.2, WALL_Z + 5.2, eased),
+            THREE.MathUtils.lerp(PROJECTOR_Z + 3.2, WALL_Z + 6.5, eased),
         );
         const ease = 1 - Math.pow(0.001, delta);
         camera.position.lerp(target, ease);
@@ -195,9 +195,8 @@ function Projector() {
 export default function ProjectorIntro({ movies, progress, className, lite = false }: { movies: WallMovie[]; progress: MotionValue<number>; className?: string; lite?: boolean }) {
     return (
         <div className={className}>
-            <Canvas dpr={lite ? [1, 1.25] : [1, 1.75]} camera={{ position: [0, 2.3, PROJECTOR_Z + 3.2], fov: 50 }} gl={{ antialias: !lite, powerPreference: 'high-performance' }}>
-                <color attach="background" args={['#050505']} />
-                <fog attach="fog" args={['#050505', 8, 26]} />
+            <Canvas dpr={lite ? [1, 1.25] : [1, 1.75]} camera={{ position: [0, 2.3, PROJECTOR_Z + 3.2], fov: 50 }} gl={{ antialias: !lite, alpha: true, powerPreference: 'high-performance' }}>
+                <fog attach="fog" args={['#050505', 12, 40]} />
                 <ambientLight intensity={0.25} />
                 <pointLight position={[0, 1.1, PROJECTOR_Z]} intensity={6} distance={6} color="#fff4d6" />
                 <Projector />

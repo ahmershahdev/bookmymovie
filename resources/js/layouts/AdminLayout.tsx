@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import ProgressBar from '@/components/shell/ProgressBar';
 import ScrollIndicator from '@/components/shell/ScrollIndicator';
@@ -8,17 +8,19 @@ import { Alert } from '@/components/ui';
 import { Meta } from '@/layouts/SiteLayout';
 import { cn, route, useShared } from '@/lib/utils';
 
+/** Grouped by the job at hand, so the list reads as "what do I need to do?". */
 export const ADMIN_NAV = [
-    { label: 'Overview', icon: 'grid', route: 'admin.dashboard', match: '/admin/dashboard', need: 'view' },
-    { label: 'Revenue & occupancy', icon: 'chart', route: 'admin.analytics', match: '/admin/analytics', need: 'view' },
-    { label: 'Movies & shows', icon: 'film', route: 'admin.dashboard', hash: '#movies', match: '/admin/dashboard/movies', need: 'manage' },
-    { label: 'Coupons, stock & sales', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce', need: 'manage' },
-    { label: 'Members & bans', icon: 'user', route: 'admin.users', match: '/admin/users', need: 'view' },
-    { label: 'Reviews', icon: 'star', route: 'admin.reviews', match: '/admin/reviews', need: 'view' },
-    { label: 'Bookings & refunds', icon: 'ticket', route: 'admin.activity', match: '/admin/activity', need: 'view' },
-    { label: 'Staff & roles', icon: 'shield', route: 'admin.staff', match: '/admin/staff', need: 'own' },
-    { label: 'Site & brand', icon: 'settings', route: 'admin.settings', match: '/admin/settings', need: 'own' },
-    { label: 'My security', icon: 'lock', route: 'admin.security', match: '/admin/security', need: 'view' },
+    { group: 'Today', label: 'Overview', hint: 'Sales, shows and alerts at a glance', icon: 'grid', route: 'admin.dashboard', match: '/admin/dashboard', need: 'view' },
+    { group: 'Today', label: 'Bookings & refunds', hint: 'Find a booking, refund it, issue gift cards', icon: 'ticket', route: 'admin.activity', match: '/admin/activity', need: 'view' },
+    { group: 'Catalogue', label: 'Movies & shows', hint: 'Add or edit films, artwork and showtimes', icon: 'film', route: 'admin.movies', match: '/admin/movies', need: 'manage' },
+    { group: 'Catalogue', label: 'Coupons, stock & sales', hint: 'Offers, snack stock, ticket sales on/off', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce', need: 'manage' },
+    { group: 'Catalogue', label: 'Reviews', hint: 'Approve, hide or flag reviews', icon: 'star', route: 'admin.reviews', match: '/admin/reviews', need: 'view' },
+    { group: 'People', label: 'Members & bans', hint: 'Look up customers, block abuse', icon: 'user', route: 'admin.users', match: '/admin/users', need: 'view' },
+    { group: 'People', label: 'Staff & roles', hint: 'Who can use this back office', icon: 'shield', route: 'admin.staff', match: '/admin/staff', need: 'own' },
+    { group: 'Reports', label: 'Revenue & occupancy', hint: 'Money and seats filled over time', icon: 'chart', route: 'admin.analytics', match: '/admin/analytics', need: 'view' },
+    { group: 'Settings', label: 'Site & brand', hint: 'Name, logo, contact details, social links', icon: 'settings', route: 'admin.settings', match: '/admin/settings', need: 'own' },
+    { group: 'Settings', label: 'SEO & broadcasts', hint: 'Page titles, ticker, site-wide notices', icon: 'megaphone', route: 'admin.content', match: '/admin/content', need: 'own' },
+    { group: 'Settings', label: 'My security', hint: 'Your password and two-step sign-in', icon: 'lock', route: 'admin.security', match: '/admin/security', need: 'view' },
 ] as const;
 
 /** Read-only notice for the public demo admin. */
@@ -59,15 +61,23 @@ export function AdminSidebar({ children }: { children?: ReactNode }) {
                     </Link>
                 </div>
             )}
-            <nav className="no-scrollbar mt-5 flex gap-1 overflow-x-auto lg:flex-1 lg:flex-col lg:overflow-y-auto" data-lenis-prevent aria-label="Admin">
-                {visible.map((item) => {
+            <nav className="no-scrollbar mt-5 flex gap-1 overflow-x-auto lg:flex-1 lg:flex-col lg:gap-0 lg:overflow-y-auto" data-lenis-prevent aria-label="Admin">
+                {visible.map((item, index) => {
                     const active = item.match === '/admin/dashboard' ? path === '/admin/dashboard' : path.startsWith(item.match);
+                    const firstOfGroup = index === 0 || visible[index - 1].group !== item.group;
                     return (
-                        <Link key={item.label} href={route(item.route) + ('hash' in item ? item.hash : '')} aria-current={active ? 'page' : undefined}
-                            className={cn('flex shrink-0 items-center gap-3 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[.08em] transition [font-stretch:115%]',
-                                active ? 'bg-volt text-noir' : 'text-mute hover:bg-ink-3 hover:text-paper')}>
-                            <Icon name={item.icon} size={16} /> {item.label}
-                        </Link>
+                        <div key={item.label} className="contents">
+                            {firstOfGroup && <p className={cn('label hidden px-3 pb-1.5 text-[10px] text-dim lg:block', index > 0 && 'mt-4')}>{item.group}</p>}
+                            <Link href={route(item.route)} aria-current={active ? 'page' : undefined} title={item.hint}
+                                className={cn('group flex min-h-11 shrink-0 items-center gap-3 border-l-2 px-3 py-2 transition lg:mb-0.5',
+                                    active ? 'border-noir bg-volt text-noir' : 'border-transparent text-paper-2 hover:border-line-2 hover:bg-ink-3 hover:text-paper')}>
+                                <Icon name={item.icon} size={16} className={active ? '' : 'text-mute group-hover:text-accent'} />
+                                <span className="min-w-0">
+                                    <span className="block text-[12px] font-semibold uppercase tracking-[.06em] [font-stretch:112%]">{item.label}</span>
+                                    <span className={cn('hidden truncate text-[11px] normal-case lg:block', active ? 'text-noir/70' : 'text-mute')}>{item.hint}</span>
+                                </span>
+                            </Link>
+                        </div>
                     );
                 })}
             </nav>
@@ -79,7 +89,50 @@ export function AdminSidebar({ children }: { children?: ReactNode }) {
     );
 }
 
-export default function AdminLayout({ title, label, lede, actions, children }: { title: string; label: string; lede?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+export type GuideStep = [title: string, detail: ReactNode];
+
+/**
+ * "How this page works": numbered steps every admin screen opens with.
+ * Collapsed state is remembered per page, so regulars can tuck it away.
+ */
+export function Guide({ id, steps, tip }: { id: string; steps: GuideStep[]; tip?: ReactNode }) {
+    const key = `admin-guide:${id}`;
+    const [open, setOpen] = useState(() => {
+        try { return window.localStorage.getItem(key) !== 'closed'; } catch { return true; }
+    });
+    const toggle = () => {
+        setOpen(!open);
+        try { window.localStorage.setItem(key, open ? 'closed' : 'open'); } catch { /* storage blocked */ }
+    };
+
+    return (
+        <section className="guide border border-line bg-ink-2" aria-label="How this page works">
+            <button type="button" onClick={toggle} aria-expanded={open} className="flex w-full items-center justify-between gap-4 px-5 py-3.5 text-left">
+                <span className="flex items-center gap-3">
+                    <span className="grid h-7 w-7 place-items-center bg-volt text-noir"><Icon name="info" size={14} /></span>
+                    <span className="label text-paper">How this page works</span>
+                    <span className="hidden text-xs text-mute sm:inline">{open ? 'Tap to hide' : `Show ${steps.length} steps`}</span>
+                </span>
+                <Icon name="chevron-down" size={16} className={cn('text-mute transition-transform', open && 'rotate-180')} />
+            </button>
+            {open && (
+                <div className="border-t border-line px-5 pb-5 pt-4">
+                    <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {steps.map(([title, detail], index) => (
+                            <li key={title} className="flex gap-3">
+                                <span className="num grid h-6 w-6 shrink-0 place-items-center border border-line-2 text-[11px] text-accent">{index + 1}</span>
+                                <span><span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs leading-relaxed text-mute">{detail}</span></span>
+                            </li>
+                        ))}
+                    </ol>
+                    {tip && <p className="mt-4 flex items-start gap-2 border-t border-line pt-3 text-xs text-paper-2"><Icon name="sparkle" size={13} className="mt-0.5 shrink-0 text-accent" /> <span>{tip}</span></p>}
+                </div>
+            )}
+        </section>
+    );
+}
+
+export default function AdminLayout({ title, label, lede, actions, guide, children }: { title: string; label: string; lede?: ReactNode; actions?: ReactNode; guide?: ReactNode; children: ReactNode }) {
     const { errors } = useShared();
     const firstError = Object.values(errors)[0];
 
@@ -87,18 +140,19 @@ export default function AdminLayout({ title, label, lede, actions, children }: {
         <>
             <Meta />
             <ProgressBar />
-            <div className="min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
+            <div className="min-h-screen lg:grid lg:grid-cols-[18rem_1fr]">
                 <AdminSidebar />
-                <main id="main" className="min-w-0 space-y-8 p-4 sm:p-6 lg:p-10">
-                    <header className="grid gap-6 border-b border-line pb-8 xl:grid-cols-[1fr_auto] xl:items-end">
-                        <div>
+                <main id="main" className="min-w-0 space-y-6 p-4 sm:p-6 lg:p-10">
+                    <header className="grid gap-5 border-b border-line pb-6 xl:grid-cols-[1fr_auto] xl:items-end">
+                        <div className="min-w-0">
                             <p className="label label-accent">{label}</p>
-                            <h1 className="display mt-3 text-[clamp(3rem,6vw,5.5rem)]">{title}</h1>
-                            {lede && <p className="mt-3 max-w-2xl text-sm text-mute">{lede}</p>}
+                            <h1 className="display mt-2 text-[clamp(2.25rem,4.5vw,3.75rem)]">{title}</h1>
+                            {lede && <p className="mt-2 max-w-3xl text-[0.9375rem] leading-relaxed text-paper-2">{lede}</p>}
                         </div>
-                        {actions}
+                        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
                     </header>
                     <DemoBanner />
+                    {guide}
                     {firstError && <Alert tone="error">{firstError}</Alert>}
                     {children}
                 </main>

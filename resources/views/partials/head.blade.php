@@ -19,7 +19,9 @@
         ?: ($siteSettings['default_meta_description'] ?? 'Book cinema tickets online with live seat maps and honest prices.');
     $pageDescription = Seo::description(html_entity_decode($descriptionSource, ENT_QUOTES));
 
-    $privateRoute = request()->routeIs('user.*', 'admin.*', 'password.*', 'movies.seats', 'oauth.*', 'payments.*');
+    // Sign in and create account are public entry points and may be indexed.
+    $privateRoute = request()->routeIs('user.*', 'admin.*', 'password.*', 'movies.seats', 'oauth.*', 'payments.*')
+        && ! request()->routeIs('user.login', 'user.register');
     $robots = $seo['robots'] ?? ($privateRoute ? 'noindex, nofollow' : (request()->routeIs('search') ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1'));
 
     $page = (int) request()->query('page', 1);
@@ -71,7 +73,10 @@
 <link rel="manifest" href="{{ asset('images/site.webmanifest') }}">
 <link rel="sitemap" type="application/xml" href="{{ asset('sitemap.xml') }}">
 <meta name="theme-color" content="#0a0a0a">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="dark light">
+@if (! empty($seo['preload']['href']))
+<link rel="preload" as="image" href="{{ $seo['preload']['href'] }}" @if (! empty($seo['preload']['srcset'])) imagesrcset="{{ $seo['preload']['srcset'] }}" imagesizes="{{ $seo['preload']['sizes'] }}" @endif fetchpriority="high">
+@endif
 
 <script type="application/ld+json" nonce="{{ $cspNonce ?? '' }}">{!! $schemaGraph !!}</script>
 @stack('head')

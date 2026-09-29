@@ -13,7 +13,10 @@ use Illuminate\Validation\ValidationException;
  *  2. Fill time - a form submitted faster than a human can type is rejected.
  *  3. Image code - a server-rendered, distorted PNG; the answer never appears
  *     in the DOM, only its salted hash lives in the session (single use).
- *  4. Google reCAPTCHA v2 checkbox and v3 risk score, when keys are set.
+ *  4. Google reCAPTCHA, when keys are set. Only one Google check is ever
+ *     shown: with a v3 key, v3 runs invisibly on every submit and the v2
+ *     checkbox appears only as a step-up after v3 returns a low score (or
+ *     fails to load). With only a v2 key, the checkbox is always shown.
  */
 class FormSecurity
 {
@@ -66,8 +69,42 @@ class FormSecurity
             return;
         }
 
-        self::validateRecaptchaV2($request, $action);
+        if (! self::usesV3()) {
+            self::validateRecaptchaV2($request, $action);
+
+            return;
+        }
+
+        // Step-up: this visitor was shown the checkbox, so the checkbox decides.
+        if ($request->session()->get(self::stepUpKey($action)) && config('services.recaptcha.v2_secret_key')) {
+            self::validateRecaptchaV2($request, $action);
+            $request->session()->forget(self::stepUpKey($action));
+
+            return;
+        }
+
         self::validateRecaptchaV3($request, $action);
+    }
+
+    private static function usesV3(): bool
+    {
+        return (bool) (config('services.recaptcha.v3_site_key') && config('services.recaptcha.v3_secret_key'));
+    }
+
+    private static function stepUpKey(string $action): string
+    {
+        return 'recaptcha_step_up.'.$action;
+    }
+
+    /** v3 was unsure: ask for the checkbox next time, if a v2 key exists. */
+    private static function stepUp(Request $request, string $action, string $message): never
+    {
+        if (config('services.recaptcha.v2_site_key') && config('services.recaptcha.v2_secret_key')) {
+            $request->session()->put(self::stepUpKey($action), true);
+            self::fail('One more check: please tick “I’m not a robot” and send again.');
+        }
+
+        self::fail($message);
     }
 
     /**
@@ -100,12 +137,15 @@ class FormSecurity
     public static function forPage(string $action): array
     {
         $skipGoogle = self::shouldSkipGoogleRecaptcha(request());
+        $v3 = ! $skipGoogle && self::usesV3();
+        // With v3 on, the checkbox only appears for a step-up (see stepUp()).
+        $showV2 = ! $skipGoogle && (! $v3 || session()->get(self::stepUpKey($action)));
 
         return [
             'action' => $action,
             ...self::customCaptchaChallenge($action),
-            'v2_site_key' => $skipGoogle ? null : (config('services.recaptcha.v2_site_key') ?: null),
-            'v3_site_key' => $skipGoogle ? null : (config('services.recaptcha.v3_site_key') ?: null),
+            'v2_site_key' => $showV2 ? (config('services.recaptcha.v2_site_key') ?: null) : null,
+            'v3_site_key' => $v3 ? config('services.recaptcha.v3_site_key') : null,
         ];
     }
 
@@ -197,7 +237,7 @@ class FormSecurity
         $token = (string) $request->input('recaptcha_v3_token');
 
         if ($token === '') {
-            self::fail('The background security check did not load. Please refresh and try again.');
+            self::stepUp($request, $action, 'The background security check did not load. Please refresh and try again.');
         }
 
         $payload = self::verifyWithGoogle($secret, $token, $request);
@@ -217,7 +257,7 @@ class FormSecurity
                 'reported_action' => $payload['action'] ?? null,
             ]);
 
-            self::fail('Our automated check was not sure you are human. Please try again.');
+            self::stepUp($request, $action, 'Our automated check was not sure you are human. Please try again.');
         }
     }
 

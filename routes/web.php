@@ -39,6 +39,8 @@ Route::get('/movies/{slug}', [MovieController::class, 'show'])->where('slug', '[
 Route::get('/u/{username}', [\App\Http\Controllers\ProfileController::class, 'show'])->where('username', '[a-z0-9_]{3,30}')->name('profile.show');
 Route::get('/movies/{slug}/reviews', [MovieController::class, 'reviews'])->where('slug', '[a-z0-9-]+')->name('movies.reviews')->middleware('throttle:60,1');
 Route::get('/movies/{slug}/book/{show}', [MovieController::class, 'seats'])->whereNumber('show')->name('movies.seats');
+// Old or hand-typed seat links (/movies/{slug}/{show}) land on the seat map instead of a 404.
+Route::permanentRedirect('/movies/{slug}/{show}', '/movies/{slug}/book/{show}')->where('slug', '[a-z0-9-]+')->whereNumber('show');
 Route::get('/compare', [PublicController::class, 'compare'])->name('movies.compare');
 Route::get('/search/{query?}', [PublicController::class, 'search'])->where('query', '[^/]{1,120}')->middleware('throttle:search')->name('search');
 
@@ -125,8 +127,10 @@ Route::prefix('admin')->middleware([\App\Http\Middleware\BlockDemoAdminWrites::c
     Route::post('/register', [AuthController::class, 'adminRegister'])->middleware('throttle:admin-login');
     Route::post('/logout', [AuthController::class, 'adminLogout'])->name('admin.logout');
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::get('/dashboard/movies/{movie}', [AdminController::class, 'dashboard'])->whereNumber('movie')->name('admin.dashboard.movie');
+    Route::get('/dashboard/movies/{movie}', fn (int $movie) => redirect()->route('admin.movies', $movie))->whereNumber('movie');
     Route::post('/dashboard', [AdminController::class, 'handleDashboard'])->middleware('throttle:30,1');
+    Route::get('/movies/{movie?}', [AdminController::class, 'movies'])->whereNumber('movie')->name('admin.movies');
+    Route::get('/content', [AdminController::class, 'content'])->name('admin.content');
 
     Route::get('/activity', [AdminOperationsController::class, 'activity'])->name('admin.activity');
     Route::get('/users', [AdminPortalController::class, 'users'])->name('admin.users');

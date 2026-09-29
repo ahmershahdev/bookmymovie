@@ -100,7 +100,7 @@ class PublicController extends Controller
         ], [
             'title' => 'Compare Films Side by Side | BookMyMovie',
             'description' => 'Compare up to four films by rating, runtime, certificate, language and ticket price before you choose a showtime.',
-            'robots' => 'noindex, follow',
+            // The bare page is indexable; ?ids= variants are kept out by the canonical and robots.txt.
         ]);
     }
 

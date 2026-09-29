@@ -74,7 +74,7 @@ export default function Page({ page, related }: { page: ContentPage; related: { 
                     {related.length > 0 && (
                         <nav className="mt-16" aria-label="Related pages">
                             <p className="label">Related</p>
-                            <ul className="grid-lines mt-4 sm:grid-cols-2">
+                            <ul className="grid-lines grid-fill-odd mt-4 sm:grid-cols-2">
                                 {related.map((item) => (
                                     <li key={item.url}>
                                         <Link href={item.url} className="group flex items-center justify-between px-5 py-4 transition-colors hover:bg-volt hover:text-noir">

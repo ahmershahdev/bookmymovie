@@ -25,7 +25,7 @@ class SiteSetting extends Model
         'logo_path' => null,
         'support_email' => 'support@ahmershah.dev',
         'support_phone' => '+92 370 4831994',
-        'contact_address' => 'Lahore, Pakistan',
+        'contact_address' => 'Hyderabad, Pakistan',
         'social_website' => 'https://ahmershah.dev/',
         'social_github' => 'https://github.com/ahmershahdev',
         'social_linkedin' => 'https://linkedin.com/in/syedahmershah',

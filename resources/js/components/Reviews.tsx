@@ -170,7 +170,7 @@ export default function ReviewsSection({ movie, initial, summary, canReview, use
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
                         <div className="flex flex-wrap gap-1" role="group" aria-label="Sort reviews">
                             {SORTS.map(([key, label]) => (
-                                <button key={key} type="button" onClick={() => setSort(key)} aria-pressed={sort === key} className={cn('chip', sort === key && '!border-accent !text-accent')}>{label}</button>
+                                <button key={key} type="button" onClick={() => setSort(key)} aria-pressed={sort === key} className={'chip'}>{label}</button>
                             ))}
                         </div>
                         <label className="flex cursor-pointer items-center gap-2 text-sm text-mute">

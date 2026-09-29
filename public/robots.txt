@@ -9,14 +9,11 @@ Disallow: /account
 Disallow: /cart
 Disallow: /checkout
 Disallow: /payments/
-Disallow: /login
-Disallow: /register
 Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /auth/
 Disallow: /search/
-Disallow: /compare
 Disallow: /*/book/
 Disallow: /*?
 

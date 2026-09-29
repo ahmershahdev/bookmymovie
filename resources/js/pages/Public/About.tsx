@@ -24,7 +24,7 @@ export default function About({ page, stats }: { page: ContentPage; stats: { fil
                     <dl className="grid-lines grid-cols-2 lg:grid-cols-4">
                         {([[stats.films, 'films on the slate'], [stats.cinemas, 'partner cinemas'], [stats.screens, 'screens'], [stats.seats, 'seats on the map']] as [number, string][]).map(([value, label]) => (
                             <div key={label} className="px-5 py-12">
-                                <dd><CountUp value={value} className="display block text-8xl tabular" /></dd>
+                                <dd><CountUp value={value} className="display block text-[clamp(3rem,14vw,6rem)] tabular" /></dd>
                                 <dt className="label mt-3">{label}</dt>
                             </div>
                         ))}
@@ -49,7 +49,7 @@ export default function About({ page, stats }: { page: ContentPage; stats: { fil
                         <div className="lg:col-span-8">
                             {section.body && <Reveal><p className="prose-body">{section.body}</p></Reveal>}
                             {section.items.length > 0 && (
-                                <ol className="grid-lines mt-6 sm:grid-cols-2">
+                                <ol className="grid-lines grid-fill-odd mt-6 sm:grid-cols-2">
                                     {section.items.map((item, index) => (
                                         <Reveal as="li" key={item} delay={index * 80} className="p-7">
                                             <span className="num text-xs text-accent">{pad(index + 1)}</span>

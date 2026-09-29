@@ -127,6 +127,7 @@ class AdminStaffController extends AdminController
             'recoveryCodes' => $request->session()->pull('admin_2fa_codes'),
             'codesLeft' => count((array) $admin->two_factor_recovery_codes),
             'role' => $admin->roleLabel(),
+            'profile' => ['name' => $admin->name, 'email' => $admin->email],
         ], ['title' => 'Security | Admin', 'description' => 'Two-step sign-in.', 'robots' => 'noindex, nofollow']);
     }
 

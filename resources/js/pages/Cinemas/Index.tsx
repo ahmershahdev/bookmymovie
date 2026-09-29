@@ -32,17 +32,17 @@ export default function CinemasIndex({ cities, totals }: Props) {
 
             {cities.map((city) => (
                 <section key={city.slug} id={`city-${city.slug}`} className="scroll-mt-24 pt-24" aria-labelledby={`city-title-${city.slug}`}>
-                    <div className="shell grid gap-10 lg:grid-cols-12">
-                        <div className="lg:col-span-3">
+                    <div className="shell grid grid-cols-1 gap-10 lg:grid-cols-12">
+                        <div className="min-w-0 lg:col-span-3">
                             <p className="label">{city.province}</p>
-                            <h2 id={`city-title-${city.slug}`} className="display mt-3 text-8xl">{city.name}</h2>
+                            <h2 id={`city-title-${city.slug}`} className="display mt-3 text-[clamp(3rem,13vw,6rem)] [overflow-wrap:anywhere]">{city.name}</h2>
                             <p className="mt-3 text-sm text-mute">{plural(city.cinemas.length, 'cinema')}</p>
                         </div>
-                        <div className="grid-lines md:grid-cols-2 lg:col-span-9">
+                        <div className="grid-lines grid-fill-odd min-w-0 md:grid-cols-2 lg:col-span-9">
                             {city.cinemas.map((cinema, index) => (
-                                <Reveal as="article" key={cinema.slug} delay={index * 80} className="group flex flex-col p-7 sm:p-8">
+                                <Reveal as="article" key={cinema.slug} delay={index * 80} className="group flex min-w-0 flex-col p-5 sm:p-8">
                                     <div className="flex items-start justify-between gap-4">
-                                        <h3 className="headline text-4xl"><Link href={route('cinemas.show', cinema.slug)} className="link">{cinema.name}</Link></h3>
+                                        <h3 className="headline min-w-0 text-3xl [overflow-wrap:anywhere] sm:text-4xl"><Link href={route('cinemas.show', cinema.slug)} className="link">{cinema.name}</Link></h3>
                                         <span className={cn('tag shrink-0', cinema.today > 0 && 'tag-mint')}>{cinema.today} today</span>
                                     </div>
                                     <p className="mt-4 flex items-start gap-2 text-sm text-mute"><Icon name="pin" size={16} className="mt-0.5 text-dim" /> {cinema.address}</p>

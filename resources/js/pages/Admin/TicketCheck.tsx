@@ -55,7 +55,7 @@ export default function TicketCheck({ number, signature, verdict, tone, detail, 
                 {errors.admit && <Alert tone="error">{errors.admit}</Alert>}
 
                 {booking && (
-                    <dl className="grid-lines sm:grid-cols-2">
+                    <dl className="grid-lines grid-fill-odd sm:grid-cols-2">
                         {[
                             ['Film', booking.film],
                             ['Guest', booking.customer ?? '—'],
@@ -75,7 +75,7 @@ export default function TicketCheck({ number, signature, verdict, tone, detail, 
                 )}
 
                 {canAdmit && (
-                    <button type="button" disabled={form.processing} onClick={() => form.post(route('admin.tickets.admit', { number, signature }), { preserveScroll: true })}
+                    <button type="button" disabled={form.processing} aria-busy={form.processing} onClick={() => form.post(route('admin.tickets.admit', { number, signature }), { preserveScroll: true })}
                         className="btn btn-primary btn-lg w-full">
                         <Icon name="check" size={18} /> {form.processing ? 'Admitting…' : booking?.paid ? 'Admit guests' : `Take ${money(booking?.total ?? 0)} and admit`}
                     </button>

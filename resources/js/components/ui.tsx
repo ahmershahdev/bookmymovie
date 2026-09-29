@@ -21,13 +21,13 @@ export function Breadcrumbs({ items, className }: { items?: Crumb[]; className?:
     const fold = crumbs.length > 3 && !unfolded;
 
     return (
-        <nav aria-label="Breadcrumb" className={cn('no-scrollbar overflow-x-auto', className)}>
-            <ol className="flex w-max items-center gap-1 text-[11px] font-semibold uppercase tracking-[.1em] text-mute [font-stretch:115%]">
+        <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
+            <ol className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1.5 text-[10px] font-semibold uppercase tracking-[.1em] text-mute [font-stretch:115%] sm:text-[11px]">
                 {crumbs.map((item, index) => {
                     const last = index === crumbs.length - 1;
                     const hiddenOnMobile = fold && index > 0 && index < crumbs.length - 2;
                     return (
-                        <motion.li key={`${item.label}-${index}`} className={cn('flex items-center gap-1', hiddenOnMobile && 'max-sm:hidden')}
+                        <motion.li key={`${item.label}-${index}`} className={cn('flex min-w-0 items-center gap-1', last && 'max-w-full', hiddenOnMobile && 'max-sm:hidden')}
                             initial={reduce ? false : { opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.08 * index, ease: [0.16, 1, 0.3, 1] }}>
                             {index > 0 && (
                                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="text-dim rtl:rotate-180">
@@ -35,15 +35,15 @@ export function Breadcrumbs({ items, className }: { items?: Crumb[]; className?:
                                 </svg>
                             )}
                             {index === 1 && fold && (
-                                <button type="button" onClick={() => setUnfolded(true)} className="px-2 py-1 text-dim hover:text-paper sm:hidden" aria-label="Show the full path">…</button>
+                                <button type="button" onClick={() => setUnfolded(true)} className="min-h-6 min-w-6 px-2 py-1 text-mute hover:text-paper sm:hidden" aria-label="Show the full path">…</button>
                             )}
                             {last ? (
-                                <span aria-current="page" className="flex items-center gap-2 bg-ink-3 px-2.5 py-1.5 text-paper">
-                                    <span className="h-1.5 w-1.5 bg-volt" aria-hidden="true" />
-                                    <span className="max-w-[14rem] truncate">{item.label}</span>
+                                <span aria-current="page" className="flex min-w-0 max-w-full items-center gap-2 bg-ink-3 px-2.5 py-1.5 text-paper">
+                                    <span className="h-1.5 w-1.5 shrink-0 bg-volt" aria-hidden="true" />
+                                    <span className="min-w-0 max-w-[min(22rem,70vw)] truncate" title={item.label}>{item.label}</span>
                                 </span>
                             ) : item.url ? (
-                                <Link href={item.url} className="group relative flex items-center gap-1.5 px-2 py-1.5 transition-colors hover:text-paper">
+                                <Link href={item.url} className="group relative flex min-h-6 items-center gap-1.5 whitespace-nowrap px-2 py-1.5 transition-colors hover:text-paper">
                                     {index === 0 && <Icon name="film" size={13} className="text-accent" />}
                                     {item.label}
                                     <span className="absolute inset-x-2 bottom-0.5 h-px origin-left scale-x-0 bg-volt transition-transform duration-300 group-hover:scale-x-100" aria-hidden="true" />

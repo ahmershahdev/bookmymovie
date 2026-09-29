@@ -20,13 +20,13 @@ class AuthorizeAdminRole
     private const MAP = [
         'admin.login' => null, 'admin.logout' => null, 'admin.two-factor*' => null,
         'admin.credentials.*' => null, 'admin.register' => null,
-        'admin.staff*' => 'own', 'admin.settings*' => 'own',
+        'admin.staff*' => 'own', 'admin.settings*' => 'own', 'admin.content' => 'own',
         'admin.security*' => 'view',
         'admin.tickets.verify' => 'admit', 'admin.tickets.admit' => 'admit',
     ];
 
     /** Pages every role may open (GET only). */
-    private const VIEW_PAGES = ['admin.dashboard', 'admin.dashboard.movie', 'admin.activity', 'admin.users', 'admin.users.show', 'admin.reviews', 'admin.analytics'];
+    private const VIEW_PAGES = ['admin.dashboard', 'admin.movies','admin.activity', 'admin.users', 'admin.users.show', 'admin.reviews', 'admin.analytics'];
 
     public function handle(Request $request, Closure $next): Response
     {

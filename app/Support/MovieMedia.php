@@ -23,6 +23,7 @@ class MovieMedia
     /** Films with trailers lead the home carousel, in this order. */
     private const HERO_ORDER = [
         'the-last-cinema-on-empress-road',
+        'brass-monkeys',
         'the-quiet-meridian',
         'whistle-of-the-night-heron',
         'a-small-hour-of-grace',

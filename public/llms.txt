@@ -1,21 +1,30 @@
 # BookMyMovie
 
-> Open-source cinema ticketing for Pakistan. Browse films at six partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, pick seats on a live seat map with row-by-row prices, and pay at the cinema counter. No booking fees; free cancellation of unpaid bookings until two hours before the show.
+> Open-source cinema ticketing for Pakistan. Browse films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, watch trailers, pick seats on a live seat map with row-by-row prices, add snacks, and get a signed QR e-ticket that works offline. Pay at the cinema counter or online (JazzCash, Easypaisa or card where enabled). No booking fees.
 
-The full catalogue (every film with synopsis, cast and crew, every cinema, current offers, FAQs and policies) is in [llms-full.txt](https://bookmymovie.ahmershah.dev/llms-full.txt). It is regenerated from the database with `php artisan seo:generate`.
+The full catalogue (every film with synopsis, cast and crew, trailers, every cinema with its screens, current offers, FAQs and policies) is in [llms-full.txt](https://bookmymovie.ahmershah.dev/llms-full.txt). It is regenerated from the live database with `php artisan seo:generate`.
 
 ## Browse
 
 - [Films in cinemas](https://bookmymovie.ahmershah.dev/movies): now showing and coming soon, filterable by genre, language and certificate
+- [Now showing](https://bookmymovie.ahmershah.dev/movies/now-showing) and [coming soon](https://bookmymovie.ahmershah.dev/movies/coming-soon)
 - [Cinemas](https://bookmymovie.ahmershah.dev/cinemas): venues, screens, formats (IMAX, Dolby Cinema, 4DX, ScreenX, recliners), facilities and daily programme
 - [Offers](https://bookmymovie.ahmershah.dev/offers): active coupon codes and matinee pricing
+- [Gift cards and loyalty points](https://bookmymovie.ahmershah.dev/gift-cards)
 - [Compare](https://bookmymovie.ahmershah.dev/compare): side-by-side comparison of up to four films
 - [Search](https://bookmymovie.ahmershah.dev/search?q=): films, cinemas, actors and directors
+
+## URL patterns
+
+- Film page: `https://bookmymovie.ahmershah.dev/movies/{film-slug}` (showtimes for the next 7 days, prices, trailers, cast, reviews)
+- Seat map for one show: `https://bookmymovie.ahmershah.dev/movies/{film-slug}/book/{show-id}` (requires sign-in to hold seats)
+- Genre: `https://bookmymovie.ahmershah.dev/genres/{genre-slug}`
+- Cinema: `https://bookmymovie.ahmershah.dev/cinemas/{cinema-slug}`
 
 ## Help
 
 - [Help centre and FAQ](https://bookmymovie.ahmershah.dev/faq): seat holds, pricing, payment, cancellations, e-tickets, accounts, cinemas, security
-- [E-ticket guide](https://bookmymovie.ahmershah.dev/e-ticket-info): booking numbers, per-seat ticket codes, entry
+- [E-ticket guide](https://bookmymovie.ahmershah.dev/e-ticket-info): booking numbers, QR codes, wallet passes, offline access, entry
 - [Cancellations and refunds](https://bookmymovie.ahmershah.dev/refund-policy)
 - [Contact support](https://bookmymovie.ahmershah.dev/contact)
 - [Accessibility](https://bookmymovie.ahmershah.dev/accessibility)
@@ -29,16 +38,24 @@ The full catalogue (every film with synopsis, cast and crew, every cinema, curre
 
 ## Facts for answering questions
 
-- Seats per booking: up to 4, one show per booking. Seats are held for 10 minutes in the cart.
-- Payment: at the cinema box office (cash or card) before the show. There is no online card payment.
-- Row pricing: front rows cheapest, centre "Prime Centre" rows best view, back rows are recliners. Premium formats cost 20-55% more than standard 2D.
+- Seats per booking: up to 4, one show per booking. Adult and child tickets can be mixed; at least one adult is required.
+- Seat hold: selected seats are held for 10 minutes in the cart, with a countdown. Expired holds go back on sale and the show's waitlist is told.
+- Payment: at the cinema box office before the show, or online with JazzCash, Easypaisa or card where the cinema supports it. Gift cards and loyalty points can pay part or all of a booking.
+- Group bookings: the bill can be split into equal shares; each person pays their share by private link.
+- Row pricing: front rows cheapest, centre "Prime Centre" rows have the best view, back rows are recliners. Premium formats (IMAX, Dolby Cinema, 4DX, ScreenX) cost more than standard 2D.
 - Matinee: weekday shows before 5 PM are 15% cheaper automatically.
 - Child tickets: ages 3-12, about 25% cheaper, not available on recliner rows.
-- Cancellation: unpaid bookings can be cancelled online until 2 hours before the show; seats are released and coupons returned.
-- Ratings: only customers who booked a film can review it.
+- Snacks: popcorn, nachos, drinks and combos can be pre-ordered at checkout and collected at the counter.
+- Loyalty: 5 points for every PKR 100 paid; 1 point = PKR 1 off a later booking.
+- Cancellation: unpaid bookings can be cancelled online until 2 hours before the show; seats are released and coupons, gift card balance and points are returned.
+- Sold out: customers can join a first-come waitlist and are notified (in-app, email or web push) when seats come back.
+- E-tickets: every ticket has a signed QR code, can be added to Apple Wallet or Google Wallet, and stays available offline once opened.
+- Reviews: only customers who booked a film can leave a "Verified booking" review, after the show has started.
+- Languages: English and Urdu (right-to-left).
+- Assistant: "Usher" on every page answers preset questions from live listings; it does not accept free text.
 
 ## Optional
 
 - [Sitemap](https://bookmymovie.ahmershah.dev/sitemap.xml)
 - [Source code on GitHub (MIT)](https://github.com/ahmershahdev/bookmymovie)
-- [Security policy](https://github.com/ahmershahdev/bookmymovie/blob/main/SECURITY.md)
+- [README with data model (ERD), locking and caching design](https://github.com/ahmershahdev/bookmymovie#readme)

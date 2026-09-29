@@ -2,7 +2,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import Icon from '@/components/Icon';
 import { Checkbox, Field, Select } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, money, route } from '@/lib/utils';
 
 type Coupon = {
@@ -24,7 +24,13 @@ export default function AdminCommerce({ coupons, snacks, films }: { coupons: Cou
     const paused = films.filter((film) => !film.bookings).length;
 
     return (
-        <AdminLayout label="Commerce" title="Coupons, stock & sales" lede="Run offers, keep the snack counter stocked and switch ticket sales on or off per film. Limits are enforced at checkout with atomic updates, so a rush can never oversell.">
+        <AdminLayout label="Commerce" title="Coupons, stock & sales" lede="Run offers, keep the snack counter stocked and switch ticket sales on or off per film. Limits are enforced at checkout with atomic updates, so a rush can never oversell."
+            guide={<Guide id="commerce" steps={[
+                ['Create a coupon', 'Give it a code, a percentage or fixed amount, and a total use limit. Customers type the code at checkout.'],
+                ['Pause instead of deleting', 'The switch stops a coupon at once but keeps its history and totals.'],
+                ['Set snack stock', 'Enter how many are left. Pre-orders stop by themselves at zero and warn you when stock is low.'],
+                ['Control ticket sales', 'Turn sales off for a film to stop new bookings without hiding the film.'],
+            ]} />}>
             <div className="grid-lines grid-cols-2 lg:grid-cols-4">
                 {[['Live coupons', live], ['Discount given', money(coupons.reduce((sum, coupon) => sum + coupon.given, 0))], ['Low-stock snacks', low], ['Films with sales paused', paused]].map(([label, value]) => (
                     <div key={label} className="p-6"><p className="label">{label}</p><p className="display mt-3 text-4xl sm:text-5xl">{value}</p></div>
@@ -116,16 +122,16 @@ function CouponForm({ coupon, onDone }: { coupon: Coupon | null; onDone: () => v
             <Field label="Description" value={form.data.description} onChange={(event) => form.setData('description', event.target.value)} error={errors.description} maxLength={255} placeholder="Shown on the offers page" />
             <div className="grid grid-cols-2 gap-3">
                 <Select label="Type" value={form.data.type} onChange={(event) => form.setData('type', event.target.value as 'percentage' | 'fixed')} options={[['percentage', 'Percent off'], ['fixed', 'Fixed PKR off']]} />
-                <Field label={form.data.type === 'percentage' ? 'Percent' : 'Amount (PKR)'} type="number" min={1} max={form.data.type === 'percentage' ? 100 : 100000} value={form.data.value} onChange={(event) => form.setData('value', event.target.value)} error={errors.value} required />
+                <Field label={form.data.type === 'percentage' ? 'Percent' : 'Amount (PKR)'} placeholder={form.data.type === 'percentage' ? 'e.g. 15' : 'e.g. 300'} type="number" min={1} max={form.data.type === 'percentage' ? 100 : 100000} value={form.data.value} onChange={(event) => form.setData('value', event.target.value)} error={errors.value} required />
                 <Field label="Max discount (PKR)" type="number" min={1} value={form.data.cap} onChange={(event) => form.setData('cap', event.target.value)} error={errors.cap} placeholder="No cap" />
                 <Field label="Min order (PKR)" type="number" min={0} value={form.data.min_order} onChange={(event) => form.setData('min_order', event.target.value)} error={errors.min_order} placeholder="0" />
                 <Field label="Total uses" type="number" min={1} value={form.data.max_uses} onChange={(event) => form.setData('max_uses', event.target.value)} error={errors.max_uses} placeholder="Unlimited" hint="Hard stop, even under a rush." />
-                <Field label="Per member" type="number" min={1} max={100} value={form.data.per_user} onChange={(event) => form.setData('per_user', event.target.value)} error={errors.per_user} required />
+                <Field label="Per member" placeholder="e.g. 1" type="number" min={1} max={100} value={form.data.per_user} onChange={(event) => form.setData('per_user', event.target.value)} error={errors.per_user} required />
                 <Field label="Starts" type="datetime-local" value={form.data.from} onChange={(event) => form.setData('from', event.target.value)} error={errors.from} required />
                 <Field label="Ends" type="datetime-local" value={form.data.until} onChange={(event) => form.setData('until', event.target.value)} error={errors.until} required />
             </div>
             <Checkbox checked={form.data.active} onChange={(event) => form.setData('active', event.target.checked)}>Live as soon as it starts</Checkbox>
-            <button type="submit" disabled={form.processing} className="btn btn-primary w-full"><Icon name={coupon ? 'check' : 'plus'} size={16} /> {coupon ? 'Save coupon' : 'Create coupon'}</button>
+            <button type="submit" disabled={form.processing} aria-busy={form.processing} className="btn btn-primary w-full"><Icon name={coupon ? 'check' : 'plus'} size={16} /> {coupon ? 'Save coupon' : 'Create coupon'}</button>
         </form>
     );
 }
@@ -161,10 +167,10 @@ function SnackCard({ snack }: { snack: Snack }) {
                 <span className={cn('tag', out ? 'tag-signal' : low ? 'tag-volt' : !snack.active ? '' : 'tag-mint')}>{out ? 'Sold out' : low ? `${snack.stock} left` : !snack.active ? 'Hidden' : tracked ? `${snack.stock} in stock` : 'Untracked'}</span>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
-                <Field label="Price (PKR)" type="number" min={0} value={form.data.price} onChange={(event) => form.setData('price', event.target.value)} error={form.errors.price} />
+                <Field label="Price (PKR)" placeholder="e.g. 650" type="number" min={0} value={form.data.price} onChange={(event) => form.setData('price', event.target.value)} error={form.errors.price} />
                 <Field label="Stock" type="number" min={0} value={form.data.stock} onChange={(event) => form.setData('stock', event.target.value)} error={form.errors.stock} placeholder="Untracked" />
                 <Field label="Add units" type="number" min={1} value={form.data.restock} onChange={(event) => form.setData('restock', event.target.value)} error={form.errors.restock} placeholder="+0" hint="Adds to live stock." />
-                <Field label="Warn at" type="number" min={0} value={form.data.low_at} onChange={(event) => form.setData('low_at', event.target.value)} error={form.errors.low_at} />
+                <Field label="Warn at" placeholder="e.g. 20" type="number" min={0} value={form.data.low_at} onChange={(event) => form.setData('low_at', event.target.value)} error={form.errors.low_at} />
             </div>
             <div className="mt-4 flex items-center justify-between gap-3">
                 <Checkbox checked={form.data.active} onChange={(event) => form.setData('active', event.target.checked)}>On sale</Checkbox>

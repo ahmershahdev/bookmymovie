@@ -38,7 +38,7 @@ class LayoutData
     public static function navMovies(): array
     {
         return self::remember('navMovies', fn () => self::ready()
-            ? Cache::remember('nav.movies.cards.v2', now()->addMinutes(10), fn () => Movie::query()
+            ? Cache::flexible('nav.movies.cards.v2', [600, 1800], fn () => Movie::query()
                 ->withCardMetrics()
                 ->with('genres')
                 ->where('status', 'now_showing')
@@ -56,7 +56,7 @@ class LayoutData
     public static function footerGenres(): array
     {
         return self::remember('footerGenres', fn () => self::ready()
-            ? Cache::remember('footer.genres', now()->addHour(), fn () => Genre::query()
+            ? Cache::flexible('footer.genres', [3600, 7200], fn () => Genre::query()
                 ->whereHas('movies', fn ($query) => $query->publiclyListed())
                 ->orderBy('name')
                 ->get(['name', 'slug'])
@@ -70,7 +70,7 @@ class LayoutData
     public static function footerCinemas(): array
     {
         return self::remember('footerCinemas', fn () => self::ready()
-            ? Cache::remember('footer.cinemas', now()->addHour(), fn () => DB::table('v_theater_catalog')
+            ? Cache::flexible('footer.cinemas', [3600, 7200], fn () => DB::table('v_theater_catalog')
                 ->where('is_active', true)
                 ->orderBy('city')
                 ->orderBy('name')

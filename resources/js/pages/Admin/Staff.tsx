@@ -1,7 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import Icon from '@/components/Icon';
 import { Field, Select } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, route } from '@/lib/utils';
 
 type Member = { id: number; name: string; email: string; role: string; role_label: string; active: boolean; two_factor: boolean; last_login: string; me: boolean };
@@ -18,7 +18,13 @@ export default function AdminStaff({ staff, roles }: { staff: Member[]; roles: R
     const errors = form.errors as Record<string, string>;
 
     return (
-        <AdminLayout label="Owner" title="Staff & roles" lede="Who can sign in to the back office and what each person may do. Every change is written to the audit log.">
+        <AdminLayout label="Owner" title="Staff & roles" lede="Who can sign in to the back office and what each person may do. Every change is written to the audit log."
+            guide={<Guide id="staff" steps={[
+                ['Invite a person', 'Add their name, email and a starting password, and pick a role.'],
+                ['Choose the smallest role', 'Box office can check tickets in and view bookings; Admin can also edit films and offers; Owner can do everything.'],
+                ['Require two-step sign-in', 'The shield shows who has it on. Reset it if someone loses their phone.'],
+                ['Deactivate, don’t delete', 'Switching someone off ends their session on their next click and keeps their history.'],
+            ]} />}>
             <section className="grid gap-3 md:grid-cols-3">
                 {roles.map((role) => (
                     <div key={role.key} className="border border-line p-5">
@@ -35,8 +41,8 @@ export default function AdminStaff({ staff, roles }: { staff: Member[]; roles: R
                     <Field label="Full name" value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} error={errors.name} required placeholder="e.g. Bilal Ahmed" />
                     <Field label="Work email" type="email" value={form.data.email} onChange={(event) => form.setData('email', event.target.value)} error={errors.email} required placeholder="name@yourcinema.com" />
                     <Select label="Role" value={form.data.role} onChange={(event) => form.setData('role', event.target.value)} options={roles.map((role) => [role.key, role.label] as [string, string])} hint={ROLE_HELP[form.data.role]} />
-                    <Field label="Temporary password" type="password" value={form.data.password} onChange={(event) => form.setData('password', event.target.value)} error={errors.password} required autoComplete="new-password" hint="10+ characters with upper and lower case, a number and a symbol. Ask them to change it and turn on two-step sign-in." />
-                    <button type="submit" disabled={form.processing} className="btn btn-primary w-full"><Icon name="plus" size={16} /> Create account</button>
+                    <Field label="Temporary password" placeholder="At least 12 characters; they change it after signing in" type="password" value={form.data.password} onChange={(event) => form.setData('password', event.target.value)} error={errors.password} required autoComplete="new-password" hint="10+ characters with upper and lower case, a number and a symbol. Ask them to change it and turn on two-step sign-in." />
+                    <button type="submit" disabled={form.processing} aria-busy={form.processing} className="btn btn-primary w-full"><Icon name="plus" size={16} /> Create account</button>
                 </form>
 
                 <div className="overflow-x-auto border border-line xl:col-span-8" data-lenis-prevent>

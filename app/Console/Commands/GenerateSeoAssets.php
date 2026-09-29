@@ -234,6 +234,10 @@ class GenerateSeoAssets extends Command
         }
         $add('/cinemas', $today, 'weekly', '0.8');
         $add('/offers', $today, 'weekly', '0.6');
+        $add('/gift-cards', $today, 'monthly', '0.5');
+        $add('/compare', $today, 'weekly', '0.4');
+        $add('/register', $today, 'yearly', '0.3');
+        $add('/login', $today, 'yearly', '0.2');
         $add('/faq', $today, 'monthly', '0.6');
         $add('/contact', $today, 'yearly', '0.4');
 
@@ -299,7 +303,7 @@ class GenerateSeoAssets extends Command
         $out = [
             '# BookMyMovie',
             '',
-            '> BookMyMovie is an open-source cinema ticketing platform for Pakistan. It lists films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, shows live seat maps with row-by-row prices, holds seats for '.config('bookmymovie.booking.cart_hold_minutes').' minutes and issues e-tickets that are paid for at the cinema counter. No booking fees are charged.',
+            '> BookMyMovie is an open-source cinema ticketing platform for Pakistan. It lists films at partner cinemas in Karachi, Lahore, Islamabad and Rawalpindi, plays trailers, shows live seat maps with row-by-row prices, holds seats for '.config('bookmymovie.booking.cart_hold_minutes').' minutes and issues signed QR e-tickets that work offline. Customers pay at the cinema counter or online (JazzCash, Easypaisa or card where enabled). No booking fees are charged.',
             '',
             'Generated '.now()->toDateString().' from the live database. Canonical site: '.$base.'/',
             '',
@@ -307,8 +311,11 @@ class GenerateSeoAssets extends Command
             '',
             '1. Choose a film at '.$base.'/movies and pick a showtime (the next 7 days are listed on each film page).',
             '2. Select up to '.config('bookmymovie.booking.max_seats_per_booking').' seats on the seat map. Seats are held for '.config('bookmymovie.booking.cart_hold_minutes').' minutes.',
-            '3. Confirm at checkout with name, phone and email, optionally with a coupon code.',
-            '4. Pay at the cinema box office at least 20 minutes before the show. Unpaid bookings can be cancelled online until 2 hours before the show.',
+            '3. At checkout, add snacks and use a coupon, gift card or loyalty points (5 points per PKR 100 paid; 1 point = PKR 1).',
+            '4. Pay online, or at the cinema box office at least 20 minutes before the show. Group bookings can split the bill into equal shares.',
+            '5. The QR e-ticket arrives at once; it can go into Apple or Google Wallet and stays readable offline.',
+            '',
+            'Unpaid bookings can be cancelled online until 2 hours before the show; seats, coupon use, gift card balance and points are returned. Sold-out shows have a first-come waitlist that is notified when seats come back.',
             '',
             'Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best sightlines and the back rows are recliners. IMAX, Dolby Cinema, 4DX and ScreenX screens cost more than standard 2D. Weekday shows before 5 PM carry a 15% matinee discount. Child tickets (ages 3-12) cost about 25% less and are not sold on recliner rows.',
             '',
@@ -330,6 +337,10 @@ class GenerateSeoAssets extends Command
                 '- Director: '.$movie->directorNames(),
                 '- Cast: '.$movie->creditsFor('cast')->map(fn ($credit) => $credit->person->name.' as '.$credit->character_name)->join('; '),
             );
+
+            foreach ($movie->trailers ?? [] as $trailer) {
+                $out[] = '- '.($trailer['label'] ?? 'Trailer').': '.$base.'/'.ltrim((string) $trailer['src'], '/');
+            }
 
             if ($movie->total_reviews > 0) {
                 $out[] = '- Audience rating: '.number_format((float) $movie->average_rating, 1).'/5 from '.$movie->total_reviews.' verified reviews';
@@ -379,7 +390,8 @@ class GenerateSeoAssets extends Command
             '',
             '- Source code (MIT licence): https://github.com/ahmershahdev/bookmymovie',
             '- Author: Syed Ahmer Shah',
-            '- Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Tailwind CSS 4, Alpine.js',
+            '- Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Inertia 2, React 19, TypeScript, Tailwind CSS 4, Three.js',
+            '- Languages: English and Urdu (right-to-left)',
             '',
         );
 

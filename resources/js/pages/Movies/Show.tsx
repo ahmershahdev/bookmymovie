@@ -1,6 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import MarqueeSign from '@/components/MarqueeSign';
 import MovieCard from '@/components/MovieCard';
@@ -51,6 +51,19 @@ interface Props {
     userReview: { rating: number; title: string; text: string; spoilers: boolean } | null;
 }
 
+/** Parallax only where poster and title sit side by side (lg and up). */
+function useWide() {
+    const [wide, setWide] = useState(false);
+    useEffect(() => {
+        const query = window.matchMedia('(min-width: 1024px)');
+        const sync = () => setWide(query.matches);
+        sync();
+        query.addEventListener('change', sync);
+        return () => query.removeEventListener('change', sync);
+    }, []);
+    return wide;
+}
+
 export default function MovieShow(props: Props) {
     const { movie, showCount, totalReviews } = props;
     const { auth } = useShared();
@@ -62,6 +75,7 @@ export default function MovieShow(props: Props) {
     const [ground, accent] = movie.palette;
     const [trailer, setTrailer] = useState<number | null>(null);
     const t = useT();
+    const wide = useWide();
 
     const toggleWishlist = () => {
         if (props.inWishlist) {
@@ -77,25 +91,29 @@ export default function MovieShow(props: Props) {
     return (
         <>
             {/* Hero ------------------------------------------------------------ */}
-            <section ref={hero} className="relative isolate overflow-hidden pb-16 pt-[calc(var(--header)+2.5rem)]">
+            <section ref={hero} className="relative isolate overflow-hidden pb-12 pt-[calc(var(--header)+1.5rem)] sm:pb-16 sm:pt-[calc(var(--header)+2.5rem)]">
                 <div className="absolute inset-0 -z-10" aria-hidden="true"
                     style={{ background: `radial-gradient(55% 70% at 22% 35%, color-mix(in oklab, ${accent} 20%, transparent), transparent 70%), radial-gradient(60% 60% at 90% 0%, color-mix(in oklab, ${ground} 80%, transparent), transparent 70%), var(--color-ink)` }} />
                 {(movie.trailers.length > 0 || (movie.hero_image_url && movie.hero_image_url !== movie.poster_url)) && (
-                    <div className="absolute inset-0 -z-10 opacity-45" aria-hidden="true">
+                    // Phones stack poster, title and facts in one tall column: the 16:9
+                    // backdrop covers the top of it and fades down, instead of being
+                    // blown up to fill the whole column. From lg it fills the hero.
+                    <div className="absolute inset-x-0 top-0 -z-10 h-[min(75svh,40rem)] opacity-45 lg:inset-0 lg:h-auto" aria-hidden="true">
                         <BackdropVideo trailer={movie.trailers[0]} image={movie.hero_image_url} />
-                        <div className="absolute inset-0 rtl:-scale-x-100 bg-[linear-gradient(90deg,var(--color-ink)_0%,color-mix(in_oklab,var(--color-ink)_60%,transparent)_45%,transparent_100%)]" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_oklab,var(--color-ink)_55%,transparent)] to-ink lg:hidden" />
+                        <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,var(--color-ink)_0%,color-mix(in_oklab,var(--color-ink)_60%,transparent)_45%,transparent_100%)] lg:block rtl:-scale-x-100" />
                     </div>
                 )}
                 <div className="absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-b from-transparent to-ink" aria-hidden="true" />
 
                 <div className="shell">
-                    <Breadcrumbs className="mb-10" />
+                    <Breadcrumbs className="mb-6 sm:mb-10" />
                     <div className="grid gap-10 lg:grid-cols-12 lg:gap-14">
-                        <motion.div style={{ y: posterY }} className="mx-auto w-full max-w-xs lg:col-span-4 lg:max-w-none">
-                            <Poster movie={movie} size="lg" eager className="shadow-[0_60px_120px_-40px_rgba(0,0,0,.95)]" />
+                        <motion.div style={{ y: wide ? posterY : 0 }} className="mx-auto w-full max-w-[16rem] sm:max-w-xs lg:col-span-4 lg:max-w-none">
+                            <Poster movie={movie} size="lg" eager sizes="(min-width: 1024px) 30vw, (min-width: 640px) 20rem, 16rem" className="shadow-[0_60px_120px_-40px_rgba(0,0,0,.95)]" />
                         </motion.div>
 
-                        <motion.div style={{ y: titleY }} className="flex flex-col justify-end lg:col-span-8">
+                        <motion.div style={{ y: wide ? titleY : 0 }} className="flex min-w-0 flex-col justify-end lg:col-span-8">
                             <div className="flex flex-wrap gap-1.5">
                                 <span className={cn('tag', movie.status_key === 'now_showing' ? 'tag-mint' : 'tag-volt')}>{movie.status}</span>
                                 <span className="tag" title={movie.certificate_label}>{movie.certificate}</span>
@@ -104,7 +122,7 @@ export default function MovieShow(props: Props) {
                                 ))}
                             </div>
 
-                            <SplitHeading as="h1" text={movie.title} className="mt-6 text-[clamp(4rem,12vw,11.5rem)] leading-[.8]" />
+                            <SplitHeading as="h1" text={movie.title} className="mt-6 text-[clamp(2.5rem,11vw,11.5rem)] leading-[.85] [overflow-wrap:anywhere]" />
                             {movie.tagline && <p className="lede mt-6 max-w-2xl text-xl sm:text-2xl" dir="auto">{movie.tagline}</p>}
 
                             <dl className="grid-lines mt-10 max-w-3xl grid-cols-2 sm:grid-cols-4">
@@ -114,14 +132,14 @@ export default function MovieShow(props: Props) {
                                     [movie.status_key === 'coming_soon' ? 'Opens' : 'Released', movie.release_date ?? '—'],
                                     ['Rating', totalReviews ? `${movie.average_rating.toFixed(1)} / 5` : 'No reviews yet'],
                                 ].map(([label, value]) => (
-                                    <div key={label} className="!bg-ink/70 px-5 py-4">
+                                    <div key={label} className="min-w-0 !bg-ink/70 px-4 py-3 sm:px-5 sm:py-4">
                                         <dt className="label">{label}</dt>
-                                        <dd className="num mt-2 text-[0.95rem]">{value}</dd>
+                                        <dd className="num mt-2 break-words text-[0.95rem]">{value}</dd>
                                     </div>
                                 ))}
                             </dl>
 
-                            <div className="mt-10 flex flex-wrap gap-2">
+                            <div className="mt-8 flex flex-wrap gap-2 sm:mt-10 max-sm:[&>*]:grow max-sm:[&>*:first-child]:w-full">
                                 {showCount > 0 ? (
                                     <button type="button" onClick={() => scrollToTarget('#showtimes')} className="btn btn-primary btn-lg">Choose a showtime <Icon name="arrow-down" size={18} /></button>
                                 ) : (
@@ -174,16 +192,15 @@ export default function MovieShow(props: Props) {
                             title={movie.trailers.length > 1 ? t('Trailers') : t('Trailer')} id="trailers-title" />
                         <div className={cn('mt-12 grid gap-4', movie.trailers.length > 1 && 'md:grid-cols-2')}>
                             {movie.trailers.map((item, index) => (
-                                <button key={item.src} type="button" onClick={() => setTrailer(index)} className="group relative block aspect-video overflow-hidden bg-ink-3 text-left"
-                                    aria-label={`${t('Play')} ${item.label}: ${movie.title}`}>
+                                <button key={item.src} type="button" onClick={() => setTrailer(index)} className="group relative block aspect-video overflow-hidden bg-ink-3 text-left">
                                     {item.poster || movie.hero_image_url ? (
                                         <img src={item.poster ?? movie.hero_image_url ?? ''} alt="" loading="lazy" decoding="async"
                                             className="h-full w-full object-cover transition-transform duration-[900ms] ease-[var(--ease-out-expo)] group-hover:scale-[1.04]" />
                                     ) : null}
                                     <span className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
-                                    <span className="absolute left-5 top-5 num text-[11px] text-paper-2">{String(index + 1).padStart(2, '0')} · 0:10</span>
+                                    <span className="absolute left-5 top-5 num text-[11px] text-paper-2" aria-hidden="true">{String(index + 1).padStart(2, '0')} · 0:10</span>
                                     <span className="absolute inset-x-5 bottom-5 flex items-end justify-between gap-4">
-                                        <span className="headline text-3xl sm:text-4xl">{item.label}</span>
+                                        <span className="headline text-3xl sm:text-4xl"><span className="sr-only">{t('Play')} </span>{item.label}<span className="sr-only">: {movie.title}</span></span>
                                         <span className="grid h-14 w-14 shrink-0 place-items-center bg-volt text-noir transition-transform duration-500 group-hover:scale-110"><Icon name="play" size={22} /></span>
                                     </span>
                                 </button>
@@ -321,15 +338,15 @@ function Showtimes({ movie, showDays: allDays, cities, showCount, venueCount }: 
                                         {venue.shows.map((show) => (
                                             <li key={show.id}>
                                                 <Link href={route('movies.seats', { slug: movie.slug, show: show.id })}
-                                                    aria-label={`${show.time} ${show.meridiem}, ${show.format}, ${show.screen}, from ${money(show.from_price)}${show.fast ? ', selling fast' : ''}`}
                                                     className="group relative isolate flex min-w-[9.5rem] flex-col overflow-hidden border border-line-2 px-4 py-3 transition hover:border-accent">
                                                     <span className="absolute inset-0 -z-10 origin-bottom scale-y-0 bg-volt transition-transform duration-500 ease-[var(--ease-out-expo)] group-hover:scale-y-100" />
                                                     <span className="flex items-center justify-between gap-3">
                                                         <span className="num text-2xl font-semibold transition-colors group-hover:text-noir">{show.time}<span className="ml-1 text-xs text-mute group-hover:text-noir/60">{show.meridiem}</span></span>
-                                                        {show.fast && <span className="h-2 w-2 animate-blink bg-signal" title="Selling fast" />}
+                                                        {show.fast && <span className="h-2 w-2 animate-blink bg-signal" title="Selling fast" aria-hidden="true" />}
                                                     </span>
                                                     <span className="label mt-1 text-[9px] group-hover:text-noir/70">{show.format}</span>
                                                     <span className={cn('num mt-2 text-xs transition-colors group-hover:text-noir', show.on_sale ? 'text-signal' : 'text-mute')}>from {money(show.from_price)}</span>
+                                                    <span className="sr-only">, {show.screen}{show.fast ? ', selling fast' : ''}</span>
                                                 </Link>
                                             </li>
                                         ))}

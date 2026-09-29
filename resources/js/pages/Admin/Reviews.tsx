@@ -2,7 +2,7 @@ import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import Icon from '@/components/Icon';
 import { Field, Pagination } from '@/components/ui';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, route } from '@/lib/utils';
 import type { PageLink } from '@/types';
 
@@ -23,7 +23,13 @@ export default function AdminReviews({ reviews, filters, counts }: Props) {
     const act = (id: number, action: string) => router.post(route('admin.reviews.moderate', id), { action }, { preserveScroll: true });
 
     return (
-        <AdminLayout label="Community" title="Reviews" lede="Every review on the site. Hidden reviews stop counting towards a film's rating straight away.">
+        <AdminLayout label="Community" title="Reviews" lede="Every review on the site. Hidden reviews stop counting towards a film's rating straight away."
+            guide={<Guide id="reviews" steps={[
+                ['Start with “Waiting”', 'New reviews wait here until someone approves them.'],
+                ['Approve or hide', 'Approved reviews show on the film page and count toward its star rating.'],
+                ['Verified badge', 'Reviews from people who actually booked the film carry a verified mark.'],
+                ['Ban abusive authors', 'Open the author to ban their account, IP and device in one go.'],
+            ]} />}>
             <div className="grid-lines sm:grid-cols-4">
                 {[['Reviews', counts.total], ['Verified bookings', counts.verified], ['Waiting', counts.pending], ['Flagged', counts.flagged]].map(([label, value]) => (
                     <div key={label} className="p-6"><p className="label">{label}</p><p className="display mt-3 text-5xl">{Number(value).toLocaleString('en-PK')}</p></div>
@@ -35,10 +41,10 @@ export default function AdminReviews({ reviews, filters, counts }: Props) {
                 <button type="submit" className="btn btn-primary">Search</button>
                 <div className="flex flex-wrap gap-1 lg:ms-auto">
                     {(['all', 'pending', 'flagged', 'hidden'] as const).map((state) => (
-                        <button key={state} type="button" onClick={() => go({ state })} aria-pressed={filters.state === state} className={cn('chip capitalize', filters.state === state && '!border-accent !text-accent')}>{state}</button>
+                        <button key={state} type="button" onClick={() => go({ state })} aria-pressed={filters.state === state} className={'chip capitalize'}>{state}</button>
                     ))}
                     {[5, 4, 3, 2, 1].map((stars) => (
-                        <button key={stars} type="button" onClick={() => go({ stars: filters.stars === stars ? null : stars })} aria-pressed={filters.stars === stars} className={cn('chip', filters.stars === stars && '!border-accent !text-accent')}>{stars}★</button>
+                        <button key={stars} type="button" onClick={() => go({ stars: filters.stars === stars ? null : stars })} aria-pressed={filters.stars === stars} className={'chip'}>{stars}★</button>
                     ))}
                 </div>
             </form>

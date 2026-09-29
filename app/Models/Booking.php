@@ -41,6 +41,49 @@ class Booking extends Model
         'cancelled_by',
     ];
 
+    /**
+     * Allowed booking_status moves. Terminal states have no way out, so a
+     * cancelled booking can never be cancelled (and refunded) twice.
+     */
+    public const STATUS_TRANSITIONS = [
+        'confirmed' => ['completed', 'cancelled', 'no_show'],
+        'completed' => [],
+        'no_show' => [],
+        'cancelled' => [],
+    ];
+
+    public function canMoveTo(string $status): bool
+    {
+        return in_array($status, self::STATUS_TRANSITIONS[$this->booking_status] ?? [], true);
+    }
+
+    /**
+     * Status lock (compare-and-set): moves the row from the status this model
+     * last saw to $status in one guarded UPDATE. If another request changed
+     * the status in between, no row matches and nothing is written.
+     *
+     * @param  array<string, mixed>  $extra  columns written in the same UPDATE
+     *
+     * @throws \App\Exceptions\StaleStatusException
+     */
+    public function claimStatus(string $status, array $extra = []): void
+    {
+        $from = (string) $this->booking_status;
+
+        if (! $this->canMoveTo($status)) {
+            throw new \App\Exceptions\StaleStatusException("Booking {$this->booking_number} cannot move from {$from} to {$status}.");
+        }
+
+        $claimed = static::query()->whereKey($this->getKey())->where('booking_status', $from)
+            ->update(['booking_status' => $status, 'updated_at' => now(), ...$extra]);
+
+        if ($claimed !== 1) {
+            throw new \App\Exceptions\StaleStatusException("Booking {$this->booking_number} changed while it was being updated.");
+        }
+
+        $this->forceFill(['booking_status' => $status, ...$extra])->syncOriginal();
+    }
+
     protected function casts(): array
     {
         return [

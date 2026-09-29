@@ -148,6 +148,32 @@ class BookingFlowTest extends TestCase
         $this->assertSame(2, BookingSeat::query()->where('show_id', $show->id)->whereIn('seat_id', $seats)->where('seat_lock', 1)->count());
     }
 
+    public function test_a_stale_copy_cannot_cancel_a_booking_twice(): void
+    {
+        $user = $this->customer();
+        [$show, $seats] = $this->bookableShow(1);
+        $this->actingAs($user)->post('/cart', ['show_id' => $show->id, 'seats' => $seats]);
+        $this->checkout($user);
+
+        $booking = Booking::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+        $stale = $booking->replicate()->setRawAttributes($booking->getAttributes(), true); // still says "confirmed"
+
+        \App\Support\BookingLifecycle::unwind($booking, 'admin', null, 'First refund', refund: true);
+        $bookedAfterFirst = $show->fresh()->booked_seats;
+
+        try {
+            DB::transaction(fn () => \App\Support\BookingLifecycle::unwind($stale, 'admin', null, 'Second refund', refund: true));
+            $this->fail('A second cancellation must be refused by the status lock.');
+        } catch (\App\Exceptions\StaleStatusException) {
+            // Expected: nothing below may have changed.
+        }
+
+        $this->assertSame('cancelled', $booking->fresh()->booking_status);
+        $this->assertSame('First refund', $booking->fresh()->cancellation_reason);
+        $this->assertSame($bookedAfterFirst, $show->fresh()->booked_seats);
+        $this->assertFalse($booking->fresh()->canMoveTo('confirmed'));
+    }
+
     public function test_coupon_cannot_be_redeemed_beyond_its_usage_cap(): void
     {
         $coupon = Coupon::query()->where('code', 'MATINEE200')->firstOrFail();

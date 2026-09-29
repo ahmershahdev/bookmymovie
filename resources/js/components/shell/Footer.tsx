@@ -99,17 +99,23 @@ export default function Footer() {
                         <span className="label">{t('Based in')}</span>
                         <span className="mt-3 block text-lg font-semibold">{site.contact_address}</span>
                     </div>
-                    {site.socials.map((social) => (
-                        <a key={social.key} href={social.url} target="_blank" rel="noopener me" className="group flex items-center justify-between gap-3 p-6 transition-colors hover:!bg-volt hover:text-noir">
-                            <span className="flex items-center gap-3 text-lg font-semibold">{['github', 'linkedin'].includes(social.key) ? <Icon name={social.key} size={18} /> : <Icon name="globe" size={18} />} {social.label}</span>
-                            <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
-                        </a>
-                    ))}
                 </div>
 
-                <p className="pointer-events-none mt-24 select-none whitespace-nowrap text-center text-[15.5vw] font-black uppercase leading-[.78] tracking-[-0.03em] text-paper/[.06] [font-stretch:62%]" aria-hidden="true">
-                    {site.name}
-                </p>
+                {/* One cell per link, however many are configured: never an empty block. */}
+                {site.socials.length > 0 && (
+                    <div className="grid-lines footer-socials border-t-0" style={{ ['--socials' as string]: site.socials.length }} aria-label="Elsewhere">
+                        {site.socials.map((social) => (
+                            <a key={social.key} href={social.url} target="_blank" rel="noopener me" className="group flex items-center justify-between gap-3 p-6 transition-colors hover:!bg-volt hover:text-noir">
+                                <span className="flex items-center gap-3 text-lg font-semibold">{['github', 'linkedin'].includes(social.key) ? <Icon name={social.key} size={18} /> : <Icon name="globe" size={18} />} {social.label}</span>
+                                <Icon name="arrow-up-right" size={16} className="transition group-hover:rotate-45" />
+                            </a>
+                        ))}
+                    </div>
+                )}
+
+                {/* A watermark, not text: drawn from a data attribute so screen readers
+                    and contrast checkers do not treat it as content. */}
+                <div data-watermark={site.name} className="pointer-events-none mt-24 select-none whitespace-nowrap text-center text-[15.5vw] font-black uppercase leading-[.78] tracking-[-0.03em] text-paper/[.06] [font-stretch:62%] after:content-[attr(data-watermark)]" aria-hidden="true" />
 
                 <div className="flex flex-col gap-6 border-t border-line py-8 text-xs text-mute md:flex-row md:items-center md:justify-between">
                     <p dir="ltr" className="rtl:text-right">© {new Date().getFullYear()} {site.name} · {site.copyright_note}</p>

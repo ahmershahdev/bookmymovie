@@ -25,6 +25,10 @@ export default defineConfig({
                 manualChunks: {
                     three: ['three', '@react-three/fiber'],
                     motion: ['motion'],
+                    // Shared by the seat map page and the lazy 3D hall. Left alone, Rollup
+                    // merges it into the page's chunk, the page loses its manifest entry
+                    // and Laravel answers the seat map with "Unable to locate file".
+                    'hall-layout': [fileURLToPath(new URL('./resources/js/three/hallLayout.ts', import.meta.url))],
                 },
             },
         },

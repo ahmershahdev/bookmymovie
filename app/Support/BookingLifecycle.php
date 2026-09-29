@@ -38,6 +38,16 @@ class BookingLifecycle
 
     public static function unwind(Booking $booking, string $actor, ?int $actorId, string $reason, bool $refund = false): Booking
     {
+        // Status lock first: claim confirmed → cancelled before touching seats,
+        // coupons or balances, so two racing cancellations cannot both refund.
+        $wasPaid = $booking->payment_status === 'paid';
+        $booking->claimStatus('cancelled', [
+            'payment_status' => $wasPaid && $refund ? 'refunded' : 'failed',
+            'cancelled_at' => now(),
+            'cancelled_by' => $actor,
+            'cancellation_reason' => Str::limit($reason, 250, ''),
+        ]);
+
         Show::query()->whereKey($booking->show_id)->lockForUpdate()->first();
 
         $released = BookingSeat::query()->where('booking_id', $booking->id)->update(['seat_lock' => null]);
@@ -62,15 +72,6 @@ class BookingLifecycle
         }
 
         self::reversePoints($booking);
-
-        $wasPaid = $booking->payment_status === 'paid';
-        $booking->forceFill([
-            'booking_status' => 'cancelled',
-            'payment_status' => $wasPaid && $refund ? 'refunded' : 'failed',
-            'cancelled_at' => now(),
-            'cancelled_by' => $actor,
-            'cancellation_reason' => Str::limit($reason, 250, ''),
-        ])->save();
 
         Payment::query()->where('booking_id', $booking->id)->update($wasPaid && $refund
             ? ['status' => 'refunded', 'refunded_at' => now(), 'refund_reason' => Str::limit($reason, 250, '')]

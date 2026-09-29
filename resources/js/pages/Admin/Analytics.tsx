@@ -1,7 +1,7 @@
 import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import Icon from '@/components/Icon';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout, { Guide } from '@/layouts/AdminLayout';
 import { cn, money, route } from '@/lib/utils';
 
 type Day = { day: string; label: string; revenue: number; tickets: number; bookings: number };
@@ -31,11 +31,17 @@ export default function AdminAnalytics({ days, series, occupancy, cinemas, total
 
     return (
         <AdminLayout label="Numbers" title="Revenue & occupancy" lede="Money taken and seats filled. Cancelled bookings are excluded; revenue includes gift card spend."
+            guide={<Guide id="analytics" steps={[
+                ['Pick a range', 'Use 7, 30 or 90 days at the top right. Every number and chart follows it.'],
+                ['Compare periods', 'The green or red arrow compares revenue with the same number of days just before.'],
+                ['Hover the bars', 'Each column is one day. Hover or tab onto it for revenue, tickets and bookings.'],
+                ['Need exact figures?', 'Press “Show as tables” for plain numbers you can copy into a spreadsheet.'],
+            ]} />}
             actions={
                 <div className="flex gap-1" role="group" aria-label="Date range">
                     {[7, 30, 90].map((range) => (
                         <button key={range} type="button" aria-pressed={days === range} onClick={() => router.get(route('admin.analytics'), { days: range }, { preserveScroll: true, preserveState: true })}
-                            className={cn('chip', days === range && '!border-accent !text-accent')}>{range} days</button>
+                            className={'chip'}>{range} days</button>
                     ))}
                 </div>
             }>

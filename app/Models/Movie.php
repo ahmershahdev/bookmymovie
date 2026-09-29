@@ -62,7 +62,7 @@ class Movie extends Model
     ];
 
     /** Cached rails and menus that list films; cleared whenever a film changes. */
-    public const LISTING_CACHE_KEYS = ['home.rails', 'home.stats', 'nav.movies.cards.v2', 'assistant.context'];
+    public const LISTING_CACHE_KEYS = ['home.rails', 'home.stats', 'nav.movies.cards.v2', 'assistant.context', 'footer.genres'];
 
     protected static function booted(): void
     {

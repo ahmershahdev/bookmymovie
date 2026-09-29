@@ -120,11 +120,32 @@ class GroupWaitlistRolesTest extends TestCase
 
         $this->withSession($session)->get(route('admin.dashboard'))->assertOk();
         $this->withSession($session)->get(route('admin.analytics'))->assertOk();
+        $this->withSession($session)->get(route('admin.movies'))->assertOk();
         $this->withSession($session)->get(route('admin.commerce'))->assertForbidden();
         $this->withSession($session)->get(route('admin.staff'))->assertForbidden();
+        $this->withSession($session)->get(route('admin.content'))->assertForbidden();
+        $this->withSession($session)->post(route('admin.dashboard'), ['_action' => 'send_notification', 'message' => 'Nope'])->assertSessionHasErrors('role');
+        // Everyone may edit their own profile from My security.
+        $this->withSession($session)->post(route('admin.dashboard'), ['_action' => 'update_profile', 'name' => 'Door Staff Two', 'email' => 'door@bookmymovie.test'])->assertSessionHasNoErrors();
+        $this->assertSame('Door Staff Two', $staff->refresh()->name);
         $member = User::query()->where('is_blocked', false)->firstOrFail();
         $this->withSession($session)->post(route('admin.users.ban', $member->id), ['reason' => 'Should not work'])->assertSessionHasErrors('role');
         $this->assertFalse($member->refresh()->is_blocked);
+    }
+
+    public function test_the_owner_sees_every_back_office_page_with_its_data(): void
+    {
+        $owner = Admin::query()->create(['name' => 'Owner Three', 'email' => 'owner3@bookmymovie.test', 'password' => 'Owner#Pass2026', 'role' => 'superadmin', 'is_active' => true]);
+        $session = ['admin_id' => $owner->id, 'admin_authenticated_at' => now()->timestamp];
+
+        $this->withSession($session)->get(route('admin.dashboard'))->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Admin/Dashboard')->has('kpis.revenue_today')->has('series', 14)->has('setup', 6)->has('heat')->has('tonight'));
+        $movie = \App\Models\Movie::query()->firstOrFail();
+        $this->withSession($session)->get(route('admin.movies', $movie->id))->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Admin/Movies')->where('selectedMovie.id', $movie->id));
+        $this->withSession($session)->get('/admin/dashboard/movies/'.$movie->id)->assertRedirect(route('admin.movies', $movie->id));
+        $this->withSession($session)->get(route('admin.content'))->assertOk()->assertInertia(fn ($page) => $page->component('Admin/Content')->has('contentPages'));
+        $this->withSession($session)->get(route('admin.security'))->assertOk()->assertInertia(fn ($page) => $page->where('profile.email', 'owner3@bookmymovie.test'));
     }
 
     public function test_admin_two_step_sign_in_requires_the_authenticator_code(): void

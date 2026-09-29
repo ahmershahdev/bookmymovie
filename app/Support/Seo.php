@@ -138,6 +138,29 @@ class Seo
      * @param  iterable<object>  $shows  rows from v_show_details
      * @return array<string, mixed>
      */
+    /**
+     * A <link rel="preload"> for the page's largest image (LCP), with the same
+     * srcset the React <img> uses (card/hero ship -sm copies), so the browser
+     * starts the download before the JavaScript has even run.
+     *
+     * @return array{href: string, srcset: ?string, sizes: string}|null
+     */
+    public static function preloadImage(?string $url, string $sizes): ?array
+    {
+        if (! $url) {
+            return null;
+        }
+
+        $srcset = null;
+        if (preg_match('#^(.*/(card|hero))\.webp$#', $url, $match)) {
+            $srcset = $match[2] === 'card'
+                ? "{$match[1]}-sm.webp 640w, {$match[1]}.webp 1200w"
+                : "{$match[1]}-sm.webp 960w, {$match[1]}.webp 1600w";
+        }
+
+        return ['href' => $url, 'srcset' => $srcset, 'sizes' => $sizes];
+    }
+
     public static function movie(Movie $movie, iterable $shows = []): array
     {
         $rating = $movie->verifiedRating();

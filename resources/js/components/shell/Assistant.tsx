@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
 import { cn, money, route, useShared } from '@/lib/utils';
-import type { NavMovie } from '@/types';
 
 type Context = {
     top: { title: string; slug: string; rating: number; reviews: number } | null;
@@ -12,7 +11,14 @@ type Context = {
     formats: { format: string; cinemas: string[] }[];
     nowShowing: number;
     offers: number;
-    user: null | { first_name: string; points: number; next: null | { film: string; number: string; when: string; in: string; cinema: string; paid: boolean } };
+    user: null | {
+        first_name: string;
+        points: number;
+        bookings: number;
+        next: null | { film: string; number: string; when: string; in: string; cinema: string; paid: boolean };
+        watchlist: { title: string; slug: string; when: string }[];
+        pick: null | { title: string; slug: string; rating: number; because: string | null };
+    };
 };
 
 type Site = ReturnType<typeof useShared>['site'];
@@ -22,100 +28,95 @@ type Site = ReturnType<typeof useShared>['site'];
  * out a character at a time: **bold** and a new line per list item.
  */
 type Answer = { text: string; action?: { label: string; href: string } };
-type Question = { id: string; label: string; keywords: string[]; answer: (ctx: Context, site: Site) => Answer };
+type Question = { id: string; label: string; answer: (ctx: Context, site: Site) => Answer };
 type Message = { id: number; from: 'bot' | 'you'; text: string; action?: Answer['action']; at: string };
 
 const NAME = 'Usher';
 const ease = [0.16, 1, 0.3, 1] as const;
 const clock = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-/** The questions. Each answer is written from live data, never a canned price. */
+/**
+ * The questions. Each answer is written from live data, never a canned price.
+ * Signed-in customers get their own set first: a pick based on the genres
+ * they book, their watchlist, their next show and their points.
+ */
 function useQuestions(signedIn: boolean): Question[] {
     return useMemo((): Question[] => [
+        ...(signedIn ? [
+            {
+                id: 'pick', label: 'Pick a film for me',
+                answer: (ctx: Context): Answer => ctx.user?.pick
+                    ? { text: `Try **${ctx.user.pick.title}**${ctx.user.pick.rating ? `, rated **${ctx.user.pick.rating}★**` : ''}. ${ctx.user.pick.because ? `You book a lot of ${ctx.user.pick.because.toLowerCase()}, and you have not seen this one yet.` : 'It is the best rated film you have not seen yet.'}`, action: { label: `Open ${ctx.user.pick.title}`, href: route('movies.show', ctx.user.pick.slug) } }
+                    : { text: 'You have seen everything we are showing. New titles arrive every week.', action: { label: 'Coming soon', href: route('movies.status', 'coming-soon') } },
+            },
+            {
+                id: 'watchlist', label: 'Is my watchlist on?',
+                answer: (ctx: Context): Answer => ctx.user?.watchlist.length
+                    ? { text: `Seats are on sale for:\n${ctx.user.watchlist.map((film) => `**${film.title}**, next show ${film.when}`).join('\n')}`, action: { label: `Book ${ctx.user.watchlist[0].title}`, href: route('movies.show', ctx.user.watchlist[0].slug) + '#showtimes' } }
+                    : { text: 'Nothing on your watchlist has a show on sale right now. Add films with the heart button and they show up here once seats open.', action: { label: 'My watchlist', href: route('user.wishlist') } },
+            },
+        ] : []),
         {
-            id: 'good', label: "What's good this week?", keywords: ['good', 'best', 'recommend', 'popular', 'top', 'watch', 'suggest', 'trending', 'rated'],
+            id: 'good', label: "What's good this week?",
             answer: (ctx) => ctx.top
                 ? { text: `The crowd favourite right now is **${ctx.top.title}**, rated **${ctx.top.rating}★** across ${ctx.top.reviews} reviews, most from verified bookings. ${ctx.nowShowing} films are showing in total.`, action: { label: `Open ${ctx.top.title}`, href: route('movies.show', ctx.top.slug) } }
                 : { text: 'Nothing is showing just now. New titles are on the way.', action: { label: 'Coming soon', href: route('movies.status', 'coming-soon') } },
         },
         {
-            id: 'cheap', label: 'Cheapest seat tonight?', keywords: ['cheap', 'price', 'cost', 'tonight', 'budget', 'lowest', 'rate', 'kitna', 'ticket price'],
+            id: 'cheap', label: 'Cheapest seat tonight?',
             answer: (ctx) => ctx.cheapest
                 ? { text: `Tonight's lowest price is **${money(ctx.cheapest.price)}** for **${ctx.cheapest.title}** at ${ctx.cheapest.cinema}, ${ctx.cheapest.time}. No booking fee on top.`, action: { label: 'Pick seats', href: route('movies.show', ctx.cheapest.slug) + '#showtimes' } }
                 : { text: "Tonight's shows have all started. Tomorrow's matinees are usually the best value.", action: { label: 'See showtimes', href: route('movies.index') } },
         },
         signedIn
             ? {
-                id: 'next', label: 'When is my next show?', keywords: ['my show', 'my booking', 'next', 'upcoming', 'my ticket', 'when'],
+                id: 'next', label: 'When is my next show?',
                 answer: (ctx) => ctx.user?.next
                     ? { text: `**${ctx.user.next.film}** at ${ctx.user.next.cinema}, ${ctx.user.next.when} (${ctx.user.next.in}). ${ctx.user.next.paid ? 'It is paid, just show the QR code at the door.' : 'Pay at the counter before the show.'}`, action: { label: 'Open e-ticket', href: route('user.booking.show', ctx.user.next.number) } }
                     : { text: 'You have no upcoming shows. Shall we find you one?', action: { label: 'Browse films', href: route('movies.index') } },
             }
             : {
-                id: 'how', label: 'How does booking work?', keywords: ['how', 'book', 'booking', 'reserve', 'seat', 'buy'],
+                id: 'how', label: 'How does booking work?',
                 answer: () => ({ text: 'Pick a film and a showtime, tap your seats on the live map (they are held for 10 minutes), add snacks if you like, then confirm. Your QR e-ticket arrives straight away. No card is needed to book.', action: { label: 'Create a free account', href: route('user.register') } }),
             },
         signedIn
             ? {
-                id: 'points', label: 'How many points do I have?', keywords: ['point', 'loyalty', 'reward', 'balance'],
+                id: 'points', label: 'How many points do I have?',
                 answer: (ctx) => ({ text: `You have **${(ctx.user?.points ?? 0).toLocaleString('en-PK')} points**, worth ${money(ctx.user?.points ?? 0)} off your next booking. You earn 5 points for every PKR 100 you pay.`, action: { label: 'Points history', href: route('user.dashboard') } }),
             }
             : {
-                id: 'points', label: 'What are loyalty points?', keywords: ['point', 'loyalty', 'reward'],
+                id: 'points', label: 'What are loyalty points?',
                 answer: () => ({ text: 'Members earn **5 points for every PKR 100** they pay, and each point is PKR 1 off a later booking. Tick "use my points" at checkout.', action: { label: 'Gift cards & points', href: route('gift-cards') } }),
             },
         {
-            id: 'formats', label: 'Where can I watch in IMAX or Dolby?', keywords: ['imax', 'dolby', '4dx', 'screenx', 'recliner', 'format', 'premium', '3d'],
+            id: 'formats', label: 'Where can I watch in IMAX or Dolby?',
             answer: (ctx) => ({ text: ctx.formats.length ? ctx.formats.map((row) => `**${row.format}:** ${row.cinemas.join(', ')}`).join('\n') : 'Premium screens are being set up. Check back soon.', action: { label: 'All cinemas', href: route('cinemas.index') } }),
         },
         {
-            id: 'cancel', label: 'Can I cancel a booking?', keywords: ['cancel', 'refund', 'money back', 'change'],
+            id: 'cancel', label: 'Can I cancel a booking?',
             answer: () => ({ text: 'Yes. Unpaid bookings can be cancelled **free until 2 hours** before the show from My bookings. Seats go back on sale and any points or gift card balance you used come straight back.', action: { label: 'Refund policy', href: route('refund') } }),
         },
         {
-            id: 'offline', label: 'Will my ticket work without signal?', keywords: ['offline', 'signal', 'internet', 'wallet', 'qr', 'e-ticket', 'eticket'],
+            id: 'offline', label: 'Will my ticket work without signal?',
             answer: () => ({ text: 'Yes. Open the e-ticket once while online and it is saved on your phone, QR code included. You can also add it to Apple or Google Wallet.', action: { label: 'How e-tickets work', href: route('eticket.info') } }),
         },
         {
-            id: 'food', label: 'Can I pre-order snacks?', keywords: ['snack', 'food', 'popcorn', 'drink', 'nachos', 'combo', 'eat'],
+            id: 'food', label: 'Can I pre-order snacks?',
             answer: () => ({ text: 'At checkout you can add **popcorn, nachos, drinks and combos**. They are ready at the snack counter when you arrive, so you skip the queue.' }),
         },
         {
-            id: 'offers', label: 'Any offers running?', keywords: ['offer', 'coupon', 'discount', 'promo', 'deal', 'code', 'sale'],
+            id: 'offers', label: 'Any offers running?',
             answer: (ctx) => ({ text: ctx.offers ? `**${ctx.offers} codes** are live right now. Enter one at checkout; the discount shows before you confirm.` : 'No codes are live today, but gift cards and loyalty points always work.', action: { label: 'See offers', href: route('offers') } }),
         },
         {
-            id: 'pay', label: 'How can I pay?', keywords: ['pay', 'payment', 'card', 'jazzcash', 'easypaisa', 'cash', 'counter'],
+            id: 'pay', label: 'How can I pay?',
             answer: () => ({ text: 'Pay online with **JazzCash or Easypaisa** where the cinema supports it, or reserve now and **pay at the box office** before the show. Gift cards and points can cover part or all of it.' }),
         },
         {
-            id: 'human', label: 'I need a human', keywords: ['human', 'help', 'support', 'contact', 'complain', 'agent', 'call', 'email'],
+            id: 'human', label: 'I need a human',
             answer: (_ctx, site) => ({ text: `Of course. Email **${site.support_email}** or call **${site.support_phone}**. We reply within one working day.`, action: { label: 'Contact form', href: route('contact') } }),
         },
     ], [signedIn]);
-}
-
-/** Picks the question whose keywords best match what was typed, if any. */
-function matchQuestion(input: string, questions: Question[]): Question | null {
-    const text = ` ${input.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')} `;
-    let best: Question | null = null;
-    let bestScore = 0;
-    for (const question of questions) {
-        const score = question.keywords.reduce((total, keyword) => total + (text.includes(keyword) ? keyword.length : 0), 0);
-        if (score > bestScore) { best = question; bestScore = score; }
-    }
-    return bestScore >= 3 ? best : null;
-}
-
-/** A film title mentioned in the question ("is kestrel any good?"). */
-function matchFilm(input: string, films: NavMovie[]): NavMovie | null {
-    const text = input.toLowerCase();
-    return films
-        .filter((film) => {
-            const title = film.title.toLowerCase().replace(/^(the|a|an)\s+/, '');
-            return title.length >= 4 && text.includes(title.split(' ').slice(0, 2).join(' '));
-        })
-        .sort((a, b) => b.title.length - a.title.length)[0] ?? null;
 }
 
 /** Renders **bold** and line breaks from an answer string (never HTML). */
@@ -176,12 +177,13 @@ function Mark({ busy, size = 40 }: { busy: boolean; size?: number }) {
 }
 
 /**
- * Usher, the site assistant. Visitors tap a question or type one; replies
- * are matched in the browser against live listings (nothing typed is sent
- * anywhere) and always end with a link to act on.
+ * Usher, the site assistant. Visitors tap one of its questions; there is no
+ * free-text box, so nothing a visitor writes is ever sent, stored or echoed
+ * back. Replies are built in the browser from live listings (and, when signed
+ * in, the customer's own bookings) and always end with a link to act on.
  */
 export default function Assistant({ className }: { className?: string }) {
-    const { auth, site, navMovies } = useShared();
+    const { auth, site } = useShared();
     const questions = useQuestions(Boolean(auth.user));
     const [open, setOpen] = useState(false);
     const [ctx, setCtx] = useState<Context | null>(null);
@@ -189,12 +191,10 @@ export default function Assistant({ className }: { className?: string }) {
     const [thinking, setThinking] = useState(false);
     const [typingId, setTypingId] = useState<number | null>(null);
     const [asked, setAsked] = useState<string[]>([]);
-    const [draft, setDraft] = useState('');
     const [teaser, setTeaser] = useState(false);
     const log = useRef<HTMLDivElement>(null);
-    const input = useRef<HTMLInputElement>(null);
+    const firstChip = useRef<HTMLButtonElement>(null);
     const counter = useRef(0);
-    const pending = useRef<Question | null>(null);
     const busy = thinking || typingId !== null;
 
     // Braces matter: scrollTo() returns a Promise in current Chrome, and an
@@ -218,12 +218,14 @@ export default function Assistant({ className }: { className?: string }) {
         if (messages.length === 0) {
             const name = auth.user?.first_name;
             const id = counter.current++;
-            setMessages([{ id, from: 'bot', at: clock(), text: `${name ? `Salaam ${name}!` : 'Salaam!'} I'm **${NAME}**, your guide to ${site.name}. Ask me anything about films, prices, seats or your bookings, or tap a question below.` }]);
+            setMessages([{ id, from: 'bot', at: clock(), text: name
+                ? `Salaam ${name}! I'm **${NAME}**. I can check your next show, your points and your watchlist, or pick a film for you. Tap a question below.`
+                : `Salaam! I'm **${NAME}**, your guide to ${site.name}. Tap a question below about films, prices, seats or booking.` }]);
             setTypingId(id);
         }
         const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
         window.addEventListener('keydown', onKey);
-        window.setTimeout(() => input.current?.focus({ preventScroll: true }), 350);
+        window.setTimeout(() => firstChip.current?.focus({ preventScroll: true }), 350);
         return () => window.removeEventListener('keydown', onKey);
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -236,33 +238,13 @@ export default function Assistant({ className }: { className?: string }) {
         setTypingId(id);
     };
 
-    const answerFor = (question: Question | null, typed: string): Answer => {
-        const film = typed ? matchFilm(typed, navMovies) : null;
-        if (film && (!question || question.id === 'good')) {
-            return { text: `**${film.title}** is a ${film.certificate} ${film.genre.toLowerCase()} running ${film.duration}${film.reviews ? `, rated **${film.rating}★** by ${film.reviews} viewers` : ''}. Showtimes and seats are one tap away.`, action: { label: `Book ${film.title}`, href: route('movies.show', film.slug) + '#showtimes' } };
-        }
-        if (!question) {
-            return { text: "I'm not sure about that one yet. I know about **films, prices, formats, bookings, snacks, payments and offers**. Try one of the questions below, or reach a person.", action: { label: 'Contact support', href: route('contact') } };
-        }
-        return ctx ? question.answer(ctx, site) : { text: 'One second, I am still checking the listings. Please ask again in a moment.' };
-    };
-
-    const ask = (question: Question | null, typed = '') => {
+    const ask = (question: Question) => {
         if (thinking) return;
         setTypingId(null); // a new question finishes the reply being typed
-        if (question) setAsked((current) => [...current, question.id]);
-        setMessages((current) => [...current, { id: counter.current++, from: 'you', at: clock(), text: typed || question?.label || '' }]);
+        setAsked((current) => [...current, question.id]);
+        setMessages((current) => [...current, { id: counter.current++, from: 'you', at: clock(), text: question.label }]);
         setThinking(true);
-        pending.current = question;
-        window.setTimeout(() => reply(answerFor(pending.current, typed)), 550 + Math.random() * 400);
-    };
-
-    const submit = (event: React.FormEvent) => {
-        event.preventDefault();
-        const text = draft.trim().slice(0, 200);
-        if (!text || thinking) return;
-        setDraft('');
-        ask(matchQuestion(text, questions), text);
+        window.setTimeout(() => reply(ctx ? question.answer(ctx, site) : { text: 'One second, I am still checking the listings. Please tap the question again in a moment.' }), 450 + Math.random() * 300);
     };
 
     const restart = () => {
@@ -291,7 +273,7 @@ export default function Assistant({ className }: { className?: string }) {
                                     <p className="flex items-center gap-2 text-sm font-semibold">{NAME} <span className="tag !px-1.5 !py-0 text-[9px]">Beta</span></p>
                                     <p className="flex items-center gap-1.5 text-xs text-mute" aria-live="polite">
                                         <span className={cn('h-1.5 w-1.5', busy ? 'animate-pulse bg-accent' : 'bg-mint')} />
-                                        {thinking ? `${NAME} is typing…` : 'Online · answers from live listings'}
+                                        {thinking ? `${NAME} is typing…` : auth.user ? 'Online · private to your account' : 'Online · answers from live listings'}
                                     </p>
                                 </div>
                             </div>
@@ -336,22 +318,22 @@ export default function Assistant({ className }: { className?: string }) {
                         </div>
 
                         <div className="border-t border-line bg-ink-2">
-                            <div className="flex gap-1.5 overflow-x-auto px-3 pb-1 pt-3 [scrollbar-width:none]" aria-label="Suggested questions">
-                                {(remaining.length ? remaining : questions).map((question) => (
-                                    <button key={question.id} type="button" onClick={() => ask(question)} disabled={thinking}
-                                        className="shrink-0 border border-line-2 px-2.5 py-1.5 text-xs text-paper-2 transition hover:border-accent hover:text-accent disabled:opacity-40">
-                                        {question.label}
-                                    </button>
+                            <p className="label px-3 pt-3 text-[10px]" id="usher-questions">{auth.user ? `Just for you, ${auth.user.first_name}` : 'Tap a question'}</p>
+                            <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto overscroll-contain p-3" aria-labelledby="usher-questions">
+                                {(remaining.length ? remaining : questions).map((question, index) => (
+                                    <li key={question.id}>
+                                        <button ref={index === 0 ? firstChip : undefined} type="button" onClick={() => ask(question)} disabled={thinking}
+                                            className="min-h-9 border border-line-2 px-3 py-1.5 text-left text-xs text-paper-2 transition hover:border-paper hover:bg-paper hover:text-ink disabled:opacity-40">
+                                            {question.label}
+                                        </button>
+                                    </li>
                                 ))}
-                            </div>
-                            <form onSubmit={submit} className="flex items-center gap-2 p-3">
-                                <label htmlFor="usher-input" className="sr-only">Ask {NAME} a question</label>
-                                <input ref={input} id="usher-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={200} autoComplete="off"
-                                    placeholder={`Ask ${NAME}: "cheapest seat tonight?"`} className="input min-h-11 flex-1 !py-2 text-sm" />
-                                <button type="submit" disabled={!draft.trim() || thinking} className="grid h-11 w-11 shrink-0 place-items-center bg-volt text-noir transition disabled:opacity-40" aria-label="Send">
-                                    <Icon name="arrow-up" size={18} />
-                                </button>
-                            </form>
+                            </ul>
+                            {!auth.user && (
+                                <p className="border-t border-line px-3 py-2 text-[11px] text-mute">
+                                    <Link href={route('user.login')} onClick={() => setOpen(false)} className="link text-paper-2">Sign in</Link> for your next show, points and film picks.
+                                </p>
+                            )}
                         </div>
                     </motion.section>
                 )}
@@ -367,7 +349,7 @@ export default function Assistant({ className }: { className?: string }) {
                 )}
             </AnimatePresence>
 
-            <motion.button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? 'Close assistant' : `Ask ${NAME}, the assistant`}
+            <motion.button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? 'Close assistant' : teaser ? `Ask ${NAME}, the assistant: 1 new message` : `Ask ${NAME}, the assistant`}
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }}
                 className="relative grid h-14 w-14 place-items-center bg-volt text-noir shadow-2xl shadow-black/50">
                 <AnimatePresence mode="wait" initial={false}>
@@ -376,7 +358,7 @@ export default function Assistant({ className }: { className?: string }) {
                     </motion.span>
                 </AnimatePresence>
                 {!open && <span className="absolute inset-0 animate-ping bg-volt/40 [animation-duration:2.6s]" aria-hidden="true" />}
-                {teaser && !open && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center bg-signal text-[9px] font-bold text-white" aria-hidden="true">1</span>}
+                {teaser && !open && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center bg-signal text-[9px] font-bold text-white after:content-['1']" aria-hidden="true" />}
             </motion.button>
         </div>
     );

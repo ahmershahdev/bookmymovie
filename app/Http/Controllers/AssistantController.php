@@ -13,9 +13,14 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Facts for the on-site assistant. It only answers pre-set questions, so
- * this returns a small, read-only snapshot: nothing a visitor types is ever
- * sent anywhere, and nothing here needs a language model.
+ * Facts for Usher, the on-site assistant.
+ *
+ * Usher only answers its own pre-set questions (there is no free-text box),
+ * so this endpoint takes no input at all and returns a small read-only
+ * snapshot. The public part is shared through the cache; the personal part
+ * (name, points, next show, watchlist, picks from the genres the customer
+ * books) is built per request for the signed-in customer only and is sent
+ * with Cache-Control: private, no-store so no proxy or browser cache keeps it.
  */
 class AssistantController extends Controller
 {
@@ -62,8 +67,11 @@ class AssistantController extends Controller
         return response()->json([
             ...$public,
             'user' => $user ? [
-                'first_name' => strtok($user->name, ' '),
+                'first_name' => strtok((string) $user->name, ' '),
                 'points' => (int) $user->loyalty_points,
+                'bookings' => Booking::query()->where('user_id', $user->id)->where('booking_status', '!=', 'cancelled')->count(),
+                'watchlist' => $this->watchlistOnSale($user->id),
+                'pick' => $this->pickFor($user->id),
                 'next' => $next ? [
                     'film' => $next->show->movie->title,
                     'number' => $next->booking_number,
@@ -73,6 +81,53 @@ class AssistantController extends Controller
                     'paid' => $next->payment_status === 'paid',
                 ] : null,
             ] : null,
-        ]);
+        ])->header('Cache-Control', $user ? 'private, no-store' : 'private, max-age=60');
+    }
+
+    /** Watchlist films that have a show on sale, soonest first (max 3). */
+    private function watchlistOnSale(int $userId): array
+    {
+        return DB::table('wishlists as w')
+            ->join('movies as m', 'm.id', '=', 'w.movie_id')
+            ->join('shows as s', 's.movie_id', '=', 'm.id')
+            ->where('w.user_id', $userId)
+            ->where('s.status', 'scheduled')
+            ->whereRaw('TIMESTAMP(s.show_date, s.show_time) > ?', [now()->toDateTimeString()])
+            ->groupBy('m.id', 'm.title', 'm.slug')
+            ->orderByRaw('MIN(TIMESTAMP(s.show_date, s.show_time))')
+            ->limit(3)
+            ->get(['m.title', 'm.slug', DB::raw('MIN(TIMESTAMP(s.show_date, s.show_time)) AS next_at')])
+            ->map(fn ($row) => ['title' => $row->title, 'slug' => $row->slug, 'when' => Carbon::parse($row->next_at)->format('D j M, g:i A')])
+            ->all();
+    }
+
+    /**
+     * A film now showing in the genre this customer books most, that they
+     * have not booked yet. Falls back to the best rated film they have not seen.
+     */
+    private function pickFor(int $userId): ?array
+    {
+        $seen = DB::table('bookings as b')->join('shows as s', 's.id', '=', 'b.show_id')
+            ->where('b.user_id', $userId)->where('b.booking_status', '!=', 'cancelled')
+            ->distinct()->pluck('s.movie_id');
+
+        $genre = $seen->isEmpty() ? null : DB::table('movie_genres as mg')->join('genres as g', 'g.id', '=', 'mg.genre_id')
+            ->whereIn('mg.movie_id', $seen)
+            ->groupBy('g.id', 'g.name')
+            ->orderByRaw('COUNT(*) DESC')
+            ->first(['g.id', 'g.name']);
+
+        $query = Movie::query()->where('status', 'now_showing')->whereNotIn('id', $seen)
+            ->orderByDesc('average_rating')->orderByDesc('total_reviews');
+
+        $movie = $genre ? (clone $query)->whereHas('genres', fn ($q) => $q->where('genres.id', $genre->id))->first(['id', 'title', 'slug', 'average_rating']) : null;
+        $movie ??= $query->first(['id', 'title', 'slug', 'average_rating']);
+
+        return $movie ? [
+            'title' => $movie->title,
+            'slug' => $movie->slug,
+            'rating' => round((float) $movie->average_rating, 1),
+            'because' => $genre?->name,
+        ] : null;
     }
 }

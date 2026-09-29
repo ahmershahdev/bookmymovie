@@ -4,9 +4,11 @@ namespace App\Jobs;
 
 use App\Support\Notify;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -14,14 +16,33 @@ use Illuminate\Support\Facades\DB;
  * Seats came back on a show (a cancellation or an expired hold): tell the
  * waitlist, first come first served, only as many people as there are
  * seats for. Each person is told once; joining again re-arms it.
+ *
+ * Two atomic cache locks keep it to one run per show: ShouldBeUnique drops
+ * duplicate dispatches while one is queued (the minute sweep and a
+ * cancellation often fire together), and WithoutOverlapping stops two
+ * workers handling the same show at once.
  */
-class ProcessShowWaitlist implements ShouldQueue
+class ProcessShowWaitlist implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
     public int $tries = 3;
 
+    /** Seconds the uniqueness lock lives if a worker dies mid-job. */
+    public int $uniqueFor = 120;
+
     public function __construct(public int $showId) {}
+
+    public function uniqueId(): string
+    {
+        return (string) $this->showId;
+    }
+
+    /** @return list<object> */
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping('show-'.$this->showId))->releaseAfter(10)->expireAfter(120)];
+    }
 
     public function handle(): void
     {
