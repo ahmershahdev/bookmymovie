@@ -410,7 +410,8 @@
 
     /* Forms ------------------------------------------------------------ */
 
-    .field { display: grid; gap: 0.5rem; }
+    /* align-content: start keeps label, input and hint together when a grid row is taller than the field. */
+    .field { display: grid; gap: 0.5rem; align-content: start; }
 
     .field-label {
         font-stretch: 115%;

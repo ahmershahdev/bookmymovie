@@ -1,6 +1,6 @@
 # Contributing to BookMyMovie
 
-Thanks for taking the time to look at the project. BookMyMovie is a finished portfolio project, feature-complete and mainly here to read, run and learn from. The repository may be archived (read-only) at any time. Forks are welcome, and so are the notes below if you want to build on it.
+Thanks for taking the time to look at the project. BookMyMovie is a finished portfolio project, feature-complete and mainly here to read, run and learn from. The repository is archived (read-only) and the site is not hosted; run it locally. Forks are welcome, and so are the notes below if you want to build on it.
 
 > Found a security problem? Do **not** open an issue. Follow [SECURITY.md](SECURITY.md).
 

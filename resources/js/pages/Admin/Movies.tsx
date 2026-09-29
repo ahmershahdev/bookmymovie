@@ -134,7 +134,7 @@ function Section({ step, title, help, children }: { step: number; title: string;
                 <span className="num grid h-8 w-8 shrink-0 place-items-center bg-volt text-sm font-semibold text-noir">{step}</span>
                 <div><h3 className="headline text-2xl">{title}</h3><p className="mt-1 text-xs text-mute">{help}</p></div>
             </div>
-            <div className="grid gap-5 lg:grid-cols-2">{children}</div>
+            <div className="grid items-start gap-5 lg:grid-cols-2">{children}</div>
         </fieldset>
     );
 }

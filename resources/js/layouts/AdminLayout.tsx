@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import ProgressBar from '@/components/shell/ProgressBar';
 import ScrollIndicator from '@/components/shell/ScrollIndicator';
@@ -11,16 +11,16 @@ import { cn, route, useShared } from '@/lib/utils';
 /** Grouped by the job at hand, so the list reads as "what do I need to do?". */
 export const ADMIN_NAV = [
     { group: 'Today', label: 'Overview', hint: 'Sales, shows and alerts at a glance', icon: 'grid', route: 'admin.dashboard', match: '/admin/dashboard', need: 'view' },
-    { group: 'Today', label: 'Bookings & refunds', hint: 'Find a booking, refund it, issue gift cards', icon: 'ticket', route: 'admin.activity', match: '/admin/activity', need: 'view' },
-    { group: 'Catalogue', label: 'Movies & shows', hint: 'Add or edit films, artwork and showtimes', icon: 'film', route: 'admin.movies', match: '/admin/movies', need: 'manage' },
-    { group: 'Catalogue', label: 'Coupons, stock & sales', hint: 'Offers, snack stock, ticket sales on/off', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce', need: 'manage' },
+    { group: 'Today', label: 'Bookings & refunds', hint: 'Refunds, gift cards, audit log', icon: 'ticket', route: 'admin.activity', match: '/admin/activity', need: 'view' },
+    { group: 'Catalogue', label: 'Movies & shows', hint: 'Films, artwork, showtimes', icon: 'film', route: 'admin.movies', match: '/admin/movies', need: 'manage' },
+    { group: 'Catalogue', label: 'Coupons & stock', hint: 'Offers, snacks, ticket sales on/off', icon: 'tag', route: 'admin.commerce', match: '/admin/commerce', need: 'manage' },
     { group: 'Catalogue', label: 'Reviews', hint: 'Approve, hide or flag reviews', icon: 'star', route: 'admin.reviews', match: '/admin/reviews', need: 'view' },
-    { group: 'People', label: 'Members & bans', hint: 'Look up customers, block abuse', icon: 'user', route: 'admin.users', match: '/admin/users', need: 'view' },
+    { group: 'People', label: 'Members & bans', hint: 'Look up customers, stop abuse', icon: 'user', route: 'admin.users', match: '/admin/users', need: 'view' },
     { group: 'People', label: 'Staff & roles', hint: 'Who can use this back office', icon: 'shield', route: 'admin.staff', match: '/admin/staff', need: 'own' },
     { group: 'Reports', label: 'Revenue & occupancy', hint: 'Money and seats filled over time', icon: 'chart', route: 'admin.analytics', match: '/admin/analytics', need: 'view' },
-    { group: 'Settings', label: 'Site & brand', hint: 'Name, logo, contact details, social links', icon: 'settings', route: 'admin.settings', match: '/admin/settings', need: 'own' },
-    { group: 'Settings', label: 'SEO & broadcasts', hint: 'Page titles, ticker, site-wide notices', icon: 'megaphone', route: 'admin.content', match: '/admin/content', need: 'own' },
-    { group: 'Settings', label: 'My security', hint: 'Your password and two-step sign-in', icon: 'lock', route: 'admin.security', match: '/admin/security', need: 'view' },
+    { group: 'Settings', label: 'Site & brand', hint: 'Name, logo, contact, socials', icon: 'settings', route: 'admin.settings', match: '/admin/settings', need: 'own' },
+    { group: 'Settings', label: 'SEO & broadcasts', hint: 'Page titles, ticker, notices', icon: 'megaphone', route: 'admin.content', match: '/admin/content', need: 'own' },
+    { group: 'Settings', label: 'My security', hint: 'Password and two-step sign-in', icon: 'lock', route: 'admin.security', match: '/admin/security', need: 'view' },
 ] as const;
 
 /** Read-only notice for the public demo admin. */
@@ -41,6 +41,12 @@ export function AdminSidebar({ children }: { children?: ReactNode }) {
     const path = url.split('?')[0].split('#')[0];
     const role = auth.adminRole;
     const visible = ADMIN_NAV.filter((item) => item.need === 'view' || (role ? role.can[item.need] : true));
+    const nav = useRef<HTMLElement>(null);
+
+    // The list scrolls on its own; keep the current page in view after each visit.
+    useEffect(() => {
+        nav.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, [path]);
 
     return (
         <aside className="z-20 flex flex-col border-b border-line bg-ink-2 p-4 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:p-5">
@@ -61,7 +67,7 @@ export function AdminSidebar({ children }: { children?: ReactNode }) {
                     </Link>
                 </div>
             )}
-            <nav className="no-scrollbar mt-5 flex gap-1 overflow-x-auto lg:flex-1 lg:flex-col lg:gap-0 lg:overflow-y-auto" data-lenis-prevent aria-label="Admin">
+            <nav ref={nav} className="no-scrollbar mt-5 flex gap-1 overflow-x-auto lg:flex-1 lg:flex-col lg:gap-0 lg:overflow-y-auto" data-lenis-prevent aria-label="Admin">
                 {visible.map((item, index) => {
                     const active = item.match === '/admin/dashboard' ? path === '/admin/dashboard' : path.startsWith(item.match);
                     const firstOfGroup = index === 0 || visible[index - 1].group !== item.group;

@@ -15,15 +15,16 @@ interface Props {
     giftCards: GiftCard[];
 }
 
-const tabs = [['log', 'Audit log', 'shield'], ['refunds', 'Bookings & refunds', 'ticket'], ['gift', 'Gift cards', 'gift']] as const;
+// Same order as the guide: find a booking first, the audit log last.
+const tabs = [['refunds', 'Bookings & refunds', 'ticket'], ['gift', 'Gift cards', 'gift'], ['log', 'Audit log', 'shield']] as const;
 type Tab = (typeof tabs)[number][0];
 
 /** Back office: who changed what, cancellations with refunds, and gift cards. */
 export default function AdminActivity({ logs, bookings, giftCards }: Props) {
-    const [tab, setTab] = useState<Tab>('log');
+    const [tab, setTab] = useState<Tab>('refunds');
 
     return (
-        <AdminLayout label="Back office" title="Bookings & refunds" lede="Every admin and customer action that changes data, cancellations with refunds, and gift cards."
+        <AdminLayout label="Back office" title="Bookings & refunds" lede="Find a booking and refund or cancel it, issue gift cards, and see every change made by staff and customers."
             guide={<Guide id="activity" steps={[
                 ['Find the booking', 'Recent bookings are listed with their number, as printed on the ticket and confirmation email.'],
                 ['Refund or cancel', 'Write a short reason, then press the button. Paid bookings are refunded and cancelled; the seats go back on sale.'],

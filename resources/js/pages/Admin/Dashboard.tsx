@@ -327,6 +327,8 @@ function TrendChart({ series, members }: { series: Day[]; members: number[] }) {
     const lastWeek = values.slice(-7).reduce((sum, value) => sum + value, 0);
     const weekBefore = values.slice(0, 7).reduce((sum, value) => sum + value, 0);
     const change = weekBefore > 0 ? Math.round(((lastWeek - weekBefore) / weekBefore) * 100) : null;
+    const best = values.reduce((top, value, index) => (value > values[top] ? index : top), 0);
+    const quietest = values.reduce((low, value, index) => (value < values[low] ? index : low), 0);
 
     return (
         <Panel title="Two-week trend" info="Switch the metric to compare. The dashed line splits this week from last week."
@@ -341,7 +343,7 @@ function TrendChart({ series, members }: { series: Day[]; members: number[] }) {
                 <p className="display text-4xl">{fmt(total)}</p>
                 {change !== null && <p className={cn('num text-xs', change >= 0 ? 'text-mint' : 'text-signal')}>{change >= 0 ? '▲' : '▼'} {Math.abs(change)}% this week vs last</p>}
             </div>
-            <div className="relative">
+            <div className="relative mb-5 flex flex-1 flex-col justify-center">
                 <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`${metric} per day for 14 days, total ${fmt(total)}`} onMouseLeave={() => setHover(null)}>
                     <defs>
                         <linearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
@@ -380,6 +382,12 @@ function TrendChart({ series, members }: { series: Day[]; members: number[] }) {
                     </div>
                 )}
             </div>
+            {/* Pinned to the bottom so the card never shows a blank block when the column beside it is taller. */}
+            <dl className="mt-auto grid grid-cols-3 gap-px border border-line bg-line pt-px text-center [&>div]:bg-ink-2 [&>div]:px-3 [&>div]:py-4">
+                <div><dt className="label text-[10px]">Daily average</dt><dd className="num mt-1.5 text-sm">{fmt(total / Math.max(1, values.length))}</dd></div>
+                <div><dt className="label text-[10px]">Best day</dt><dd className="num mt-1.5 text-sm">{series[best]?.label ?? '—'} · {fmt(values[best] ?? 0)}</dd></div>
+                <div><dt className="label text-[10px]">Quietest day</dt><dd className="num mt-1.5 text-sm">{series[quietest]?.label ?? '—'} · {fmt(values[quietest] ?? 0)}</dd></div>
+            </dl>
         </Panel>
     );
 }

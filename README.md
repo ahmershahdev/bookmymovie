@@ -31,6 +31,8 @@ BookMyMovie is a full-stack cinema booking platform. Visitors browse films, watc
 
 Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptech DISM project.
 
+> **Status: complete and archived.** BookMyMovie is a finished portfolio project. It isn't hosted anywhere: clone it and run it locally (see [Getting started](#getting-started)). URLs under `bookmymovie.ahmershah.dev` in the SEO files are the configured canonical domain, not a live site.
+
 ![BookMyMovie home page: a full-bleed trailer carousel with the featured film, booking buttons and the next films in the rotation](docs/screenshots/home.webp)
 
 ## Screenshots
@@ -52,6 +54,32 @@ Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptec
   <img src="docs/screenshots/m-seats.webp" width="200" alt="Seat map on a phone">&nbsp;
   <img src="docs/screenshots/m-films.webp" width="200" alt="Catalogue on a phone">
 </p>
+
+### Back office
+
+![Admin overview: grouped sidebar, a "How this page works" guide, and the 14-day revenue with a 3D skyline chart](docs/screenshots/admin-overview.webp)
+
+| | |
+| --- | --- |
+| ![Tonight on every screen: one lane per screen, each show's bar filled by the share of seats sold, with a live now-line](docs/screenshots/admin-timeline.webp) | ![Two-week trend with a metric switch, daily average, best and quietest day, next to the "Needs you" list and setup checklist](docs/screenshots/admin-trend.webp) |
+| **Tonight on every screen**: live occupancy per show | **Trend and "Needs you"**: what to act on first |
+| ![Movies and shows: film list with search and the step-by-step film editor](docs/screenshots/admin-movie-editor.webp) | ![Bookings and refunds: recent bookings with payment and booking status and one-step cancel](docs/screenshots/admin-bookings.webp) |
+| **Movies & shows**: numbered editor sections, one save bar | **Bookings & refunds**: cancel returns seats, coupon, gift card and points |
+| ![Coupons and stock: KPI cards, a new-coupon form with example placeholders and live coupons with usage](docs/screenshots/admin-commerce.webp) | ![Staff and roles: owner, manager and box office roles, a staff table and the add-staff form](docs/screenshots/admin-staff.webp) |
+| **Coupons & stock**: hard use limits, snack stock, sales switch | **Staff & roles**: three roles, two-step status per person |
+| ![Revenue and occupancy: revenue, tickets, average ticket and seats filled for 7, 30 or 90 days](docs/screenshots/admin-analytics.webp) | ![A member's page: profile, spend and points beside the ban form with IP and device blocking](docs/screenshots/admin-member.webp) |
+| **Revenue & occupancy**: 7, 30 or 90 days, or as tables | **Member detail**: bans cover the account, its IPs and devices |
+
+<details>
+<summary><strong>More back-office screens</strong></summary>
+
+![When seats sell heatmap and top films](docs/screenshots/admin-heatmap.webp)
+![Members list with search and status filters](docs/screenshots/admin-members.webp)
+![Review moderation with verified-booking badges](docs/screenshots/admin-reviews.webp)
+![Site and brand settings with logo upload](docs/screenshots/admin-settings.webp)
+![SEO and broadcasts: page titles, descriptions and summaries per page](docs/screenshots/admin-seo.webp)
+
+</details>
 
 <details>
 <summary><strong>Architecture, data model and lifecycle diagrams</strong></summary>
