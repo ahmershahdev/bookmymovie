@@ -33,3 +33,6 @@ Schedule::command('queue:work --stop-when-empty --tries=3 --max-time=50')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
+
+// Keeps a week of upcoming shows on the board once the seeded week has passed.
+Schedule::command('shows:extend')->dailyAt('00:05')->withoutOverlapping();
