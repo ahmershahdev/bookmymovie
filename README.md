@@ -31,7 +31,7 @@ BookMyMovie is a full-stack cinema booking platform. Visitors browse films, watc
 
 Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptech DISM project.
 
-> **Status: complete and archived.** BookMyMovie is a finished portfolio project. It isn't hosted anywhere: clone it and run it locally (see [Getting started](#getting-started)). URLs under `bookmymovie.ahmershah.dev` in the SEO files are the configured canonical domain, not a live site.
+> **Status: complete and archived.** BookMyMovie is a finished portfolio project. It isn't hosted anywhere: clone it and run it locally (see [Getting started](#getting-started)). URLs under `bookmymovie.ahmershah.dev` in the SEO files are the configured canonical domain, not a live site. Final version: [v1.0.0](../../releases/tag/v1.0.0).
 
 ![BookMyMovie home page: a full-bleed trailer carousel with the featured film, booking buttons and the next films in the rotation](docs/screenshots/home.webp)
 
