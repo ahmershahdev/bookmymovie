@@ -427,6 +427,10 @@ Pricing: front rows are cheapest, the centre rows ("Prime Centre") have the best
 ## Project
 
 - Source code (MIT licence): https://github.com/ahmershahdev/bookmymovie
+- Wiki: https://github.com/ahmershahdev/bookmymovie/wiki
+- Project page: https://ahmershah.dev/projects/bookmymovie
+- Case study: https://ahmershah.dev/blogs/bookmymovie-case-study-cinema-ticketing-platform
+- Security write-up (race conditions, IDOR and keys): https://ahmershah.dev/blogs/one-seat-two-buyers-race-conditions-idor-and-keys-in-bookmymovie
 - Author: Syed Ahmer Shah
 - Stack: Laravel 12, PHP 8.2+, MySQL 8 / MariaDB 10.4+, Inertia 2, React 19, TypeScript, Tailwind CSS 4, Three.js
 - Languages: English and Urdu (right-to-left)

@@ -25,6 +25,13 @@
   <a href="public/llms.txt">llms.txt</a>
 </p>
 
+<p align="center">
+  <a href="https://ahmershah.dev/projects/bookmymovie">Project page</a> ·
+  <a href="https://ahmershah.dev/blogs/bookmymovie-case-study-cinema-ticketing-platform">Case study</a> ·
+  <a href="https://ahmershah.dev/blogs/one-seat-two-buyers-race-conditions-idor-and-keys-in-bookmymovie">One seat, two buyers (security write-up)</a> ·
+  <a href="../../wiki">Wiki</a>
+</p>
+
 ---
 
 BookMyMovie is a full-stack cinema booking platform. Visitors browse films, watch trailers, pick seats on a live map (or from inside a 3D model of the hall), add snacks and book. Customers get a signed QR e-ticket that also works offline and can go into Apple or Google Wallet. Box-office staff scan tickets, issue refunds and gift cards, and every change lands in an audit log.
@@ -106,7 +113,8 @@ Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptec
 12. [Film artwork and trailers](#film-artwork-and-trailers)
 13. [Project layout](#project-layout)
 14. [Tests](#tests)
-15. [Licence](#licence)
+15. [Write-ups](#write-ups)
+16. [Licence](#licence)
 
 ## Features
 
@@ -651,6 +659,13 @@ Feature tests cover the booking flow, payments and signed URLs, bans and commerc
 ## Contributing and security
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions and the pull request checklist. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## Write-ups
+
+- [BookMyMovie project page](https://ahmershah.dev/projects/bookmymovie): overview, stack and screenshots on ahmershah.dev.
+- [BookMyMovie case study: building a cinema ticketing platform](https://ahmershah.dev/blogs/bookmymovie-case-study-cinema-ticketing-platform): the product, design and engineering decisions end to end.
+- [One seat, two buyers: race conditions, IDOR and keys in BookMyMovie](https://ahmershah.dev/blogs/one-seat-two-buyers-race-conditions-idor-and-keys-in-bookmymovie): how double-selling, insecure direct object references and key handling were found and fixed.
+- [Project wiki](../../wiki): setup, architecture, booking flow, security and FAQ in short pages.
 
 ## Licence
 

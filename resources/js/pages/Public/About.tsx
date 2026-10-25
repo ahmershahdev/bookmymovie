@@ -12,6 +12,12 @@ const engineering = [
     ['Open to inspection', 'The code is MIT-licensed on GitHub. Cinemas can self-host it; developers can read exactly how a booking is made.'],
 ];
 
+const writeups = [
+    ['Project', 'BookMyMovie on ahmershah.dev', 'https://ahmershah.dev/projects/bookmymovie'],
+    ['Case study', 'Building a cinema ticketing platform', 'https://ahmershah.dev/blogs/bookmymovie-case-study-cinema-ticketing-platform'],
+    ['Security', 'One seat, two buyers: race conditions, IDOR and keys', 'https://ahmershah.dev/blogs/one-seat-two-buyers-race-conditions-idor-and-keys-in-bookmymovie'],
+];
+
 export default function About({ page, stats }: { page: ContentPage; stats: { films: number; cinemas: number; screens: number; seats: number } }) {
     const [lead, ...rest] = page.paragraphs;
 
@@ -93,6 +99,14 @@ export default function About({ page, stats }: { page: ContentPage; stats: { fil
                             </div>
                         </div>
                     </Reveal>
+                    <div className="mt-px grid gap-px bg-line sm:grid-cols-3">
+                        {writeups.map(([label, title, href]) => (
+                            <a key={href} href={href} target="_blank" rel="noopener" className="group flex flex-col justify-between gap-8 bg-ink p-8 transition-colors hover:bg-paper/5">
+                                <span className="label">{label}</span>
+                                <span className="headline flex items-end justify-between gap-4 text-2xl">{title} <Icon name="arrow-up-right" size={22} className="shrink-0 text-accent transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" /></span>
+                            </a>
+                        ))}
+                    </div>
                 </div>
             </section>
         </>

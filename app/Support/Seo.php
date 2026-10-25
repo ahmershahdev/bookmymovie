@@ -84,7 +84,7 @@ class Seo
                 'height' => 512,
             ],
             'email' => $settings['support_email'] ?? 'support@ahmershah.dev',
-            'sameAs' => ['https://ahmershah.dev/', 'https://github.com/ahmershahdev', 'https://github.com/ahmershahdev/bookmymovie', 'https://linkedin.com/in/syedahmershah'],
+            'sameAs' => ['https://ahmershah.dev/', 'https://github.com/ahmershahdev', 'https://github.com/ahmershahdev/bookmymovie', 'https://ahmershah.dev/projects/bookmymovie', 'https://linkedin.com/in/syedahmershah'],
             'founder' => ['@type' => 'Person', 'name' => 'Syed Ahmer Shah', 'url' => 'https://ahmershah.dev/', 'sameAs' => ['https://github.com/ahmershahdev', 'https://linkedin.com/in/syedahmershah']],
             'contactPoint' => [
                 '@type' => 'ContactPoint',
