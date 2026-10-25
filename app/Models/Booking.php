@@ -109,7 +109,7 @@ class Booking extends Model
 
     public function concessions(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->belongsToMany(Concession::class, 'booking_concessions')->withPivot(['quantity', 'unit_price'])->withTimestamps();
+        return $this->belongsToMany(Concession::class, 'booking_concessions')->withPivot(['quantity', 'unit_price'])->withTimestamps('created_at', 'updated_at');
     }
 
     public function giftCard(): \Illuminate\Database\Eloquent\Relations\BelongsTo

@@ -41,9 +41,9 @@ class AdminPortalController extends AdminController
         $users = User::query()
             ->withCount(['bookings', 'reviews'])
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('name', 'like', "%{$q}%")
-                ->orWhere('username', 'like', "%{$q}%")
-                ->orWhere('email', 'like', "%{$q}%")
+                ->where('name', 'like', '%'.addcslashes($q, '\%_').'%')
+                ->orWhere('username', 'like', '%'.addcslashes($q, '\%_').'%')
+                ->orWhere('email', 'like', '%'.addcslashes($q, '\%_').'%')
                 ->orWhere('last_login_ip', $q)))
             ->when(($filters['status'] ?? 'all') === 'banned', fn (Builder $query) => $query->where('is_blocked', true))
             ->when(($filters['status'] ?? 'all') === 'active', fn (Builder $query) => $query->where('is_blocked', false))
@@ -166,7 +166,9 @@ class AdminPortalController extends AdminController
                 BannedIp::query()->updateOrCreate(['ip_address' => $ip], ['reason' => $data['reason'], 'banned_by' => $admin->id, 'user_id' => $user->id, 'expires_at' => $until]);
             }
 
-            $devices = $banDevices ? DB::table('user_devices')->where('user_id', $user->id)->get(['device_hash', 'user_agent']) : collect();
+            // Like the IP list above, never ban the browser the admin is using right now.
+            $devices = $banDevices ? DB::table('user_devices')->where('user_id', $user->id)
+                ->where('device_hash', '<>', DeviceIdentity::hash($request))->get(['device_hash', 'user_agent']) : collect();
             foreach ($devices as $device) {
                 BannedDevice::query()->updateOrCreate(['device_hash' => $device->device_hash], [
                     'reason' => $data['reason'], 'banned_by' => $admin->id, 'user_id' => $user->id,
@@ -278,10 +280,10 @@ class AdminPortalController extends AdminController
         $reviews = Review::query()
             ->with(['user:id,name,username,is_blocked', 'movie:id,title,slug'])
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('review_text', 'like', "%{$q}%")
-                ->orWhere('title', 'like', "%{$q}%")
-                ->orWhereHas('user', fn (Builder $u) => $u->where('username', 'like', "%{$q}%"))
-                ->orWhereHas('movie', fn (Builder $m) => $m->where('title', 'like', "%{$q}%"))))
+                ->where('review_text', 'like', '%'.addcslashes($q, '\%_').'%')
+                ->orWhere('title', 'like', '%'.addcslashes($q, '\%_').'%')
+                ->orWhereHas('user', fn (Builder $u) => $u->where('username', 'like', '%'.addcslashes($q, '\%_').'%'))
+                ->orWhereHas('movie', fn (Builder $m) => $m->where('title', 'like', '%'.addcslashes($q, '\%_').'%'))))
             ->when($state === 'pending', fn (Builder $query) => $query->where('is_approved', false)->where('is_flagged', false))
             ->when($state === 'flagged', fn (Builder $query) => $query->where('is_flagged', true))
             ->when($state === 'hidden', fn (Builder $query) => $query->where('is_approved', false))

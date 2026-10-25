@@ -14,6 +14,7 @@ Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /auth/
 Disallow: /search/
+Disallow: /split/
 Disallow: /*/book/
 Disallow: /*?
 
@@ -22,12 +23,32 @@ User-agent: GPTBot
 Allow: /
 Disallow: /admin/
 Disallow: /account
+Disallow: /cart
+Disallow: /checkout
 Disallow: /payments/
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /auth/
+Disallow: /search/
+Disallow: /split/
+Disallow: /*/book/
+Disallow: /*?
 
 User-agent: ClaudeBot
 Allow: /
 Disallow: /admin/
 Disallow: /account
+Disallow: /cart
+Disallow: /checkout
 Disallow: /payments/
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /auth/
+Disallow: /search/
+Disallow: /split/
+Disallow: /*/book/
+Disallow: /*?
 
 Sitemap: https://bookmymovie.ahmershah.dev/sitemap.xml

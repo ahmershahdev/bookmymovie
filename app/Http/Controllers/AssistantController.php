@@ -81,7 +81,9 @@ class AssistantController extends Controller
                     'paid' => $next->payment_status === 'paid',
                 ] : null,
             ] : null,
-        ])->header('Cache-Control', $user ? 'private, no-store' : 'private, max-age=60');
+        // Never reused from the browser cache: a guest answer cached before signing
+        // in would otherwise hide the member's own facts. The public half is cached server-side.
+        ])->header('Cache-Control', $user ? 'private, no-store' : 'private, no-cache');
     }
 
     /** Watchlist films that have a show on sale, soonest first (max 3). */

@@ -1,9 +1,11 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "ahmershahdev/bookmymovie",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Cinema ticket booking for Pakistan: Laravel 12 + React 19 (Inertia), live and 3D seat maps, QR e-tickets, Urdu and offline PWA.",
+    "keywords": ["laravel", "inertia", "react", "cinema", "ticket-booking"],
+    "homepage": "https://ahmershah.dev/projects/bookmymovie",
+    "authors": [{"name": "Syed Ahmer Shah", "homepage": "https://ahmershah.dev/"}],
     "license": "MIT",
     "require": {
         "php": "^8.2",

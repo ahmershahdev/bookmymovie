@@ -120,7 +120,7 @@ class MovieController extends Controller
             'sorts' => self::SORTS,
             'statusCounts' => Movie::query()->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status'),
         ], [
-            'title' => $label ? $label.' Films in Cinemas | BookMyMovie' : 'Films in Cinemas: Showtimes & Tickets | BookMyMovie',
+            'title' => $label ? $label.' Films in Cinemas | BookMyMovie' : 'Films in Cinemas: Showtimes | BookMyMovie',
             'description' => $fixedGenre
                 ? 'Every '.strtolower($fixedGenre->name).' film playing now or coming soon to BookMyMovie cinemas, with showtimes, ratings and seat prices.'
                 : ($status ? self::STATUSES[$status][1].' at BookMyMovie cinemas: showtimes, ratings and seat prices.' : 'Browse every film in our cinemas this week and what is coming next. Filter by genre, language and rating, then book seats.'),

@@ -38,7 +38,7 @@ BookMyMovie is a full-stack cinema booking platform. Visitors browse films, watc
 
 Built by **[Syed Ahmer Shah](https://ahmershah.dev/)**, originally for the Aptech DISM project.
 
-> **Status: complete and archived.** BookMyMovie is a finished portfolio project. It isn't hosted anywhere: clone it and run it locally (see [Getting started](#getting-started)). URLs under `bookmymovie.ahmershah.dev` in the SEO files are the configured canonical domain, not a live site. Final version: [v1.0.0](../../releases/tag/v1.0.0).
+> **Status: complete.** BookMyMovie is a finished portfolio project. It isn't hosted anywhere: clone it and run it locally (see [Getting started](#getting-started)). URLs under `bookmymovie.ahmershah.dev` in the SEO files are the configured canonical domain, not a live site. Latest release: [v1.0.2](../../releases/tag/v1.0.2).
 
 ![BookMyMovie home page: a full-bleed trailer carousel with the featured film, booking buttons and the next films in the rotation](docs/screenshots/home.webp)
 
@@ -521,7 +521,7 @@ Requests pass through five cache layers, from closest to the user to closest to 
 | --- | --- | --- |
 | **1. Browser / CDN (HTTP)** | Vite assets (`/build/assets`), fonts | `max-age=31536000, immutable`: file names change on every build |
 | | Film art, trailers (`/images/movies`, `/videos/trailers`) | 30 days plus a week of `stale-while-revalidate` (`public/.htaccess`) |
-| | HTML and JSON | Never shared (live seat counts, session cookies); `/assistant/context` is `private, no-store` when signed in and `private, max-age=60` for guests |
+| | HTML and JSON | Never shared (live seat counts, session cookies); `/assistant/context` is `private, no-store` when signed in and `private, no-cache` for guests |
 | **2. Service worker** | App shell, build assets, icons | Cache-first (`bmm-shell-v3`, `bmm-assets`) |
 | | Film art, share images, trailer stills | Stale-while-revalidate, capped at 120 entries (`bmm-media`) |
 | | Booking pages | Network-first with offline fallback; wiped on sign-out (`bmm-tickets`) |
@@ -549,7 +549,7 @@ Use `CACHE_STORE=redis` (and `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis`) i
 
 ## Getting started
 
-**Requirements:** PHP 8.2+ with `gd`, `intl`, `pdo_mysql` and `openssl`; Composer 2; Node 20+; MySQL 8 or MariaDB 10.4+.
+**Requirements:** PHP 8.2+ with `gd`, `intl`, `pdo_mysql` and `openssl`; Composer 2; Node 20.19+ or 22.12+; MySQL 8 or MariaDB 10.4+.
 
 ```bash
 git clone https://github.com/ahmershahdev/bookmymovie.git
@@ -654,7 +654,18 @@ public/llms.txt           Summary for AI assistants; llms-full.txt is generated
 php artisan test
 ```
 
-Feature tests cover the booking flow, payments and signed URLs, bans and commerce rules, community features, group bookings, waitlists and admin roles.
+Feature tests cover the booking flow, payments and signed URLs, bans and commerce rules, community features, group bookings, waitlists and admin roles, snacks with gift cards and points, SEO limits and the Usher assistant.
+
+### Docker
+
+A production-style stack (Apache + PHP 8.3, MySQL 8.4, Redis, a queue worker and the scheduler) ships in `Dockerfile` and `compose.yaml`:
+
+```bash
+cp deploy/docker/app.env.example deploy/docker/app.env   # then set APP_KEY
+docker compose up -d --build                             # http://localhost:8080
+```
+
+It was load-tested with 15 simulated people (browsers, eight buyers racing for one seat, and three staff roles), an admin feature sweep and a security probe. Results and the bugs they found are on the [Testing wiki page](../../wiki/Testing).
 
 ## Contributing and security
 

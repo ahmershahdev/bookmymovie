@@ -65,7 +65,7 @@ class CinemaController extends Controller
                 'cities' => $cinemas->pluck('city')->unique()->count(),
             ],
         ], [
-            'title' => 'Cinemas in Karachi, Lahore & Islamabad | BookMyMovie',
+            'title' => 'Cinemas: Karachi, Lahore, Islamabad | BookMyMovie',
             'description' => 'Six partner cinemas across four cities with IMAX, Dolby Cinema, 4DX, ScreenX and recliner screens. Find showtimes by venue.',
             'schema' => [[
                 '@type' => 'ItemList',

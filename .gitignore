@@ -29,3 +29,6 @@ Thumbs.db
 /*.mp4
 /*.mov
 /*.ico
+
+# Docker secrets
+/deploy/docker/app.env

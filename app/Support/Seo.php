@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
  */
 class Seo
 {
-    public const TITLE_MAX = 60;
+    public const TITLE_MAX = 50;
 
     public const DESCRIPTION_MAX = 150;
 
@@ -42,8 +42,19 @@ class Seo
         return rtrim($cut, " ,;:.-–—|").'…';
     }
 
+    /**
+     * Titles over the limit lose their trailing " | …" or ": …" segment first
+     * ("Kestrel | Showtimes & Tickets" -> "Kestrel"), so a long film or cinema
+     * name keeps its words instead of ending in an ellipsis.
+     */
     public static function title(?string $title): string
     {
+        $title = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $title)) ?? '');
+
+        while (mb_strlen($title) > self::TITLE_MAX && preg_match('/^(.+)(?: \| |: )[^|:]+$/u', $title, $match)) {
+            $title = $match[1];
+        }
+
         return self::clip($title, self::TITLE_MAX);
     }
 

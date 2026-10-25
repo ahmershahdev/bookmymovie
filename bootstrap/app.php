@@ -70,6 +70,15 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return Inertia::render('Error', ['status' => $status])
+                ->withViewData(['seo' => [
+                    'robots' => 'noindex, nofollow',
+                    'title' => match ($status) {
+                        403 => 'Access denied | BookMyMovie',
+                        404 => 'Page not found | BookMyMovie',
+                        429 => 'Too many requests | BookMyMovie',
+                        default => 'Something went wrong | BookMyMovie',
+                    },
+                ]])
                 ->toResponse($request)
                 ->setStatusCode($status);
         });

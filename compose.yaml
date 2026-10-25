@@ -1,0 +1,53 @@
+name: bookmymovie
+
+x-app: &app
+  build: .
+  image: bookmymovie:local
+  env_file: deploy/docker/app.env
+  depends_on:
+    mysql: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  volumes:
+    - storage:/var/www/html/storage/app
+
+services:
+  app:
+    <<: *app
+    environment: { CONTAINER_ROLE: app }
+    ports: ["8080:80"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/up"]
+      interval: 10s
+      retries: 6
+      start_period: 15m
+  worker:
+    <<: *app
+    environment: { CONTAINER_ROLE: worker }
+    depends_on: { app: { condition: service_healthy } }
+  scheduler:
+    <<: *app
+    environment: { CONTAINER_ROLE: scheduler }
+    depends_on: { app: { condition: service_healthy } }
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: bookmymovie
+      MYSQL_USER: bookmymovie
+      MYSQL_PASSWORD: bookmymovie
+      MYSQL_ROOT_PASSWORD: root
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes: [mysql:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      retries: 30
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  mysql:
+  storage:

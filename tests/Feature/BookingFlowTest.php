@@ -204,4 +204,60 @@ class BookingFlowTest extends TestCase
         $this->actingAs($this->customer())->get(route('user.booking.show', $booking->booking_number))->assertNotFound();
         $this->actingAs($this->customer())->post(route('user.booking.cancel', $booking->booking_number))->assertNotFound();
     }
+
+    public function test_a_booking_with_snacks_opens_and_can_be_cancelled_without_a_reason(): void
+    {
+        $user = $this->customer();
+        [$show, $seats] = $this->bookableShow(1);
+        $snack = \App\Models\Concession::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs($user)->post('/cart', ['show_id' => $show->id, 'seats' => $seats]);
+        $this->checkout($user, ['addons' => [$snack->id => 2]])->assertSessionHasNoErrors();
+        $booking = Booking::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+
+        // The snacks pivot once looked for bookings' "booked_at" timestamp name.
+        $this->assertSame(2, (int) $booking->concessions()->firstOrFail()->pivot->quantity);
+        $this->actingAs($user)->get(route('user.booking.show', $booking->booking_number))->assertOk();
+
+        $this->actingAs($user)->post(route('user.booking.cancel', $booking->booking_number))
+            ->assertRedirect(route('user.booking.show', $booking->booking_number));
+        $this->assertSame('cancelled', $booking->fresh()->booking_status);
+    }
+
+    public function test_a_double_tapped_confirm_lands_on_the_booking_it_already_made(): void
+    {
+        $user = $this->customer();
+        [$show, $seats] = $this->bookableShow(1);
+        $key = (string) Str::uuid();
+
+        $this->actingAs($user)->post('/cart', ['show_id' => $show->id, 'seats' => $seats]);
+        $first = $this->checkout($user, ['idempotency_key' => $key]);
+        $second = $this->checkout($user, ['idempotency_key' => $key]);
+
+        $number = Booking::query()->where('idempotency_key', $key)->value('booking_number');
+        $first->assertRedirect(route('user.booking.show', $number));
+        $second->assertRedirect(route('user.booking.show', $number));
+    }
+
+    public function test_snacks_a_gift_card_and_points_can_pay_together(): void
+    {
+        $user = $this->customer();
+        $user->forceFill(['loyalty_points' => 50])->save();
+        [$show, $seats] = $this->bookableShow(1);
+        $snack = \App\Models\Concession::query()->where('is_active', true)->firstOrFail();
+        $card = \App\Models\GiftCard::query()->create(['code' => 'QA-GIFT-0001', 'initial_balance' => 100, 'balance' => 100, 'is_active' => true, 'expires_at' => now()->addYear()]);
+
+        $this->actingAs($user)->post('/cart', ['show_id' => $show->id, 'seats' => $seats]);
+        $this->checkout($user, ['addons' => [$snack->id => 1], 'gift_card_code' => $card->code, 'use_points' => '1'])->assertSessionHasNoErrors();
+
+        $booking = Booking::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+        $this->assertEqualsWithDelta(100.0, (float) $booking->gift_card_amount, 0.001);
+        $this->assertSame(50, (int) $booking->points_redeemed);
+        $this->assertEqualsWithDelta(
+            (float) $booking->subtotal - (float) $booking->discount_amount + (float) $booking->addons_total - 100 - 50,
+            (float) $booking->total_amount,
+            0.001,
+        );
+        $this->assertEqualsWithDelta(0.0, (float) $card->fresh()->balance, 0.001);
+    }
 }

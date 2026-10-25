@@ -15,7 +15,7 @@ Thanks for taking the time to look at the project. BookMyMovie is a finished por
 
 ## Local setup
 
-**Requirements:** PHP 8.2+ (`gd`, `intl`, `pdo_mysql`, `openssl`), Composer 2, Node 20+, MySQL 8 or MariaDB 10.4+.
+**Requirements:** PHP 8.2+ (`gd`, `intl`, `pdo_mysql`, `openssl`), Composer 2, Node 20.19+ or 22.12+, MySQL 8 or MariaDB 10.4+.
 
 ```bash
 git clone https://github.com/ahmershahdev/bookmymovie.git

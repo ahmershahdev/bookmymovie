@@ -272,7 +272,7 @@ class AccountController extends Controller
                 return 'not-cancellable';
             }
 
-            BookingLifecycle::unwind($booking, 'user', Auth::id(), $data['reason'] ?: 'Cancelled by customer');
+            BookingLifecycle::unwind($booking, 'user', Auth::id(), ($data['reason'] ?? null) ?: 'Cancelled by customer');
 
             return $booking;
         }, 3);
@@ -782,8 +782,15 @@ class AccountController extends Controller
 
             return redirect()->route('user.cart')->withErrors(['cart' => 'One or more of your seats was just booked by someone else. Please choose again.']);
         } catch (\RuntimeException $exception) {
+            // A double-tapped Confirm: the twin waited on the user lock and found
+            // the cart already turned into this key's booking.
+            if ($exception->getMessage() === 'cart-empty'
+                && $existing = Booking::query()->where('idempotency_key', $data['idempotency_key'])->where('user_id', $user->id)->first()) {
+                return redirect()->route('user.booking.show', $existing->booking_number);
+            }
+
             $message = match ($exception->getMessage()) {
-                'cart-empty' => 'Your seat hold expired before checkout finished. Please select your seats again.',
+                'cart-empty' =>'Your seat hold expired before checkout finished. Please select your seats again.',
                 'show-unavailable' => 'This show has started or is no longer on sale.',
                 'cart-limit' => 'You can book up to '.$maxSeats.' seats at once.',
                 'mixed-show' => 'Please check out one show at a time.',

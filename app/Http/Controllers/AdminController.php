@@ -298,8 +298,8 @@ class AdminController extends Controller
     private function storeMovie(Request $request, Admin $admin): RedirectResponse
     {
         $data = $this->validatedMovieData($request);
-        $data['slug'] = $data['slug'] ?: Str::slug($data['title']);
-        $data['description'] = $data['description'] ?: 'Added from admin dashboard.';
+        $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['title']);
+        $data['description'] = ($data['description'] ?? null) ?: 'Added from admin dashboard.';
         $data['created_by'] = $admin->id;
 
         foreach (['poster_image' => 'poster_upload', 'hero_image' => 'hero_upload'] as $column => $field) {
@@ -323,7 +323,7 @@ class AdminController extends Controller
         $movie = Movie::findOrFail($request->integer('movie_id'));
 
         $data = $this->validatedMovieData($request, $movie);
-        $data['slug'] = $data['slug'] ?: Str::slug($data['title']);
+        $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['title']);
 
         foreach (['poster_image', 'hero_image'] as $column) {
             if ($request->boolean("delete_{$column}")) {

@@ -98,4 +98,18 @@ class CommunityAndAdminTest extends TestCase
         $this->actingAs($voter)->postJson(route('reviews.helpful', $review->id))->assertJson(['voted' => false, 'helpful' => $before]);
         $this->assertSame(0, DB::table('review_votes')->where('review_id', $review->id)->where('user_id', $voter->id)->count());
     }
+
+    public function test_an_admin_can_issue_a_gift_card_without_a_recipient(): void
+    {
+        $admin = Admin::query()->where('is_demo', false)->firstOrFail();
+
+        $this->withSession(['admin_id' => $admin->id, 'admin_authenticated_at' => now()->timestamp])
+            ->post(route('admin.gift-cards.store'), ['amount' => 1500, 'months' => 12])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $card = \App\Models\GiftCard::query()->latest('id')->firstOrFail();
+        $this->assertNull($card->recipient_email);
+        $this->assertEqualsWithDelta(1500.0, (float) $card->balance, 0.001);
+    }
 }

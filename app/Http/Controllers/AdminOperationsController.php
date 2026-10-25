@@ -139,7 +139,7 @@ class AdminOperationsController extends AdminController
             'code' => $code,
             'initial_balance' => $data['amount'],
             'balance' => $data['amount'],
-            'recipient_email' => $data['recipient_email'] ? strtolower($data['recipient_email']) : null,
+            'recipient_email' => isset($data['recipient_email']) ? strtolower($data['recipient_email']) : null,
             'message' => $data['message'] ?? null,
             'expires_at' => now()->addMonths((int) $data['months']),
             'is_active' => true,
